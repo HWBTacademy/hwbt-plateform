@@ -348,6 +348,7 @@ body{min-width:0}
       <div class="nav-item" data-page="communication" onclick="setUI({page:'communication'})" style="display: none;"><span class="nav-icon">◌</span>COMMUNICATION</div>
       <div class="nav-item" data-page="exercises" onclick="setUI({page:'exercises'})" style="display: none;"><span class="nav-icon">▤</span>EXERCISES</div>
       <div class="nav-item" data-page="test" onclick="setUI({page:'test'})" style="display: flex;"><span class="nav-icon">◎</span>PERSONALITY TEST</div>
+      <div class="nav-item" data-page="nutrition" onclick="setUI({page:'nutrition'})" style="display: none;"><span class="nav-icon">◍</span>NUTRITION</div>
     </div>
     <div class="sidebar-footer">
       <div class="lang-switcher">
@@ -2334,7 +2335,7 @@ function setLang(lang){
   render();
 }
 function updateChromeText(){
-  const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',test:'TEST PERSONNALITÉ'};
+  const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
   document.querySelectorAll('.nav-item').forEach(n=>{
     const icon=n.querySelector('.nav-icon')?.textContent||'';
     const label=navNames[n.dataset.page]||n.dataset.page;
@@ -2366,11 +2367,11 @@ function render(){
   document.getElementById('roleTag').textContent=tr(STATE.role==='coach'?'COACH':'JOUEUR');
   const nav=document.querySelectorAll('.nav-item');
   nav.forEach(n=>{
-    const coachOnly=['profiles','exercises','aspectsLibrary','communication'].includes(n.dataset.page);
+    const coachOnly=['profiles','exercises','aspectsLibrary','communication','nutrition'].includes(n.dataset.page);
     n.style.display=STATE.role==='player'&&coachOnly?'none':'flex';
     n.classList.toggle('active',n.dataset.page===UI.page);
   });
-  const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',test:'TEST PERSONNALITÉ'};
+  const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
   document.getElementById('pageTitle').textContent=tr(STATE.role==='player'&&UI.page==='dashboard'?'MON CARNET JOUEUR':(titles[UI.page]||UI.page.toUpperCase()));
   const mc=document.getElementById('mainContent');
   if(UI.page==='dashboard') mc.innerHTML=STATE.role==='player'?pagePlayerPortal():pageDashboard();
@@ -2382,6 +2383,7 @@ function render(){
   else if(UI.page==='aspectsLibrary') mc.innerHTML=pageAspectsLibrary();
   else if(UI.page==='communication') mc.innerHTML=pageCommunicationChapter();
   else if(UI.page==='test') mc.innerHTML=pageTest();
+  else if(UI.page==='nutrition') mc.innerHTML=pageNutrition();
   translateDom(mc);
   saveState();
 }
@@ -2825,7 +2827,8 @@ function pagePlayerDetail(playerId){
   const sub=UI.subpage||'profil';
   const c1=pr?ENERGY_COLORS[pr.c1]:'#A67C52';
   const c2=pr?ENERGY_COLORS[pr.c2]:'#666';
-  const tabs=['profil','aspects','communication','matchs'];
+  const tabs=['profil','analyse','aspects','communication','matchs'];
+  const tabLabels={profil:'PROFIL',analyse:'PROFILS & ANALYSE',aspects:'ASPECTS',communication:'COMMUNICATION',matchs:'MATCHS'};
 
   const heroSection=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px">
     <div style="height:4px;background:linear-gradient(90deg,${c1},${c2})"></div>
@@ -2865,7 +2868,7 @@ function pagePlayerDetail(playerId){
   </div>`;
 
   const tabBar=`<div class="tabs" style="margin-bottom:18px">
-    ${tabs.map(t=>`<button class="tab ${sub===t?'active':''}" onclick="setUI({subpage:'${t}'})">${t.toUpperCase()}</button>`).join('')}
+    ${tabs.map(t=>`<button class="tab ${sub===t?'active':''}" onclick="setUI({subpage:'${t}'})">${tabLabels[t]}</button>`).join('')}
     ${STATE.role==='coach'?`<button class="btn btn-ghost btn-sm" onclick="openModal('editPlayer',${player.id})" style="margin-left:auto">MODIFIER</button>
     <button class="btn btn-ghost btn-sm" onclick="startTest(${player.id})">REFAIRE TEST</button>
     <button class="btn btn-primary btn-sm" onclick="openModal('newSession',${player.id})">+ SÉANCE</button>
@@ -2917,6 +2920,41 @@ function pagePlayerDetail(playerId){
         <button class="btn btn-primary" onclick="startTest(${player.id})">COMMENCER LE TEST DE PERSONNALITÉ</button>
       </div>`;
     }
+  }
+
+  if(sub==='analyse'){
+    const deep=pr?profileDeepRead(pr):null;
+    content=`<div class="g2">
+      <div>
+        <div class="card" style="border-color:${pr?c1+'55':'var(--bronze-dim2)'}">
+          <div class="card-title">PROFIL & ANALYSE DU JOUEUR</div>
+          ${pr?`<div style="font-size:26px;font-weight:800;line-height:1.05;margin-bottom:8px">${esc(pr.name)}</div>
+            <div style="font-size:12px;color:var(--bronze);font-weight:700;margin-bottom:12px">${esc(pr.sub||'')}</div>
+            <div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.8"><p>${esc(deep.story)}</p><p>${esc(deep.work)}</p></div>
+            <div class="divider"></div>
+            <div class="card-title">POINTS CLÉS</div>
+            ${pr.strengths.slice(0,3).map(s=>`<div class="strength"><span class="plus">+</span>${esc(s)}</div>`).join('')}
+            ${pr.workAxes.slice(0,3).map(s=>`<div class="strength"><span style="color:#e74c3c;font-weight:700">→</span>${esc(s)}</div>`).join('')}`:
+            `<div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.8;margin-bottom:14px">Ce joueur n’a pas encore de profil mental. Lance le test pour obtenir son analyse et ses repères de communication.</div><button class="btn btn-primary" onclick="startTest(${player.id})">COMMENCER LE TEST</button>`}
+        </div>
+        <div class="card">
+          <div class="card-title">COMMUNICATION DIRECTE</div>
+          ${pr?`<div style="font-size:9px;letter-spacing:1.5px;color:var(--bronze);margin-bottom:6px">SOUS PRESSION</div><div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.7;background:var(--bg4);border-radius:6px;padding:12px">${esc(pr.commPressure||'—')}</div><div style="margin-top:12px"><button class="btn btn-ghost btn-sm" onclick="setUI({subpage:'communication'})">OUVRIR COMMUNICATION JOUEUR</button></div>`:
+          `<div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7">La communication personnalisée apparaît après le test.</div>`}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">LES 12 PROFILS HWBT</div>
+        <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-bottom:12px">Vue rapide de la boussole complète. Clique pour ouvrir la fiche complète d’un profil.</div>
+        <div style="display:grid;gap:8px">
+          ${PROFILES.map(pf=>{const pc1=ENERGY_COLORS[pf.c1],pc2=ENERGY_COLORS[pf.c2];return `<button type="button" onclick="setUI({page:'profiles',selectedProfileId:${pf.id}})" style="display:flex;align-items:center;gap:10px;text-align:left;background:${player.profileId===pf.id?pc1+'22':'var(--bg4)'};border:1px solid ${player.profileId===pf.id?pc1+'88':'var(--border)'};border-radius:7px;padding:10px;color:var(--offwhite);cursor:pointer">
+            <div style="width:30px;height:30px;border-radius:5px;background:linear-gradient(135deg,${pc1}44,${pc2}33);display:flex;align-items:center;justify-content:center;color:${pc1};font-weight:800;font-size:11px">${String(pf.id).padStart(2,'0')}</div>
+            <div style="flex:1"><div style="font-size:12px;font-weight:800">${esc(pf.name)}</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body)">${esc(pf.sub||'')}</div></div>
+            ${player.profileId===pf.id?`<span style="font-size:8px;color:${pc1};letter-spacing:1px">JOUEUR</span>`:''}
+          </button>`}).join('')}
+        </div>
+      </div>
+    </div>`;
   }
 
   if(sub==='aspects'){
@@ -3465,6 +3503,42 @@ function pageCommunicationChapter(){
           ].map(([label,text])=>`<div style="border-top:1px solid var(--border);padding:10px 0"><div style="font-size:9px;letter-spacing:1.4px;color:var(--bronze);margin-bottom:5px">${label}</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.6">${esc(text||'—')}</div></div>`).join('')}
         </div>`;
       }).join('')}
+    </div>
+  </div>`;
+}
+
+function pageNutrition(){
+  const cards=[
+    {title:'AVANT SÉANCE',tag:'2H À 3H AVANT',items:['Repas simple: féculent + protéine légère + aliments digestes.','Éviter les repas trop gras ou trop lourds.','Boire régulièrement avant d’arriver sur le terrain.'],color:'var(--bronze)'},
+    {title:'JUSTE AVANT',tag:'30 À 45 MIN',items:['Petite collation si besoin: banane, compote ou barre simple.','Quelques gorgées d’eau, pas une grande quantité d’un coup.','Objectif: énergie stable, ventre léger.'],color:'var(--jaune)'},
+    {title:'PENDANT',tag:'SÉANCE / MATCH',items:['Boire par petites gorgées à chaque pause.','Si séance longue: électrolytes ou snack facile à digérer.','Observer baisse d’énergie, crampes ou concentration qui chute.'],color:'var(--bleu)'},
+    {title:'APRÈS',tag:'RÉCUPÉRATION',items:['Boire dans l’heure qui suit.','Repas de récupération: protéine + glucides + hydratation.','Sommeil et récupération comptent autant que la séance.'],color:'var(--vert)'}
+  ];
+  const quick=['Arriver hydraté','Avoir une gourde','Éviter boisson trop sucrée avant effort','Prévoir snack tournoi','Manger simple les jours de match','Noter les réactions du joueur'];
+  return `<div class="content">${quoteBand()}
+    <div class="card" style="border-color:var(--bronze-dim2)">
+      <div class="card-title">NUTRITION HWBT</div>
+      <div style="font-size:28px;font-weight:800;letter-spacing:1px;line-height:1.05;margin-bottom:10px">ÉNERGIE, HYDRATATION, RÉCUPÉRATION</div>
+      <div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7;max-width:820px">Rubrique coach pour garder des repères simples. Le but n’est pas de faire un plan médical, mais d’aider le joueur à arriver avec de l’énergie, rester lucide pendant l’effort et récupérer correctement.</div>
+    </div>
+    <div class="g4">
+      ${cards.map(c=>`<div class="card" style="border-color:${c.color}55">
+        <div style="font-size:9px;letter-spacing:1.5px;color:${c.color};margin-bottom:8px">${c.tag}</div>
+        <div style="font-size:17px;font-weight:800;margin-bottom:12px">${c.title}</div>
+        ${c.items.map(it=>`<div class="strength"><span class="plus" style="color:${c.color}">+</span>${esc(it)}</div>`).join('')}
+      </div>`).join('')}
+    </div>
+    <div class="g2">
+      <div class="card">
+        <div class="card-title">CHECKLIST COACH</div>
+        ${quick.map(q=>`<label class="session-player-choice" style="margin-bottom:8px"><input type="checkbox"><span><span class="session-player-name">${esc(q)}</span><span class="session-player-meta">Repère simple à contrôler</span></span></label>`).join('')}
+      </div>
+      <div class="card">
+        <div class="card-title">NOTES À OBSERVER CHEZ LE JOUEUR</div>
+        <div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.8">Observe surtout les signes simples: baisse de concentration, jambes lourdes, crampes, nervosité, récupération lente entre les points ou gros changement d’énergie pendant la séance.</div>
+        <div class="divider"></div>
+        <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.7">Plus tard, on pourra relier cette rubrique à la fiche joueur: habitudes avant match, collation préférée, allergies, hydratation et ressenti énergie.</div>
+      </div>
     </div>
   </div>`;
 }
