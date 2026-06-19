@@ -3548,7 +3548,7 @@ function pageShop(){
     {name:'T-shirt Hard Work Beats Talent',type:'T-SHIRT',price:'15 €',img:'assets/shop/tshirt-hard-work.jpg',desc:'Logo HWBT Padel Academy devant, slogan Hard Work Beats Talent au dos.',tags:['NOIR','15 €','ACADEMY']},
     {name:'T-shirt Control First Then Attack',type:'T-SHIRT',price:'15 €',img:'assets/shop/tshirt-control-first.jpg',desc:'Version contrôle et attaque. Design noir, blanc et or, style compétition.',tags:['NOIR','15 €','TACTIQUE']},
     {name:'T-shirt Train Hard Play Smart',type:'T-SHIRT',price:'15 €',img:'assets/shop/tshirt-train-hard.jpg',desc:'Version entraînement intelligent. Pour séance, tournoi ou team academy.',tags:['NOIR','15 €','TRAINING']},
-    {name:'Hoodie HWBT Academy',type:'HOODIE',price:'25 €',img:'assets/shop/hoodie-hwbt.jpg',desc:'Hoodie noir HWBT Academy. Logo devant et marquage academy au dos.',tags:['NOIR','25 €','HOODIE']}
+    {name:'Hoodie HWBT Academy',type:'HOODIE',price:'25 €',img:'assets/shop/hoodie-hwbt-dark.jpg',desc:'Hoodie noir HWBT Academy. Logo devant et marquage academy au dos.',tags:['NOIR','25 €','HOODIE']}
   ];
   return `<div class="content">
     ${quoteBand()}
@@ -3565,7 +3565,7 @@ function pageShop(){
     </div>
     <div class="g4">
       ${products.map(p=>`<div class="card" style="padding:0;overflow:hidden;border-color:var(--bronze-dim2);display:flex;flex-direction:column">
-        <div style="height:230px;background:url('${p.img}') center/cover;border-bottom:1px solid var(--border);position:relative">
+        <div style="height:230px;background:linear-gradient(135deg,#161417,#252025);background-image:url('${p.img}');background-position:center;background-size:contain;background-repeat:no-repeat;border-bottom:1px solid var(--border);position:relative">
           <div style="position:absolute;left:12px;top:12px;background:#000c;border:1px solid var(--bronze-dim2);border-radius:4px;padding:5px 8px;font-size:9px;letter-spacing:1.5px;color:var(--bronze)">${p.type}</div>
           <div style="position:absolute;right:12px;bottom:12px;background:var(--bronze);color:var(--white);border-radius:4px;padding:8px 10px;font-size:20px;font-weight:800;line-height:1">${p.price}</div>
         </div>
