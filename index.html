@@ -3559,51 +3559,12 @@ function pageNutrition(){
 
 function pageShop(){
   const products=[
-    {name:'T-shirt HWBT Academy',type:'T-SHIRT',price:'15 €',desc:'T-shirt academy avec logo devant et slogan Hard Work Beats Talent au dos.',tags:['15 €','S À XXL','4 COULEURS'],variants:[
-      {label:'Noir',color:'#111',img:'assets/shop/tshirt-black.jpg'},
-      {label:'Bleu',color:'#8dbdc0',img:'assets/shop/tshirt-blue.jpg'},
-      {label:'Lavande',color:'#a9acd3',img:'assets/shop/tshirt-lavender.jpg'},
-      {label:'Mint',color:'#dce8d0',img:'assets/shop/tshirt-mint.jpg'}
-    ]},
-    {name:'Hoodie HWBT Academy',type:'HOODIE',price:'25 €',desc:'Hoodie academy avec logo devant, marquage dos et finition team HWBT.',tags:['25 €','S À XXL','4 COULEURS'],variants:[
-      {label:'Noir',color:'#111',img:'assets/shop/hoodie-black.jpg'},
-      {label:'Bleu',color:'#8dbdc0',img:'assets/shop/hoodie-blue.jpg'},
-      {label:'Lavande',color:'#a9acd3',img:'assets/shop/hoodie-lavender.jpg'},
-      {label:'Mint',color:'#dce8d0',img:'assets/shop/hoodie-mint.jpg'}
-    ]},
-    {name:'BeStride Perform Black',type:'CHAUSSETTES',price:'15 €',desc:'Chaussettes sport noires avec zones anti-glisse, renforts, maintien et confort pour l’effort.',tags:['15 €','35-38 À 46-50','ANTI-GLISSE'],link:'https://bestride.be/products/be-stride-perform',variants:[
-      {label:'Noir',color:'#111',img:'assets/shop/bestride-perform-black.jpg'}
-    ]}
+    {name:'T-shirt Hard Work Beats Talent',type:'T-SHIRT',price:'15 €',img:'assets/shop/tshirt-hard-work.jpg',desc:'Logo HWBT Padel Academy devant, slogan Hard Work Beats Talent au dos.',tags:['NOIR','15 €','ACADEMY']},
+    {name:'T-shirt Control First Then Attack',type:'T-SHIRT',price:'15 €',img:'assets/shop/tshirt-control-first.jpg',desc:'Version contrôle et attaque. Design noir, blanc et or, style compétition.',tags:['NOIR','15 €','TACTIQUE']},
+    {name:'T-shirt Train Hard Play Smart',type:'T-SHIRT',price:'15 €',img:'assets/shop/tshirt-train-hard.jpg',desc:'Version entraînement intelligent. Pour séance, tournoi ou team academy.',tags:['NOIR','15 €','TRAINING']},
+    {name:'Hoodie HWBT Academy',type:'HOODIE',price:'25 €',img:'assets/shop/hoodie-hwbt-dark.jpg',desc:'Hoodie noir HWBT Academy. Logo devant et marquage academy au dos.',tags:['NOIR','25 €','HOODIE']},
+    {name:'BeStride Perform Black',type:'CHAUSSETTES',price:'15 €',img:'assets/shop/bestride-perform-black.jpg',desc:'Chaussettes sport noires avec zones anti-glisse, renforts, maintien et confort pour l’effort.',tags:['NOIR','15 €','ANTI-GLISSE','S À XL'],link:'https://bestride.be/products/be-stride-perform'}
   ];
-  const productCard=p=>`<div class="card" style="padding:0;overflow:hidden;border-color:var(--bronze-dim2);display:flex;flex-direction:column">
-    <div style="height:280px;background:linear-gradient(135deg,#151316,#262126);background-image:url('${p.variants[0].img}');background-position:center;background-size:contain;background-repeat:no-repeat;border-bottom:1px solid var(--border);position:relative">
-      <div style="position:absolute;left:12px;top:12px;background:#000c;border:1px solid var(--bronze-dim2);border-radius:4px;padding:5px 8px;font-size:9px;letter-spacing:1.5px;color:var(--bronze)">${p.type}</div>
-      <div style="position:absolute;right:12px;bottom:12px;background:var(--bronze);color:var(--white);border-radius:4px;padding:8px 10px;font-size:20px;font-weight:800;line-height:1">${p.price}</div>
-    </div>
-    <div style="padding:16px;display:flex;flex-direction:column;gap:12px;flex:1">
-      <div>
-        <div class="card-title" style="margin-bottom:7px">${p.type}</div>
-        <div style="font-size:18px;font-weight:800;line-height:1.15">${p.name}</div>
-        <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-top:8px">${p.desc}</div>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${p.tags.map(t=>`<span class="badge" style="background:${t.includes('€')?'var(--bronze-dim)':'var(--bg4)'};color:${t.includes('€')?'var(--bronze)':'var(--gray)'};border:1px solid var(--border2)">${t}</span>`).join('')}
-      </div>
-      <div>
-        <div style="font-size:9px;letter-spacing:1.5px;color:var(--bronze);margin-bottom:8px">COULEURS DISPONIBLES</div>
-        <div style="display:grid;grid-template-columns:repeat(${Math.min(4,p.variants.length)},1fr);gap:7px">
-          ${p.variants.map(v=>`<div style="background:var(--bg4);border:1px solid var(--border);border-radius:7px;overflow:hidden">
-            <div style="height:70px;background:url('${v.img}') center/cover"></div>
-            <div style="display:flex;align-items:center;gap:6px;padding:7px"><span style="width:11px;height:11px;border-radius:50%;background:${v.color};border:1px solid #fff5;flex-shrink:0"></span><span style="font-size:9px;color:var(--offwhite);font-family:var(--font-body)">${v.label}</span></div>
-          </div>`).join('')}
-        </div>
-      </div>
-      <div style="margin-top:auto">
-        <button class="btn btn-primary" style="width:100%" onclick="showNotif('Commande à noter au coach: ${jsStr(p.name)} · ${jsStr(p.price)}')">CHOISIR CE MODÈLE</button>
-        ${p.link?`<button class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="window.open('${p.link}','_blank')">VOIR LE PRODUIT</button>`:''}
-      </div>
-    </div>
-  </div>`;
   return `<div class="content">
     ${quoteBand()}
     <div class="card" style="display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;border-color:var(--bronze-dim2)">
@@ -3618,8 +3579,27 @@ function pageShop(){
         <span class="badge" style="background:var(--bg4);color:var(--offwhite);border:1px solid var(--border2);font-size:12px;padding:7px 12px">CHAUSSETTES 15 €</span>
       </div>
     </div>
-    <div class="g3">
-      ${products.map(productCard).join('')}
+    <div class="g4">
+      ${products.map(p=>`<div class="card" style="padding:0;overflow:hidden;border-color:var(--bronze-dim2);display:flex;flex-direction:column">
+        <div style="height:230px;background:linear-gradient(135deg,#161417,#252025);background-image:url('${p.img}');background-position:center;background-size:contain;background-repeat:no-repeat;border-bottom:1px solid var(--border);position:relative">
+          <div style="position:absolute;left:12px;top:12px;background:#000c;border:1px solid var(--bronze-dim2);border-radius:4px;padding:5px 8px;font-size:9px;letter-spacing:1.5px;color:var(--bronze)">${p.type}</div>
+          <div style="position:absolute;right:12px;bottom:12px;background:var(--bronze);color:var(--white);border-radius:4px;padding:8px 10px;font-size:20px;font-weight:800;line-height:1">${p.price}</div>
+        </div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:12px;flex:1">
+          <div>
+            <div class="card-title" style="margin-bottom:7px">${p.type}</div>
+            <div style="font-size:17px;font-weight:800;line-height:1.15">${p.name}</div>
+            <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-top:8px">${p.desc}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${p.tags.map(t=>`<span class="badge" style="background:${t.includes('€')?'var(--bronze-dim)':'var(--bg4)'};color:${t.includes('€')?'var(--bronze)':'var(--gray)'};border:1px solid var(--border2)">${t}</span>`).join('')}
+          </div>
+          <div style="margin-top:auto">
+            <button class="btn btn-primary" style="width:100%" onclick="showNotif('Commande à noter au coach: ${jsStr(p.name)} · ${jsStr(p.price)}')">CHOISIR CE MODÈLE</button>
+            ${p.link?`<button class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="window.open('${p.link}','_blank')">VOIR LE PRODUIT</button>`:''}
+          </div>
+        </div>
+      </div>`).join('')}
     </div>
     <div class="g2">
       <div class="card">
