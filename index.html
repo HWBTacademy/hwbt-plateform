@@ -2411,10 +2411,12 @@ function pagePlayerPortal(){
   const progress=playerRecentProgress(player).slice(0,3);
   const priorities=getPlayerPriorityList(player,'player').slice(0,6);
   const suggestions=playerDashboardSuggestions(player).slice(0,6);
+  const objective=activePlayerObjective(player);
   const photo=assetUrl(player.photo);
   const first=esc(player.firstName||player.name.split(' ')[0]||player.name);
   const last=esc(player.lastName||player.name.split(' ').slice(1).join(' ')||'HWBT');
   const progressState=playerProgressState(measured.level);
+  const objectivePillar=PILLARS.find(p=>p.id===objective.pillar);
   return `<div class="content">
     ${quoteBand()}
     <div class="notebook-cover">
@@ -2431,6 +2433,23 @@ function pagePlayerPortal(){
           <span class="notebook-chip">${esc(player.position||'Position à définir')}</span>
           <span class="notebook-chip">${progressState}</span>
         </div>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="card" style="border-color:${objectivePillar?objectivePillar.color+'66':'var(--bronze-dim2)'};background:linear-gradient(90deg,${objectivePillar?objectivePillar.color+'12':'var(--bronze-dim)'},var(--bg2))">
+        <div class="card-title">MON OBJECTIF DU MOMENT</div>
+        <div style="font-size:10px;letter-spacing:1.6px;color:${objectivePillar?objectivePillar.color:'var(--bronze)'};margin-bottom:7px">${objectivePillar?objectivePillar.name:'HWBT'} · ${esc(objective.source)}</div>
+        <div style="font-size:26px;font-weight:800;line-height:1.05;margin-bottom:10px">${esc(objective.aspect)}</div>
+        <div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.75">${esc(objective.reason)}</div>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="setUI({page:'players',selectedPlayerId:${player.id},subpage:'aspects'})">AJUSTER MES PRIORITÉS</button>
+          ${nextSession?`<button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:${nextSession.id}})">VOIR LA SÉANCE</button>`:''}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">MON REPÈRE HWBT</div>
+        <div style="font-size:15px;font-weight:700;line-height:1.45;margin-bottom:10px">"${esc(playerMotivationPhrase(player,objective))}"</div>
+        <div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7">${esc(lastProgressSentence(progress[0]))}</div>
       </div>
     </div>
     <div class="g2">
@@ -2510,6 +2529,53 @@ function playerDashboardSuggestions(player){
     return true;
   });
 }
+function activePlayerObjective(player){
+  const wanted=getPlayerPriorityList(player,'player')[0];
+  if(wanted){
+    const meta=aspectInfo(wanted.pillar,wanted.aspect);
+    return {source:'JOUEUR',pillar:wanted.pillar,aspect:wanted.aspect,reason:`Tu as choisi cet axe comme priorité. ${meta.desc}`};
+  }
+  const suggested=playerDashboardSuggestions(player)[0];
+  if(suggested) return {source:suggested.source||'APP',pillar:suggested.pillar,aspect:suggested.aspect,reason:suggested.reason||'Aspect recommandé pour ta progression.'};
+  const pr=PROFILES.find(p=>p.id===player.profileId);
+  if(pr){
+    const fallback=profileAspectSuggestions(player)[0];
+    if(fallback) return {...fallback,source:'PROFIL'};
+  }
+  return {source:'HWBT',pillar:'M',aspect:'Concentration',reason:'Commence par un repère simple: rester présent point après point.'};
+}
+function lastProgressSentence(progressItem){
+  if(!progressItem) return 'Ton prochain progrès apparaîtra après une séance évaluée.';
+  const delta=Number(progressItem.progressDelta||0);
+  const direction=delta>=0?'a progressé':'a été retravaillé';
+  return `${progressItem.aspect} ${direction} lors de la dernière séance mesurée. Continue à le rendre plus stable en situation réelle.`;
+}
+function playerMotivationPhrase(player,objective){
+  const pr=PROFILES.find(p=>p.id===player.profileId);
+  if(pr?.commPositive) return pr.commPositive;
+  if(objective?.aspect) return `Aujourd’hui, ton repère est simple: ${objective.aspect}, avec une intention claire.`;
+  return 'Une bonne séance commence avec une intention claire.';
+}
+function coachDailyFocusRows(){
+  const rows=[];
+  const today=todayIso();
+  STATE.sessions.filter(s=>s.status==='open').slice(0,3).forEach(s=>rows.push({title:`Évaluer ${sessionTitle(s)}`,text:'Séance ouverte: va au point 5 et clôture les aspects travaillés.',button:'ÉVALUER',action:`setUI({page:'sessions',selectedSessionId:${s.id},sessionMode:'field',fieldBlock:${(s.blocks||[]).length}})`,color:'var(--rouge)'}));
+  STATE.sessions.filter(s=>s.status==='planned'&&s.date===today).slice(0,3).forEach(s=>rows.push({title:`Ouvrir ${sessionTitle(s)}`,text:'Séance prévue aujourd’hui: lance le mode terrain.',button:'OUVRIR',action:`setUI({page:'sessions',selectedSessionId:${s.id}})`,color:'var(--bronze)'}));
+  STATE.sessions.filter(s=>s.status==='closed_coach').slice(0,3).forEach(s=>rows.push({title:`Retour joueur · ${sessionTitle(s)}`,text:`Manquant: ${missingFeedbackPlayers(s).map(p=>p.name).join(', ')||'joueur'}.`,button:'VOIR',action:`setUI({page:'sessions',selectedSessionId:${s.id}})`,color:'var(--jaune)'}));
+  STATE.players.filter(p=>!p.profileId).slice(0,3).forEach(p=>rows.push({title:`Test mental · ${p.name}`,text:'Profil mental à faire pour mieux adapter la communication.',button:'FICHE',action:`setUI({page:'players',selectedPlayerId:${p.id},subpage:'profil'})`,color:'var(--bleu)'}));
+  return rows.slice(0,5);
+}
+function coachSessionRecommendationRows(){
+  const out=[];
+  STATE.players.forEach(p=>{
+    const objective=activePlayerObjective(p);
+    out.push({player:p,objective});
+  });
+  return out
+    .filter(x=>x.objective?.aspect)
+    .sort((a,b)=>playerEvaluationCount(a.player)-playerEvaluationCount(b.player))
+    .slice(0,5);
+}
 function todayIso(){
   const d=new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -2557,6 +2623,8 @@ function pageDashboard(){
   const incompletePlayers=players.map(p=>({player:p,missing:playerMissingData(p)})).filter(x=>x.missing.length).sort((a,b)=>b.missing.length-a.missing.length);
   const lowMeasurePlayers=players.filter(p=>playerEvaluationCount(p)<4);
   const signals=dashboardSignalRows();
+  const dailyFocus=coachDailyFocusRows();
+  const sessionRecos=coachSessionRecommendationRows();
   const futureAxes=[
     ...players.flatMap(p=>(p.futureAspects||[]).map(f=>({player:p,pillar:f.pillar,aspect:f.aspect,source:'player'}))),
     ...sessions.flatMap(s=>(s.futureAspects||[]).map(f=>({session:s,players:sessionPlayers(s),pillar:f.pillar,aspect:f.aspect,source:'session'})))
@@ -2584,6 +2652,24 @@ function pageDashboard(){
           <button class="btn btn-ghost" onclick="openModal('addPlayer')">+ JOUEUR</button>
           <button class="btn btn-ghost" onclick="setUI({page:'test'})">TEST LIBRE</button>
         </div>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="card" style="border-color:var(--bronze-dim2)">
+        <div class="card-title">PRIORITÉ DU JOUR</div>
+        ${dailyFocus.length?dailyFocus.map(r=>`<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+          <div style="width:8px;height:38px;border-radius:4px;background:${r.color};flex-shrink:0"></div>
+          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:800">${esc(r.title)}</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:3px">${esc(r.text)}</div></div>
+          <button class="btn btn-primary btn-sm" onclick="${r.action}">${r.button}</button>
+        </div>`).join(''):`<div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7">Aucune urgence aujourd’hui. Prépare une séance depuis les recommandations ou complète les fiches joueur.</div>`}
+      </div>
+      <div class="card" style="border-color:var(--bronze-dim2)">
+        <div class="card-title">SÉANCES À CONSTRUIRE</div>
+        ${sessionRecos.length?sessionRecos.map(({player,objective})=>{const pl=PILLARS.find(p=>p.id===objective.pillar);return `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+          ${avatar(player.name,'av36')}
+          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:800">${esc(player.name)} · ${esc(objective.aspect)}</div><div style="font-size:10px;color:${pl?pl.color:'var(--bronze)'};letter-spacing:1px;margin-top:2px">${pl?pl.name:objective.pillar} · ${esc(objective.source)}</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:5px">${esc(objective.reason)}</div></div>
+          <button class="btn btn-ghost btn-sm" onclick="openModal('newSession',${player.id})">CRÉER</button>
+        </div>`}).join(''):`<div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7">Les recommandations apparaissent dès que les joueurs ont priorités, retours ou mesures.</div>`}
       </div>
     </div>
     <div class="g4">
