@@ -1440,6 +1440,19 @@ const SESSION_BLOCKS = [
   {num:'04',name:'ASPECT COMPLÉMENTAIRE',time:'15 MIN',desc:'Physique ou mental. Répétition en contexte.'},
   {num:'05',name:'ÉVALUATION',time:'15 MIN',desc:'Test ou situation réelle. Valider les aspects travaillés et clôturer la séance.'},
 ];
+const AFT_SESSION_BLOCKS = [
+  {num:'01',name:'ÉCHAUFFEMENT',time:'8-10 MIN',desc:'Ludique, beaucoup de touches, tout le monde actif. Introduire le thème sans l’expliquer directement.',focus:'FAR + induction'},
+  {num:'02',name:'JEU DE DÉPART',time:'15 MIN',desc:'Révéler le niveau tactique et créer le besoin d’apprendre avec une règle simple et un score.',focus:'Tactique'},
+  {num:'03',name:"JEU D'APPRENTISSAGE",time:'15 MIN',desc:'Répéter le geste ciblé dans une situation progressive: R-1, R0, puis R+1 si possible.',focus:'Technique + tactique'},
+  {num:'04',name:"JEU D'APPLICATION",time:'15 MIN',desc:'Revenir vers le jeu de départ avec une règle enrichie ou un bonus qui récompense le bon choix.',focus:'Transfert match'},
+  {num:'05',name:'COOLING DOWN',time:'5 MIN',desc:'Retour au calme, bilan sandwich, question ouverte et vérification de ce que les joueurs retiennent.',focus:'Bilan'},
+];
+function sessionTypeLabel(type){
+  return type==='aft'?'AFT · 1H': 'HWBT';
+}
+function sessionStructure(s){
+  return s?.sessionType==='aft'?AFT_SESSION_BLOCKS:SESSION_BLOCKS;
+}
 const EXERCISE_LIBRARY=[
   {id:'ex001',title:'Volées profondes avec cible',pillar:'T',aspect:'Volée',secondary:'Placement terrain',level:'débutant',players:'2-4',duration:'12 min',setup:'Un joueur au filet, un joueur en fond. Deux zones profondes matérialisées avec cônes.',flow:'Le joueur au filet joue 8 volées de suite. Objectif: garder une volée compacte, profonde et contrôlée. Rotation après chaque série.',scoring:'1 point si la volée touche la zone. Bonus si la balle reste basse. Note exécution, compréhension et pression.',coach:'Insiste sur préparation courte, appuis actifs, cible avant puissance.',profiles:'Rouge: canaliser la finition. Vert: répéter stable. Jaune: mettre un défi. Bleu: donner un repère de zone.'},
   {id:'ex002',title:'Bandeja filet gardé',pillar:'T',aspect:'Bandeja',secondary:'Défense / Attaque',level:'intermédiaire',players:'2-4',duration:'15 min',setup:'Un joueur lobe, l’autre joue bandeja puis revient couvrir le filet.',flow:'Série de 10 lobs. La bandeja doit être longue, tendue, puis retour position filet.',scoring:'Score /10: profondeur, hauteur, replacement. Le secondaire mesure la qualité du retour filet.',coach:'La bandeja ne doit pas être un coup gagnant, elle doit garder l’avantage.'},
@@ -2156,6 +2169,8 @@ function sessionPlanningSuggestionsHtml(playerIds){
 function sessionBriefing(s,player,pr){
   const group=sessionPlayers(s);
   const blocks=(s.blocks||[]).filter(b=>b.aspect);
+  const steps=sessionStructure(s);
+  const aft=s.sessionType==='aft';
   const personalityCards=group.map(p=>{
     const gp=PROFILES.find(pr=>pr.id===p.profileId);
     const c1=gp?ENERGY_COLORS[gp.c1]:'var(--bronze)';
@@ -2171,9 +2186,16 @@ function sessionBriefing(s,player,pr){
   return `<div class="briefing-grid">
     <div class="card" style="margin-bottom:0">
       <div class="card-title">BRIEFING RAPIDE DE SÉANCE</div>
-      <div style="font-size:13px;color:var(--white);font-weight:600;margin-bottom:8px">${esc(sessionTitle(s))} · ${s.date} · ${statusBadge(s.status)}</div>
+      <div style="font-size:13px;color:var(--white);font-weight:600;margin-bottom:8px">${esc(sessionTitle(s))} · ${s.date} · ${sessionTypeLabel(s.sessionType)} · ${statusBadge(s.status)}</div>
       ${group.length>1?`<div class="session-group-line">${group.map(p=>`<span class="session-group-chip">${esc(p.name)}</span>`).join('')}</div>`:''}
       <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6">${s.goal?esc(s.goal):'Objectif: travailler un aspect précis par pilier et garder une trace claire pour la progression.'}</div>
+      ${aft?`<div style="margin-top:10px;background:var(--bg4);border-left:3px solid var(--bronze);padding:10px 12px;border-radius:0 6px 6px 0;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.55">Séance AFT: faire découvrir par le jeu, questionner avant de corriger, puis valoriser. Prévoir R-1, R0 et R+1 pour garder le cours fluide.</div>`:''}
+      ${aft&&s.aftMeta?`<div class="g2" style="margin-top:10px">
+        ${s.aftMeta.theme?`<div class="briefing-item"><div class="briefing-pill" style="color:var(--bronze)">THÈME</div><div style="font-size:12px;font-weight:700">${esc(s.aftMeta.theme)}</div></div>`:''}
+        ${s.aftMeta.technical?`<div class="briefing-item"><div class="briefing-pill" style="color:var(--bronze)">TECHNIQUE</div><div style="font-size:12px;font-weight:700">${esc(s.aftMeta.technical)}</div></div>`:''}
+        ${s.aftMeta.tactic?`<div class="briefing-item"><div class="briefing-pill" style="color:var(--bronze)">TACTIQUE</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.5">${esc(s.aftMeta.tactic)}</div></div>`:''}
+        ${s.aftMeta.technique?`<div class="briefing-item"><div class="briefing-pill" style="color:var(--bronze)">REPÈRES</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.5">${esc(s.aftMeta.technique)}</div></div>`:''}
+      </div>`:''}
       <div class="briefing-list">
         ${blocks.map(b=>{const pl=PILLARS.find(p=>p.id===b.pillar);return `<div class="briefing-item"><div class="briefing-pill" style="color:${pl?pl.color:'var(--bronze)'}">${pl?pl.name:b.pillar}</div><div style="font-size:12px;font-weight:600">${esc(b.aspect)}</div>${b.exercise?`<div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.5;margin-top:5px">${esc(b.exercise)}</div>`:''}</div>`}).join('')}
       </div>
@@ -2182,6 +2204,21 @@ function sessionBriefing(s,player,pr){
       <div class="card-title">PERSONNALITÉS DU GROUPE & COMMUNICATION</div>
       <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-bottom:8px">Résumé rapide des profils des joueurs présents, pour adapter ton ton, ton feedback et la pression pendant la séance.</div>
       ${personalityCards}
+    </div>
+  </div>`;
+}
+function sessionStructureCard(s){
+  const steps=sessionStructure(s);
+  const title=s.sessionType==='aft'?'STRUCTURE AFT — 1H PAR INDUCTION':'STRUCTURE HWBT — 5 BLOCS SYSTÉMATIQUES';
+  const subtitle=s.sessionType==='aft'?'FAR: facile, amusant, rapide. Le joueur découvre par le jeu; le coach guide avec questions, règles et feedback sandwich.':'Structure academy pour entraîner, contextualiser puis évaluer les aspects mesurés.';
+  return `<div class="card">
+    <div class="card-title">${title}</div>
+    <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-bottom:12px">${subtitle}</div>
+    <div class="briefing-list">
+      ${steps.map(st=>`<div class="briefing-item">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="background:var(--bronze-dim);border:1px solid var(--bronze-dim2);border-radius:4px;padding:5px 8px;color:var(--bronze);font-size:11px;font-weight:800">${st.num}</span><div><div style="font-size:13px;font-weight:800">${esc(st.name)}</div><div style="font-size:9px;color:var(--bronze);letter-spacing:1.2px">${esc(st.time)}${st.focus?` · ${esc(st.focus)}`:''}</div></div></div>
+        <div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.5">${esc(st.desc)}</div>
+      </div>`).join('')}
     </div>
   </div>`;
 }
@@ -3136,7 +3173,7 @@ function pageSessionsList(){
     ${sorted.length?sorted.map(s=>{const ps=sessionPlayers(s);const p=ps[0];if(!p)return '';const pr=PROFILES.find(pr=>pr.id===p.profileId);const c1=pr?ENERGY_COLORS[pr.c1]:'#A67C52';const blocks=(s.blocks||[]).filter(b=>b.aspect);return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:10px;cursor:pointer" onclick="setUI({page:'sessions',selectedSessionId:${s.id}})">
       <div style="display:flex;align-items:center;gap:14px">
         <div style="width:3px;height:48px;background:${c1};border-radius:2px;flex-shrink:0"></div>${avatar(ps.length>1?String(ps.length):p.name,'av44')}
-        <div style="flex:1"><div style="font-size:14px;font-weight:600;letter-spacing:.5px">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2);margin-top:2px">${s.date} · ${ps.length} joueur${ps.length>1?'s':''} · ${blocks.length} aspect${blocks.length>1?'s':''}</div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:600;letter-spacing:.5px">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2);margin-top:2px">${s.date} · ${sessionTypeLabel(s.sessionType)} · ${ps.length} joueur${ps.length>1?'s':''} · ${blocks.length} aspect${blocks.length>1?'s':''}</div>
         <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${blocks.map(b=>{const pl=PILLARS.find(p=>p.id===b.pillar);return `<span style="font-size:9px;padding:2px 8px;border-radius:2px;background:${pl?pl.color+'22':'var(--border)'};color:${pl?pl.color:'var(--gray)'}">${esc(b.aspect)}</span>`}).join('')}</div></div>
         <div>${statusBadge(s.status)}</div>
       </div></div>`}).join(''):`<div class="card" style="color:var(--gray);font-family:var(--font-body)">Aucune séance.</div>`}
@@ -3211,8 +3248,9 @@ function pageSessionDetail(sessionId){
     ${canEdit?`<div class="form-group"><label class="form-label">EXERCICE / CONSIGNE</label><textarea class="form-input" rows="2" oninput="updateSessionBlock(${s.id},${idx},'exercise',this.value)">${esc(b.exercise||'')}</textarea><div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="saveBlockExerciseToLibrary(${s.id},${idx})">ENREGISTRER EN BIBLIOTHÈQUE</button></div></div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);background:var(--bg4);border:1px solid var(--border);padding:10px;border-radius:6px">Modification d'information uniquement. La progression déjà appliquée ne sera pas comptée une deuxième fois.</div>`:`${b.exercise?`<div class="exercise-card"><div style="font-size:8px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:5px">EXERCICE DONNÉ</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.5">${esc(b.exercise)}</div></div>`:''}`}
   </div>`}).join('');
   return `<div class="content">${quoteBand()}
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:null,sessionMode:null})">← RETOUR</button><div style="flex:1"><div style="font-size:18px;font-weight:700;letter-spacing:1px">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2)">${s.date} · ${statusBadge(s.status)}</div></div>${STATE.role==='coach'&&(s.status==='planned'||s.status==='open')?`<button class="btn btn-primary" onclick="enterFieldMode(${s.id})">MODE TERRAIN</button>`:''}${STATE.role==='coach'&&(s.status==='closed_coach'||s.status==='completed')?`<button class="btn btn-ghost" onclick="toggleSessionEdit(${s.id})">${s.editMode?'TERMINER MODIF':'MODIFIER'}</button>`:''}</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:null,sessionMode:null})">← RETOUR</button><div style="flex:1"><div style="font-size:18px;font-weight:700;letter-spacing:1px">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2)">${s.date} · ${sessionTypeLabel(s.sessionType)} · ${statusBadge(s.status)}</div></div>${STATE.role==='coach'&&(s.status==='planned'||s.status==='open')?`<button class="btn btn-primary" onclick="enterFieldMode(${s.id})">MODE TERRAIN</button>`:''}${STATE.role==='coach'&&(s.status==='closed_coach'||s.status==='completed')?`<button class="btn btn-ghost" onclick="toggleSessionEdit(${s.id})">${s.editMode?'TERMINER MODIF':'MODIFIER'}</button>`:''}</div>
     ${sessionBriefing(s,main||{},pr)}
+    ${sessionStructureCard(s)}
     ${sessionSynthesisHtml(s)}
     ${s.playerWishes?`<div class="card"><div class="card-title">DEMANDES JOUEURS À L'ENTRÉE</div><div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.7;white-space:pre-wrap">${esc(s.playerWishes)}</div></div>`:''}
     ${group.length>1?`<div class="card"><div class="card-title">GROUPE DE SÉANCE</div><div class="session-group-line">${group.map(p=>`<span class="session-group-chip">${esc(p.name)}</span>`).join('')}</div></div>`:''}
@@ -3230,13 +3268,21 @@ function sessionClosure(s){
 function pageFieldMode(s){
   const players=sessionPlayers(s);
   const blocks=(s.blocks||[]).filter(Boolean);
+  const aft=s.sessionType==='aft';
+  const structure=sessionStructure(s);
   const rawIdx=parseInt(UI.fieldBlock);
-  const activeIdx=Math.max(0,Math.min(blocks.length,Number.isNaN(rawIdx)?0:rawIdx));
-  const isEvaluationStep=activeIdx>=blocks.length;
-  const b=blocks[activeIdx]||blocks[0]||{};
-  const pl=PILLARS.find(p=>p.id===b.pillar)||PILLARS[activeIdx]||PILLARS[0];
+  const maxStep=aft?structure.length:blocks.length;
+  const activeIdx=Math.max(0,Math.min(maxStep,Number.isNaN(rawIdx)?0:rawIdx));
+  const isEvaluationStep=activeIdx>=maxStep;
+  const isAftCooling=aft&&activeIdx===structure.length-1&&!isEvaluationStep;
+  const blockIdx=aft?Math.min(activeIdx,Math.max(0,blocks.length-1)):activeIdx;
+  const b=isAftCooling?{}:(blocks[blockIdx]||blocks[0]||{});
+  const pl=PILLARS.find(p=>p.id===b.pillar)||PILLARS[blockIdx]||PILLARS[0];
+  const activeStep=structure[activeIdx]||null;
   const prList=players.map(p=>({player:p,profile:PROFILES.find(pr=>pr.id===p.profileId)}));
-  const stepTabs=`${blocks.map((block,i)=>{const p=PILLARS.find(x=>x.id===block.pillar)||PILLARS[i]||pl;return `<button class="tab ${i===activeIdx&&!isEvaluationStep?'active':''}" style="${i===activeIdx&&!isEvaluationStep?`background:${p.color};border-color:${p.color}`:''}" onclick="setUI({fieldBlock:${i}})">${i+1}. ${p.name}</button>`}).join('')}<button class="tab ${isEvaluationStep?'active':''}" style="${isEvaluationStep?'background:var(--bronze);border-color:var(--bronze);color:#000':''}" onclick="setUI({fieldBlock:${blocks.length}})">5. ÉVALUATION</button>`;
+  const stepTabs=aft
+    ? `${structure.map((st,i)=>`<button class="tab ${i===activeIdx&&!isEvaluationStep?'active':''}" style="${i===activeIdx&&!isEvaluationStep?'background:var(--bronze);border-color:var(--bronze);color:#000':''}" onclick="setUI({fieldBlock:${i}})">${i+1}. ${esc(st.name)}</button>`).join('')}<button class="tab ${isEvaluationStep?'active':''}" style="${isEvaluationStep?'background:var(--bronze);border-color:var(--bronze);color:#000':''}" onclick="setUI({fieldBlock:${structure.length}})">ÉVAL HWBT</button>`
+    : `${blocks.map((block,i)=>{const p=PILLARS.find(x=>x.id===block.pillar)||PILLARS[i]||pl;return `<button class="tab ${i===activeIdx&&!isEvaluationStep?'active':''}" style="${i===activeIdx&&!isEvaluationStep?`background:${p.color};border-color:${p.color}`:''}" onclick="setUI({fieldBlock:${i}})">${i+1}. ${p.name}</button>`}).join('')}<button class="tab ${isEvaluationStep?'active':''}" style="${isEvaluationStep?'background:var(--bronze);border-color:var(--bronze);color:#000':''}" onclick="setUI({fieldBlock:${blocks.length}})">5. ÉVALUATION</button>`;
   return `<div class="content" style="padding-top:16px">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="setUI({sessionMode:null})">← SÉANCE CLASSIQUE</button>
@@ -3246,26 +3292,28 @@ function pageFieldMode(s){
         <div style="font-size:10px;color:var(--gray2);margin-top:3px">${esc(s.date)} · ${statusBadge(s.status)}</div>
       </div>
       ${s.status==='planned'?`<button class="btn btn-primary" onclick="startSession(${s.id})">DÉMARRER</button>`:''}
-      <button class="btn btn-danger" onclick="setUI({fieldBlock:${blocks.length}})">ÉVALUATION FINALE</button>
+      <button class="btn btn-danger" onclick="setUI({fieldBlock:${maxStep}})">ÉVALUATION FINALE</button>
     </div>
     <div class="g2">
       <div class="card" style="border-color:${pl.color}66">
         ${isEvaluationStep?`<div style="margin-bottom:14px">${stepTabs}</div>${renderCoachClosure(s)}`:`
         <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px">
           <div>
-            <div style="font-size:10px;letter-spacing:1.5px;color:${pl.color};margin-bottom:6px">ASPECT ACTIF ${activeIdx+1}/${blocks.length||4}</div>
-            <div style="font-size:34px;font-weight:700;line-height:1">${esc(b.aspect||'Aspect à définir')}</div>
+            <div style="font-size:10px;letter-spacing:1.5px;color:${aft?'var(--bronze)':pl.color};margin-bottom:6px">${aft?`ÉTAPE AFT ${activeIdx+1}/${structure.length}`:`ASPECT ACTIF ${activeIdx+1}/${blocks.length||4}`}</div>
+            <div style="font-size:34px;font-weight:700;line-height:1">${esc(isAftCooling?'Cooling down':(aft&&activeStep?activeStep.name:(b.aspect||'Aspect à définir')))}</div>
+            ${aft&&activeStep?`<div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-top:9px">${esc(activeStep.desc)}</div>`:''}
           </div>
           <div style="font-size:10px;color:var(--gray3);letter-spacing:1.4px;text-align:right;line-height:1.5">ÉVALUATION<br>À L'ÉTAPE 5</div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
           ${stepTabs}
         </div>
-        <div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:12px">
+        ${aft&&activeStep?`<div style="background:var(--bg4);border-left:3px solid var(--bronze);border-radius:0 8px 8px 0;padding:12px;margin-bottom:12px;font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6"><b style="color:var(--offwhite)">${esc(activeStep.focus||'Repère coach')}</b><br>${isAftCooling?'Bilan sandwich: 1 chose réussie, 1 point à améliorer, 1 encouragement final. Termine par une question ouverte.':'Coach: garde une règle simple, beaucoup de touches, un score ou défi, puis une question ouverte avant la correction.'}</div>`:''}
+        ${isAftCooling?`<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:12px"><div style="font-size:9px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:8px">BILAN / QUESTION OUVERTE</div><textarea class="form-input" rows="5" style="font-size:16px;line-height:1.55" oninput="saveFieldNotes(${s.id},this.value)" placeholder="Ex: Qu'avez-vous retenu ? Qu’est-ce qui vous a aidé à réussir le thème ?">${esc(s.fieldNotes||'')}</textarea></div>`:`<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:12px">
           <div style="font-size:9px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:8px">CONSIGNE / EXERCICE</div>
-          <textarea class="form-input" rows="5" style="font-size:16px;line-height:1.55" oninput="updateSessionBlock(${s.id},${activeIdx},'exercise',this.value)">${esc(b.exercise||'')}</textarea>
-          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="saveBlockExerciseToLibrary(${s.id},${activeIdx})">ENREGISTRER EN BIBLIOTHÈQUE</button></div>
-        </div>
+          <textarea class="form-input" rows="5" style="font-size:16px;line-height:1.55" oninput="updateSessionBlock(${s.id},${blockIdx},'exercise',this.value)">${esc(b.exercise||'')}</textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="saveBlockExerciseToLibrary(${s.id},${blockIdx})">ENREGISTRER EN BIBLIOTHÈQUE</button></div>
+        </div>`}
         <div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.65">Pendant l'exercice, reste sur la consigne, le rythme et la communication. L'évaluation se fait ensuite en une seule étape rapide, sur base du test ou de la situation jouée.</div>`}
       </div>
       <div>
@@ -3285,8 +3333,8 @@ function pageFieldMode(s){
     <div class="card">
       <div class="card-title">PLAN DU JOUR</div>
       <div class="briefing-list">
-        ${blocks.map((block,i)=>{const p=PILLARS.find(x=>x.id===block.pillar)||PILLARS[i]||pl;return `<div class="briefing-item" style="border-color:${i===activeIdx?p.color+'88':'var(--border)'};cursor:pointer" onclick="setUI({fieldBlock:${i}})"><div class="briefing-pill" style="color:${p.color}">${p.name}</div><div style="font-size:13px;font-weight:700">${esc(block.aspect||'Aspect')}</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:5px">${esc(block.exercise||'Consigne à préciser')}</div></div>`}).join('')}
-        <div class="briefing-item" style="border-color:${isEvaluationStep?'var(--bronze)':'var(--border)'};cursor:pointer" onclick="setUI({fieldBlock:${blocks.length}})"><div class="briefing-pill" style="color:var(--bronze)">POINT 5</div><div style="font-size:13px;font-weight:700">Évaluation rapide</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:5px">Valider les 4 aspects avec un état simple et un aspect secondaire si observé.</div></div>
+        ${aft?structure.map((st,i)=>{const block=blocks[Math.min(i,Math.max(0,blocks.length-1))]||{};return `<div class="briefing-item" style="border-color:${i===activeIdx?'var(--bronze)':'var(--border)'};cursor:pointer" onclick="setUI({fieldBlock:${i}})"><div class="briefing-pill" style="color:var(--bronze)">${esc(st.name)}</div><div style="font-size:13px;font-weight:700">${i<4?esc(block.aspect||st.focus||'Thème'):esc(st.focus||'Bilan')}</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:5px">${esc(i<4?(block.exercise||st.desc):st.desc)}</div></div>`}).join(''):blocks.map((block,i)=>{const p=PILLARS.find(x=>x.id===block.pillar)||PILLARS[i]||pl;return `<div class="briefing-item" style="border-color:${i===activeIdx?p.color+'88':'var(--border)'};cursor:pointer" onclick="setUI({fieldBlock:${i}})"><div class="briefing-pill" style="color:${p.color}">${p.name}</div><div style="font-size:13px;font-weight:700">${esc(block.aspect||'Aspect')}</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:5px">${esc(block.exercise||'Consigne à préciser')}</div></div>`}).join('')}
+        <div class="briefing-item" style="border-color:${isEvaluationStep?'var(--bronze)':'var(--border)'};cursor:pointer" onclick="setUI({fieldBlock:${maxStep}})"><div class="briefing-pill" style="color:var(--bronze)">${aft?'APRÈS AFT':'POINT 5'}</div><div style="font-size:13px;font-weight:700">Évaluation rapide</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:5px">Valider les 4 aspects avec un état simple et un aspect secondaire si observé.</div></div>
       </div>
     </div>
   </div>`;
@@ -4068,10 +4116,46 @@ function readPlayerForm(existing=null){
   };
 }
 
+function newSessionModalHtml(extra){
+  const selected=Array.isArray(extra)?extra.filter(Boolean):(extra?[extra]:[]);
+  const typeCards=[
+    {value:'hwbt',title:'SÉANCE HWBT',text:'Structure academy: 4 piliers travaillés, puis point 5 avec évaluation rapide pour les stats.'},
+    {value:'aft',title:'SÉANCE AFT · 1H',text:"Échauffement, jeu de départ, jeu d’apprentissage, jeu d’application, cooling down. FAR, induction et sandwich."}
+  ];
+  return `<div class="modal-title">CRÉER UNE SÉANCE PAS À PAS</div><button class="modal-close" onclick="closeModal()">×</button>
+  <div class="form-group">
+    <label class="form-label">TYPE D'ENTRAÎNEMENT</label>
+    <div class="g2">
+      ${typeCards.map((t,i)=>`<label style="background:var(--bg4);border:1px solid ${i===0?'var(--bronze-dim2)':'var(--border)'};border-radius:8px;padding:12px;display:block;cursor:pointer">
+        <div style="display:flex;gap:9px;align-items:flex-start">
+          <input type="radio" name="m_session_type" value="${t.value}" ${i===0?'checked':''} style="margin-top:3px">
+          <span><span style="display:block;font-size:13px;font-weight:800;color:var(--offwhite);letter-spacing:.8px">${t.title}</span><span style="display:block;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:5px">${t.text}</span></span>
+        </div>
+      </label>`).join('')}
+    </div>
+  </div>
+  <div class="form-group"><label class="form-label">JOUEURS (1 À 4)</label><div class="session-player-grid">${STATE.players.map(p=>`<label class="session-player-choice"><input type="checkbox" class="m_session_player" value="${p.id}" ${selected.includes(p.id)?'checked':''} onchange="limitSessionPlayers(this)"><span><span class="session-player-name">${esc(p.name)}</span><span class="session-player-meta">${esc(p.code||'')}</span></span></label>`).join('')}</div></div>
+  <div class="form-group"><label class="form-label">DATE</label><input class="form-input" id="m_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+  <div class="g2">
+    <div class="form-group"><label class="form-label">THÈME AFT / FIL ROUGE</label><input class="form-input" id="m_aft_theme" placeholder="Ex: construire le point après vitre, défendre bas, monter au filet..."></div>
+    <div class="form-group"><label class="form-label">ASPECT TECHNIQUE CIBLÉ</label><input class="form-input" id="m_aft_technical" placeholder="Ex: revers à plat après vitre, volée contrôlée, lob de défense..."></div>
+  </div>
+  <div class="g2">
+    <div class="form-group"><label class="form-label">TACTIQUE À TRANSMETTRE</label><textarea class="form-input" id="m_aft_tactic" rows="2" placeholder="Ce que le joueur doit comprendre par le jeu."></textarea></div>
+    <div class="form-group"><label class="form-label">TECHNIQUE À TRANSMETTRE</label><textarea class="form-input" id="m_aft_technique" rows="2" placeholder="Repères simples du geste, sans surcorriger."></textarea></div>
+  </div>
+  <div style="background:var(--bg4);border-left:3px solid var(--bronze);padding:10px 12px;border-radius:0 6px 6px 0;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:14px">Pour une séance AFT, remplis surtout le thème et les repères. Les 4 aspects HWBT restent utiles pour mesurer la progression après la séance.</div>
+  <div class="form-group"><label class="form-label">RETOUR / DEMANDES JOUEURS</label><textarea class="form-input" id="m_player_wishes" rows="3" placeholder="Ex: Julie veut travailler la confiance au filet. Marc veut mieux gérer les points importants."></textarea></div>
+  <div id="sessionPlanningSuggestions" style="margin-bottom:16px">${sessionPlanningSuggestionsHtml(selected)}</div>
+  <div style="font-size:10px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:12px">CHOIX COACH — 1 ASPECT PAR PILIER</div>
+  ${PILLARS.map(pl=>`<div class="aspect-input-block"><div class="aib-header"><span class="aib-pillar" style="background:${pl.color}22;color:${pl.color}">${pl.name}</span></div><div class="form-group"><label class="form-label">EXERCICE SAUVEGARDÉ</label><select class="form-select" onchange="applyExerciseToSessionModal('${pl.id}',this.value)"><option value="">— Choisir dans la bibliothèque —</option>${savedExercisesForPillar(pl.id).map(ex=>`<option value="${ex.id}">${ex.custom?'Coach · ':'HWBT · '}${esc(ex.title)} · ${esc(ex.aspect)}</option>`).join('')}</select></div><select class="form-select" id="m_aspect_${pl.id}"><option value="">— Choisir —</option>${pl.aspects.map(a=>`<option value="${esc(a.name)}">${esc(a.name)} · ${esc(a.desc)}</option>`).join('')}</select><textarea class="form-input" rows="2" id="m_exercise_${pl.id}" placeholder="Exercice prévu..." style="margin-top:8px"></textarea><div style="font-size:9px;color:var(--gray3);font-family:var(--font-body);line-height:1.45;margin-top:6px">Tout exercice écrit ici sera sauvegardé dans la bibliothèque après création de la séance.</div></div>`).join('')}
+  <textarea class="form-input" id="m_session_goal" rows="2" placeholder="Objectif général"></textarea>
+  <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">ANNULER</button><button class="btn btn-primary" onclick="createSession()">CRÉER</button></div>`;
+}
 function renderModal(type,extra){
   if(type==='addPlayer') return playerFormHtml();
   if(type==='editPlayer'){const p=STATE.players.find(p=>p.id===extra);return p?playerFormHtml(p):`<div class="modal-title">JOUEUR INTROUVABLE</div><button class="modal-close" onclick="closeModal()">×</button>`}
-  if(type==='newSession'){const selected=Array.isArray(extra)?extra.filter(Boolean):(extra?[extra]:[]);return `<div class="modal-title">CRÉER UNE SÉANCE PAS À PAS</div><button class="modal-close" onclick="closeModal()">×</button><div class="form-group"><label class="form-label">JOUEURS (1 À 4)</label><div class="session-player-grid">${STATE.players.map(p=>`<label class="session-player-choice"><input type="checkbox" class="m_session_player" value="${p.id}" ${selected.includes(p.id)?'checked':''} onchange="limitSessionPlayers(this)"><span><span class="session-player-name">${esc(p.name)}</span><span class="session-player-meta">${esc(p.code||'')}</span></span></label>`).join('')}</div></div><div class="form-group"><label class="form-label">DATE</label><input class="form-input" id="m_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-group"><label class="form-label">RETOUR / DEMANDES JOUEURS</label><textarea class="form-input" id="m_player_wishes" rows="3" placeholder="Ex: Julie veut travailler la confiance au filet. Marc veut mieux gérer les points importants."></textarea></div><div id="sessionPlanningSuggestions" style="margin-bottom:16px">${sessionPlanningSuggestionsHtml(selected)}</div><div style="font-size:10px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:12px">CHOIX COACH — 1 ASPECT PAR PILIER</div>${PILLARS.map(pl=>`<div class="aspect-input-block"><div class="aib-header"><span class="aib-pillar" style="background:${pl.color}22;color:${pl.color}">${pl.name}</span></div><div class="form-group"><label class="form-label">EXERCICE SAUVEGARDÉ</label><select class="form-select" onchange="applyExerciseToSessionModal('${pl.id}',this.value)"><option value="">— Choisir dans la bibliothèque —</option>${savedExercisesForPillar(pl.id).map(ex=>`<option value="${ex.id}">${ex.custom?'Coach · ':'HWBT · '}${esc(ex.title)} · ${esc(ex.aspect)}</option>`).join('')}</select></div><select class="form-select" id="m_aspect_${pl.id}"><option value="">— Choisir —</option>${pl.aspects.map(a=>`<option value="${esc(a.name)}">${esc(a.name)} · ${esc(a.desc)}</option>`).join('')}</select><textarea class="form-input" rows="2" id="m_exercise_${pl.id}" placeholder="Exercice prévu..." style="margin-top:8px"></textarea><div style="font-size:9px;color:var(--gray3);font-family:var(--font-body);line-height:1.45;margin-top:6px">Tout exercice écrit ici sera sauvegardé dans la bibliothèque après création de la séance.</div></div>`).join('')}<textarea class="form-input" id="m_session_goal" rows="2" placeholder="Objectif général"></textarea><div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">ANNULER</button><button class="btn btn-primary" onclick="createSession()">CRÉER</button></div>`;}
+  if(type==='newSession') return newSessionModalHtml(extra);
   return `<div class="modal-title">—</div><button class="modal-close" onclick="closeModal()">×</button>`;
 }
 function addPlayer(){const data=readPlayerForm();if(!data.firstName||!data.lastName){showNotif('Prénom et nom requis');return;}const id=Math.max(0,...STATE.players.map(p=>p.id))+1;if(!data.code)data.code=(data.firstName[0]+data.lastName[0]+String(id).padStart(3,'0')).toUpperCase();if(!data.playerPassword)data.playerPassword=String(data.code).toLowerCase();STATE.players.push({...data,id,profileId:null,level:null,levelManual:false,scores:{T:0,TA:0,P:0,M:0},aspects:{},futureAspects:[],sessions:[]});closeModal();showNotif('Fiche joueur créée');setUI({page:'players',selectedPlayerId:id,subpage:'profil'});}
@@ -4120,7 +4204,7 @@ function openNextSessionFromSession(sessionId){
     applySmartSessionPlan();
   },0);
 }
-function createSession(){const playerIds=selectedSessionPlayerIds();const date=document.getElementById('m_date').value;const playerWishes=document.getElementById('m_player_wishes')?.value.trim()||'';if(playerIds.length<1||playerIds.length>4||!date){showNotif('Choisis 1 à 4 joueurs et une date');return;}const blocks=PILLARS.map(pl=>{const aspect=document.getElementById('m_aspect_'+pl.id).value;const exercise=document.getElementById('m_exercise_'+pl.id).value.trim();return {pillar:pl.id,aspect,exercise,subAspects:aspect?{[aspect]:'travaille'}:{},scores:{},coachState:''};});if(blocks.some(b=>!b.aspect)){showNotif('Choisis 1 aspect par pilier');return;}let savedCount=0;blocks.forEach(b=>{const before=(STATE.customExercises||[]).length;saveCustomExerciseFromBlock(b,'session-create');if((STATE.customExercises||[]).length>before)savedCount++;});const id=Math.max(0,...STATE.sessions.map(s=>s.id))+1;STATE.sessions.push({id,playerId:playerIds[0],playerIds,date,status:'planned',goal:document.getElementById('m_session_goal').value.trim(),playerWishes,blocks,futureAspects:[],coachFeedback:{},playerFeedback:{}});closeModal();showNotif(savedCount?`Séance créée · ${savedCount} exercice${savedCount>1?'s':''} sauvegardé${savedCount>1?'s':''}`:'Séance créée');setUI({page:'sessions',selectedSessionId:id});}
+function createSession(){const playerIds=selectedSessionPlayerIds();const date=document.getElementById('m_date').value;const playerWishes=document.getElementById('m_player_wishes')?.value.trim()||'';const sessionType=document.querySelector('input[name="m_session_type"]:checked')?.value||'hwbt';const aftMeta={theme:document.getElementById('m_aft_theme')?.value.trim()||'',technical:document.getElementById('m_aft_technical')?.value.trim()||'',tactic:document.getElementById('m_aft_tactic')?.value.trim()||'',technique:document.getElementById('m_aft_technique')?.value.trim()||''};if(playerIds.length<1||playerIds.length>4||!date){showNotif('Choisis 1 à 4 joueurs et une date');return;}const blocks=PILLARS.map(pl=>{const aspect=document.getElementById('m_aspect_'+pl.id).value;const exercise=document.getElementById('m_exercise_'+pl.id).value.trim();return {pillar:pl.id,aspect,exercise,subAspects:aspect?{[aspect]:'travaille'}:{},scores:{},coachState:''};});if(blocks.some(b=>!b.aspect)){showNotif('Choisis 1 aspect par pilier');return;}let savedCount=0;blocks.forEach(b=>{const before=(STATE.customExercises||[]).length;saveCustomExerciseFromBlock(b,'session-create');if((STATE.customExercises||[]).length>before)savedCount++;});const id=Math.max(0,...STATE.sessions.map(s=>s.id))+1;STATE.sessions.push({id,playerId:playerIds[0],playerIds,date,status:'planned',sessionType,aftMeta,goal:document.getElementById('m_session_goal').value.trim(),playerWishes,blocks,futureAspects:[],coachFeedback:{},playerFeedback:{}});closeModal();showNotif(savedCount?`Séance ${sessionTypeLabel(sessionType)} créée · ${savedCount} exercice${savedCount>1?'s':''} sauvegardé${savedCount>1?'s':''}`:`Séance ${sessionTypeLabel(sessionType)} créée`);setUI({page:'sessions',selectedSessionId:id});}
 function limitSessionPlayers(input){const checked=[...document.querySelectorAll('.m_session_player:checked')];if(checked.length>4){input.checked=false;showNotif('Maximum 4 joueurs par séance');}updateSessionPlanningSuggestions();}
 function updateSessionBlock(sessionId,blockIdx,field,value){const s=STATE.sessions.find(s=>s.id===sessionId);if(!s)return;if(!s.blocks[blockIdx])s.blocks[blockIdx]={pillar:PILLARS[blockIdx].id,aspect:'',exercise:'',scores:{},coachState:''};if(field==='exercise')s.blocks[blockIdx].exercise=value;else if(field==='aspect')s.blocks[blockIdx].aspect=value;saveState();}
 function toggleSessionEdit(id){const s=STATE.sessions.find(s=>s.id===id);if(!s)return;s.editMode=!s.editMode;showNotif(s.editMode?'Modification activée':'Modification terminée');render();}
