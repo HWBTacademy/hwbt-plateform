@@ -1453,6 +1453,41 @@ function sessionTypeLabel(type){
 function sessionStructure(s){
   return s?.sessionType==='aft'?AFT_SESSION_BLOCKS:SESSION_BLOCKS;
 }
+const AFT_THEMES = [
+  {key:'service_filet',title:'Service > prendre le filet',technical:'Service',tacticAspect:'Construction du point',physical:'Vitesse',mental:'Concentration',
+    tactics:['Choisir une zone de service claire: T, vitre latérale ou corps.','Se replacer vite pour prendre le filet.','Le partenaire ferme les angles et protège le centre.','Annoncer la direction du service avant de jouer.'],
+    techniques:['Précision du service vers une zone cible.','Placement du serveur et du volleyeur selon la zone choisie.','Premier déplacement vers le filet après le service.'],
+    coachInfo:'Utilise des zones dans le carré de service et un schéma simple sur tableau/flipchart. Vérifie que le serveur ne regarde pas seulement son service mais aussi sa montée.',
+    exercises:['Défi zones service: chaque joueur annonce T, vitre ou corps, puis sert dans la zone. Bonus si la montée au filet est immédiate.','Jeu de départ: point joué uniquement après service annoncé. Le duo marque bonus si serveur et partenaire sont au filet après la 3e balle.','Jeu d’apprentissage: service zone cible + montée + première volée simple dans une grande cible. Prévoir R-1 sans score et R+1 avec retour lobé.','Jeu d’application: tie-break court, bonus si le service crée une balle facile ou une position filet claire.']},
+  {key:'sous_filet',title:'Faire jouer sous le niveau du filet',technical:'Volée',tacticAspect:'Construction du point',physical:'Coordination',mental:'Concentration',
+    tactics:['Jouer bas pour obliger l’adversaire à remonter la balle.','Chercher les pieds ou une zone basse plutôt que la puissance.','Attendre la balle facile créée par la balle basse.'],
+    techniques:['Volée compacte, contact devant, trajectoire basse.','Utiliser un repère visuel de hauteur près du filet.','Contrôler la balle avant de vouloir finir.'],
+    coachInfo:'Un câble ou une rubalise proche du filet aide beaucoup. Le prof doit observer si les joueurs frappent trop fort ou si la balle reste vraiment basse.',
+    exercises:['Échauffement trajectoires basses: échanges faciles avec objectif de passer sous un repère visuel.','Jeu de départ: point bonus quand l’adversaire touche la balle sous le niveau du filet.','Jeu d’apprentissage: volées courtes vers les pieds avec grande cible, puis ajout d’un déplacement. R-1 sans adversaire, R+1 avec défenseur actif.','Jeu d’application: match à thème, bonus si la balle basse provoque une balle facile au coup suivant.']},
+  {key:'diagonale_vitres',title:'Jouer en diagonale et utiliser les vitres',technical:'Sortie de mur',tacticAspect:'Lecture du jeu',physical:'Coordination',mental:'Concentration',
+    tactics:['Utiliser la diagonale car elle donne plus de longueur et de sécurité.','Chercher les angles et éviter le volleyeur.','Imposer des trajectoires qui peuvent amener les doubles vitres.','Varier le rythme sans perdre la sécurité.'],
+    techniques:['Orienter les épaules vers la diagonale.','Accompagner vers la zone longue.','Lire la trajectoire après vitre avant de frapper.'],
+    coachInfo:'Place des rubalises pour montrer les angles et trajectoires. Insiste sur sécurité avant vitesse: la diagonale doit aider le joueur, pas le mettre en panique.',
+    exercises:['Échauffement diagonale: échanges croisés avec cible longue simple.','Jeu de départ: demi-terrain croisé, bonus si la balle touche la zone profonde diagonale.','Jeu d’apprentissage: sortie de vitre ou balle fond de court jouée croisée avec progression R-1/R0/R+1.','Jeu d’application: points en double, bonus si le duo construit en diagonale avant de changer.']},
+  {key:'lob_rester',title:'Lober et rester derrière',technical:'Lob',tacticAspect:'Défense / Attaque',physical:'Coordination',mental:'Confiance',
+    tactics:['Utiliser le lob pour garder de la sécurité.','Rester derrière quand la volée n’est pas encore maîtrisée.','Limiter les choix tactiques des adversaires avec deux joueurs au fond.','Jouer près des vitres avec des balles verticales.'],
+    techniques:['Lob haut, long et contrôlé.','Flexion des jambes et propulsion vers le haut.','Prise de balle sous les hanches quand c’est nécessaire.'],
+    coachInfo:'Utilise des câbles pour la hauteur et deux zones cibles pour la longueur. Ne demande pas un lob parfait: cherche d’abord une trajectoire utile et sûre.',
+    exercises:['Échauffement lobs simples: chaque joueur cherche hauteur + longueur sans pression.','Jeu de départ: duo en défense contre duo au filet, bonus si le lob repousse les adversaires.','Jeu d’apprentissage: séries de lobs avec cible profonde, puis ajout d’un adversaire au filet. R-1 grande cible, R+1 choix lob ou chiquita.','Jeu d’application: point libre, bonus si le duo reste organisé derrière après le lob.']},
+  {key:'vitesse_basse',title:'Jouer calmement à vitesse basse',technical:'Coup droit',tacticAspect:'Adaptation adversaire',physical:'Endurance',mental:'Routine',
+    tactics:['Accepter de ne pas rater.','Faire mourir les balles près de la vitre.','Inviter l’adversaire à prendre le risque.','Jouer au centre pour créer de l’incertitude.'],
+    techniques:['Geste simple et relâché.','Contrôle de longueur plutôt que puissance.','Balle placée près de la vitre ou dans une zone centrale.'],
+    coachInfo:'Les balles rouges peuvent aider si le groupe va trop vite. Le prof doit valoriser la patience et compter les fautes évitées, pas seulement les coups gagnants.',
+    exercises:['Échauffement rallye calme: record d’échanges sans accélérer.','Jeu de départ: point gagné double si l’adversaire faute après une balle lente bien placée.','Jeu d’apprentissage: séries centre/vitre avec consigne de vitesse basse et cible large. R+1 avec score imposé.','Jeu d’application: match court où les fautes directes coûtent double et les échanges longs donnent bonus.']},
+  {key:'sans_vitres',title:"Enlever du temps à l'adversaire",technical:'Retour de service',tacticAspect:'Lecture du jeu',physical:'Vitesse',mental:'Prise de risque',
+    tactics:['Jouer plus tôt pour réduire le temps de réaction adverse.','Limiter les angles en visant une zone centrale.','Répondre selon la position des adversaires.','Regarder devant soi avant de choisir.'],
+    techniques:['Prise de balle tôt quand c’est possible.','Frappe plus directe, sans attendre la vitre.','Ajuster vitesse et précision sans perdre le contrôle.'],
+    coachInfo:'Commence avec balles rouges si nécessaire pour contrôler. Attention: si la balle ralentit trop, le thème perd son sens. Fais sentir la différence avec/sans vitre.',
+    exercises:['Échauffement réaction: balle envoyée simple, joueur prend tôt ou laisse passer selon signal.','Jeu de départ: point bonus si la balle est prise avant la vitre et force une réponse rapide.','Jeu d’apprentissage: prise tôt vers zone centrale, puis ajout d’une décision selon position adverse. R-1 sans adversaire, R+1 avec score.','Jeu d’application: jeu au temps, objectif de faire jouer sans vitre quand la balle le permet.']}
+];
+function aftThemeByKey(key){
+  return AFT_THEMES.find(t=>t.key===key)||null;
+}
 const EXERCISE_LIBRARY=[
   {id:'ex001',title:'Volées profondes avec cible',pillar:'T',aspect:'Volée',secondary:'Placement terrain',level:'débutant',players:'2-4',duration:'12 min',setup:'Un joueur au filet, un joueur en fond. Deux zones profondes matérialisées avec cônes.',flow:'Le joueur au filet joue 8 volées de suite. Objectif: garder une volée compacte, profonde et contrôlée. Rotation après chaque série.',scoring:'1 point si la volée touche la zone. Bonus si la balle reste basse. Note exécution, compréhension et pression.',coach:'Insiste sur préparation courte, appuis actifs, cible avant puissance.',profiles:'Rouge: canaliser la finition. Vert: répéter stable. Jaune: mettre un défi. Bleu: donner un repère de zone.'},
   {id:'ex002',title:'Bandeja filet gardé',pillar:'T',aspect:'Bandeja',secondary:'Défense / Attaque',level:'intermédiaire',players:'2-4',duration:'15 min',setup:'Un joueur lobe, l’autre joue bandeja puis revient couvrir le filet.',flow:'Série de 10 lobs. La bandeja doit être longue, tendue, puis retour position filet.',scoring:'Score /10: profondeur, hauteur, replacement. Le secondaire mesure la qualité du retour filet.',coach:'La bandeja ne doit pas être un coup gagnant, elle doit garder l’avantage.'},
@@ -2195,6 +2230,7 @@ function sessionBriefing(s,player,pr){
         ${s.aftMeta.technical?`<div class="briefing-item"><div class="briefing-pill" style="color:var(--bronze)">TECHNIQUE</div><div style="font-size:12px;font-weight:700">${esc(s.aftMeta.technical)}</div></div>`:''}
         ${s.aftMeta.tactic?`<div class="briefing-item"><div class="briefing-pill" style="color:var(--bronze)">TACTIQUE</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.5">${esc(s.aftMeta.tactic)}</div></div>`:''}
         ${s.aftMeta.technique?`<div class="briefing-item"><div class="briefing-pill" style="color:var(--bronze)">REPÈRES</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.5">${esc(s.aftMeta.technique)}</div></div>`:''}
+        ${s.aftMeta.coachInfo?`<div class="briefing-item"><div class="briefing-pill" style="color:var(--bronze)">INFOS PROF</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.5">${esc(s.aftMeta.coachInfo)}</div></div>`:''}
       </div>`:''}
       <div class="briefing-list">
         ${blocks.map(b=>{const pl=PILLARS.find(p=>p.id===b.pillar);return `<div class="briefing-item"><div class="briefing-pill" style="color:${pl?pl.color:'var(--bronze)'}">${pl?pl.name:b.pillar}</div><div style="font-size:12px;font-weight:600">${esc(b.aspect)}</div>${b.exercise?`<div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.5;margin-top:5px">${esc(b.exercise)}</div>`:''}</div>`}).join('')}
@@ -4137,14 +4173,24 @@ function newSessionModalHtml(extra){
   <div class="form-group"><label class="form-label">JOUEURS (1 À 4)</label><div class="session-player-grid">${STATE.players.map(p=>`<label class="session-player-choice"><input type="checkbox" class="m_session_player" value="${p.id}" ${selected.includes(p.id)?'checked':''} onchange="limitSessionPlayers(this)"><span><span class="session-player-name">${esc(p.name)}</span><span class="session-player-meta">${esc(p.code||'')}</span></span></label>`).join('')}</div></div>
   <div class="form-group"><label class="form-label">DATE</label><input class="form-input" id="m_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
   <div class="g2">
-    <div class="form-group"><label class="form-label">THÈME AFT / FIL ROUGE</label><input class="form-input" id="m_aft_theme" placeholder="Ex: construire le point après vitre, défendre bas, monter au filet..."></div>
+    <div class="form-group"><label class="form-label">THÈME AFT OFFICIEL</label><select class="form-select" id="m_aft_theme_key" onchange="applyAftThemeToModal(this.value)"><option value="">— Choisir un thème —</option>${AFT_THEMES.map(t=>`<option value="${t.key}">${esc(t.title)}</option>`).join('')}</select></div>
     <div class="form-group"><label class="form-label">ASPECT TECHNIQUE CIBLÉ</label><input class="form-input" id="m_aft_technical" placeholder="Ex: revers à plat après vitre, volée contrôlée, lob de défense..."></div>
+  </div>
+  <div class="form-group"><label class="form-label">THÈME / FIL ROUGE MODIFIABLE</label><input class="form-input" id="m_aft_theme" placeholder="Le thème choisi se mettra ici, tu peux l'adapter."></div>
+  <div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
+    <div style="font-size:10px;letter-spacing:1.5px;color:var(--bronze);margin-bottom:10px">QUESTIONS ASSISTANT AFT</div>
+    <div class="g3">
+      <div class="form-group"><label class="form-label">NIVEAU DU GROUPE</label><select class="form-select" id="m_aft_level"><option>Débutant</option><option>Débutant +</option><option>Intermédiaire</option></select></div>
+      <div class="form-group"><label class="form-label">CE QUE LE PROF VEUT VOIR</label><input class="form-input" id="m_aft_teacher_goal" placeholder="Ex: plus de balles basses, moins de fautes, meilleure communication..."></div>
+      <div class="form-group"><label class="form-label">CONTRAINTE / MATÉRIEL</label><input class="form-input" id="m_aft_constraint" placeholder="Ex: 4 joueurs, balles rouges, câbles, rubalises, peu de paniers..."></div>
+    </div>
   </div>
   <div class="g2">
     <div class="form-group"><label class="form-label">TACTIQUE À TRANSMETTRE</label><textarea class="form-input" id="m_aft_tactic" rows="2" placeholder="Ce que le joueur doit comprendre par le jeu."></textarea></div>
     <div class="form-group"><label class="form-label">TECHNIQUE À TRANSMETTRE</label><textarea class="form-input" id="m_aft_technique" rows="2" placeholder="Repères simples du geste, sans surcorriger."></textarea></div>
   </div>
-  <div style="background:var(--bg4);border-left:3px solid var(--bronze);padding:10px 12px;border-radius:0 6px 6px 0;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:14px">Pour une séance AFT, remplis surtout le thème et les repères. Les 4 aspects HWBT restent utiles pour mesurer la progression après la séance.</div>
+  <div style="background:var(--bg4);border-left:3px solid var(--bronze);padding:10px 12px;border-radius:0 6px 6px 0;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:14px">Pour une séance AFT, choisis un thème officiel puis lance l’assistant. Il prépare le fil conducteur, les consignes tactiques/techniques et les exercices. Les 4 aspects HWBT restent utiles pour mesurer la progression après la séance.</div>
+  <div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button type="button" class="btn btn-primary btn-sm" onclick="fillAftSessionAssistant()">ASSISTANT AFT · GÉNÉRER LE PLAN</button></div>
   <div class="form-group"><label class="form-label">RETOUR / DEMANDES JOUEURS</label><textarea class="form-input" id="m_player_wishes" rows="3" placeholder="Ex: Julie veut travailler la confiance au filet. Marc veut mieux gérer les points importants."></textarea></div>
   <div id="sessionPlanningSuggestions" style="margin-bottom:16px">${sessionPlanningSuggestionsHtml(selected)}</div>
   <div style="font-size:10px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:12px">CHOIX COACH — 1 ASPECT PAR PILIER</div>
@@ -4184,6 +4230,46 @@ function applySmartSessionPlan(){
   if(goal&&!goal.value.trim()) goal.value='Séance générée sur les priorités joueur, coach et app: clarifier 1 aspect par pilier, entraîner, puis valider au point 5.';
   showNotif('Séance intelligente pré-remplie');
 }
+function applyAftThemeToModal(key){
+  const theme=aftThemeByKey(key);
+  if(!theme) return;
+  const type=document.querySelector('input[name="m_session_type"][value="aft"]');
+  if(type) type.checked=true;
+  const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val||'';};
+  set('m_aft_theme',theme.title);
+  set('m_aft_technical',theme.technical);
+  set('m_aft_tactic',theme.tactics.join('\n'));
+  set('m_aft_technique',theme.techniques.join('\n'));
+  set('m_session_goal',`Séance AFT: ${theme.title}. Faire découvrir le thème par le jeu, puis transférer en situation réelle.`);
+  showNotif('Thème AFT chargé');
+}
+function fillAftSessionAssistant(){
+  const key=document.getElementById('m_aft_theme_key')?.value||'';
+  const theme=aftThemeByKey(key);
+  if(!theme){showNotif('Choisis d’abord un thème AFT');return;}
+  applyAftThemeToModal(key);
+  const level=document.getElementById('m_aft_level')?.value||'Débutant';
+  const teacherGoal=document.getElementById('m_aft_teacher_goal')?.value.trim()||'faire découvrir le thème par le jeu';
+  const constraint=document.getElementById('m_aft_constraint')?.value.trim()||'4 joueurs, beaucoup de touches, pas d’attente';
+  const plan=[
+    {pillar:'T',aspect:theme.technical,exercise:`Échauffement (${level}) - ${theme.exercises[0]}`},
+    {pillar:'TA',aspect:theme.tacticAspect,exercise:`Jeu de départ - ${theme.exercises[1]}`},
+    {pillar:'P',aspect:theme.physical,exercise:`Jeu d'apprentissage - ${theme.exercises[2]}`},
+    {pillar:'M',aspect:theme.mental,exercise:`Jeu d'application - ${theme.exercises[3]}`}
+  ];
+  plan.forEach(p=>{
+    const sel=document.getElementById('m_aspect_'+p.pillar);
+    const txt=document.getElementById('m_exercise_'+p.pillar);
+    if(sel){
+      if(![...sel.options].some(o=>o.value===p.aspect)) sel.add(new Option(p.aspect,p.aspect));
+      sel.value=p.aspect;
+    }
+    if(txt) txt.value=p.exercise;
+  });
+  const goal=document.getElementById('m_session_goal');
+  if(goal) goal.value=`Séance AFT ${level}: ${theme.title}. Objectif prof: ${teacherGoal}. Contrainte: ${constraint}.`;
+  showNotif('Assistant AFT: séance pré-remplie');
+}
 function openNextSessionFromSession(sessionId){
   const s=STATE.sessions.find(x=>x.id===sessionId);
   if(!s) return;
@@ -4204,7 +4290,7 @@ function openNextSessionFromSession(sessionId){
     applySmartSessionPlan();
   },0);
 }
-function createSession(){const playerIds=selectedSessionPlayerIds();const date=document.getElementById('m_date').value;const playerWishes=document.getElementById('m_player_wishes')?.value.trim()||'';const sessionType=document.querySelector('input[name="m_session_type"]:checked')?.value||'hwbt';const aftMeta={theme:document.getElementById('m_aft_theme')?.value.trim()||'',technical:document.getElementById('m_aft_technical')?.value.trim()||'',tactic:document.getElementById('m_aft_tactic')?.value.trim()||'',technique:document.getElementById('m_aft_technique')?.value.trim()||''};if(playerIds.length<1||playerIds.length>4||!date){showNotif('Choisis 1 à 4 joueurs et une date');return;}const blocks=PILLARS.map(pl=>{const aspect=document.getElementById('m_aspect_'+pl.id).value;const exercise=document.getElementById('m_exercise_'+pl.id).value.trim();return {pillar:pl.id,aspect,exercise,subAspects:aspect?{[aspect]:'travaille'}:{},scores:{},coachState:''};});if(blocks.some(b=>!b.aspect)){showNotif('Choisis 1 aspect par pilier');return;}let savedCount=0;blocks.forEach(b=>{const before=(STATE.customExercises||[]).length;saveCustomExerciseFromBlock(b,'session-create');if((STATE.customExercises||[]).length>before)savedCount++;});const id=Math.max(0,...STATE.sessions.map(s=>s.id))+1;STATE.sessions.push({id,playerId:playerIds[0],playerIds,date,status:'planned',sessionType,aftMeta,goal:document.getElementById('m_session_goal').value.trim(),playerWishes,blocks,futureAspects:[],coachFeedback:{},playerFeedback:{}});closeModal();showNotif(savedCount?`Séance ${sessionTypeLabel(sessionType)} créée · ${savedCount} exercice${savedCount>1?'s':''} sauvegardé${savedCount>1?'s':''}`:`Séance ${sessionTypeLabel(sessionType)} créée`);setUI({page:'sessions',selectedSessionId:id});}
+function createSession(){const playerIds=selectedSessionPlayerIds();const date=document.getElementById('m_date').value;const playerWishes=document.getElementById('m_player_wishes')?.value.trim()||'';const sessionType=document.querySelector('input[name="m_session_type"]:checked')?.value||'hwbt';const themeKey=document.getElementById('m_aft_theme_key')?.value||'';const theme=aftThemeByKey(themeKey);const aftMeta={themeKey,theme:document.getElementById('m_aft_theme')?.value.trim()||'',technical:document.getElementById('m_aft_technical')?.value.trim()||'',tactic:document.getElementById('m_aft_tactic')?.value.trim()||'',technique:document.getElementById('m_aft_technique')?.value.trim()||'',level:document.getElementById('m_aft_level')?.value||'',teacherGoal:document.getElementById('m_aft_teacher_goal')?.value.trim()||'',constraint:document.getElementById('m_aft_constraint')?.value.trim()||'',coachInfo:theme?.coachInfo||''};if(playerIds.length<1||playerIds.length>4||!date){showNotif('Choisis 1 à 4 joueurs et une date');return;}const blocks=PILLARS.map(pl=>{const aspect=document.getElementById('m_aspect_'+pl.id).value;const exercise=document.getElementById('m_exercise_'+pl.id).value.trim();return {pillar:pl.id,aspect,exercise,subAspects:aspect?{[aspect]:'travaille'}:{},scores:{},coachState:''};});if(blocks.some(b=>!b.aspect)){showNotif('Choisis 1 aspect par pilier');return;}let savedCount=0;blocks.forEach(b=>{const before=(STATE.customExercises||[]).length;saveCustomExerciseFromBlock(b,'session-create');if((STATE.customExercises||[]).length>before)savedCount++;});const id=Math.max(0,...STATE.sessions.map(s=>s.id))+1;STATE.sessions.push({id,playerId:playerIds[0],playerIds,date,status:'planned',sessionType,aftMeta,goal:document.getElementById('m_session_goal').value.trim(),playerWishes,blocks,futureAspects:[],coachFeedback:{},playerFeedback:{}});closeModal();showNotif(savedCount?`Séance ${sessionTypeLabel(sessionType)} créée · ${savedCount} exercice${savedCount>1?'s':''} sauvegardé${savedCount>1?'s':''}`:`Séance ${sessionTypeLabel(sessionType)} créée`);setUI({page:'sessions',selectedSessionId:id});}
 function limitSessionPlayers(input){const checked=[...document.querySelectorAll('.m_session_player:checked')];if(checked.length>4){input.checked=false;showNotif('Maximum 4 joueurs par séance');}updateSessionPlanningSuggestions();}
 function updateSessionBlock(sessionId,blockIdx,field,value){const s=STATE.sessions.find(s=>s.id===sessionId);if(!s)return;if(!s.blocks[blockIdx])s.blocks[blockIdx]={pillar:PILLARS[blockIdx].id,aspect:'',exercise:'',scores:{},coachState:''};if(field==='exercise')s.blocks[blockIdx].exercise=value;else if(field==='aspect')s.blocks[blockIdx].aspect=value;saveState();}
 function toggleSessionEdit(id){const s=STATE.sessions.find(s=>s.id===id);if(!s)return;s.editMode=!s.editMode;showNotif(s.editMode?'Modification activée':'Modification terminée');render();}
