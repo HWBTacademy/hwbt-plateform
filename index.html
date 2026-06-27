@@ -2271,7 +2271,8 @@ const DIAGRAM_TOOLS=[
   {id:'cone',label:'△',name:'Cône',color:'#ff7f50',type:'cone'},
   {id:'zone',label:'ZONE',name:'Zone',color:'#27ae60',type:'zone'},
   {id:'run',label:'Course',name:'Ligne de course',color:'#ffffff',type:'run'},
-  {id:'shot',label:'Balle',name:'Ligne de balle',color:'#f4d35e',type:'shot'},
+  {id:'shot',label:'Balle droite',name:'Ligne de balle droite',color:'#f4d35e',type:'shot'},
+  {id:'lob',label:'Lob courbe',name:'Trajectoire de lob courbe',color:'#f4d35e',type:'lob'},
   {id:'feed',label:'Lancer',name:'Ligne lanceur',color:'#f39c12',type:'feed'}
 ];
 function diagramTool(){
@@ -2284,9 +2285,9 @@ function courtBaseSvg(inner='',editable=false,sessionId=null,blockIdx=null){
   return `<svg viewBox="0 0 100 200" style="width:100%;max-width:330px;aspect-ratio:1/2;background:#0d1117;border:1px solid var(--border2);border-radius:8px;touch-action:manipulation;display:block;margin:auto" ${editable?`onclick="diagramCourtClick(event,${sessionId},${blockIdx})"`:''}>
     <defs>
       <marker id="arrowHead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#d4a017"></path></marker>
-      <marker id="runHead" markerWidth="5" markerHeight="5" refX="4.4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#ffffff"></path></marker>
-      <marker id="shotHead" markerWidth="5" markerHeight="5" refX="4.4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#f4d35e"></path></marker>
-      <marker id="feedHead" markerWidth="5" markerHeight="5" refX="4.4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#f39c12"></path></marker>
+      <marker id="runHead" markerWidth="4" markerHeight="4" refX="3.4" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 Z" fill="#ffffff"></path></marker>
+      <marker id="shotHead" markerWidth="4" markerHeight="4" refX="3.4" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 Z" fill="#f4d35e"></path></marker>
+      <marker id="feedHead" markerWidth="4" markerHeight="4" refX="3.4" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 Z" fill="#f39c12"></path></marker>
     </defs>
     <rect x="8" y="8" width="84" height="184" rx="2" fill="#101820" stroke="#d4a017" stroke-width="1.3"></rect>
     <line x1="8" y1="100" x2="92" y2="100" stroke="#eee" stroke-width="1.2"></line>
@@ -2302,9 +2303,11 @@ function courtBaseSvg(inner='',editable=false,sessionId=null,blockIdx=null){
 }
 function diagramItemSvg(it){
   const x=Number(it.x)||50, y=Number(it.y)||100;
-  if(it.type==='run') return `<line x1="${x}" y1="${y}" x2="${Number(it.x2)||Math.min(92,x+22)}" y2="${Number(it.y2)||Math.max(8,y-18)}" stroke="${esc(it.color||'#fff')}" stroke-width="1.25" marker-end="url(#runHead)" stroke-linecap="round" stroke-dasharray="3 2"></line>`;
-  if(it.type==='shot') return `<line x1="${x}" y1="${y}" x2="${Number(it.x2)||Math.min(92,x+24)}" y2="${Number(it.y2)||y}" stroke="${esc(it.color||'#f4d35e')}" stroke-width="1.25" marker-end="url(#shotHead)" stroke-linecap="round"></line>`;
-  if(it.type==='feed') return `<line x1="${x}" y1="${y}" x2="${Number(it.x2)||Math.min(92,x+22)}" y2="${Number(it.y2)||Math.min(192,y+15)}" stroke="${esc(it.color||'#f39c12')}" stroke-width="1.15" marker-end="url(#feedHead)" stroke-linecap="round" stroke-dasharray="2 2"></line>`;
+  const x2=Number.isFinite(Number(it.x2))?Number(it.x2):x, y2=Number.isFinite(Number(it.y2))?Number(it.y2):y;
+  if(it.type==='run') return `<line x1="${x}" y1="${y}" x2="${x2}" y2="${y2}" stroke="${esc(it.color||'#fff')}" stroke-width=".8" marker-end="url(#runHead)" stroke-linecap="round" stroke-dasharray="2.5 2"></line>`;
+  if(it.type==='shot') return `<line x1="${x}" y1="${y}" x2="${x2}" y2="${y2}" stroke="${esc(it.color||'#f4d35e')}" stroke-width=".85" marker-end="url(#shotHead)" stroke-linecap="round"></line>`;
+  if(it.type==='lob'){const cx=(x+x2)/2, cy=Math.min(y,y2)-28;return `<path d="M${x},${y} Q${cx},${cy} ${x2},${y2}" fill="none" stroke="${esc(it.color||'#f4d35e')}" stroke-width=".85" marker-end="url(#shotHead)" stroke-linecap="round"></path>`;}
+  if(it.type==='feed') return `<line x1="${x}" y1="${y}" x2="${x2}" y2="${y2}" stroke="${esc(it.color||'#f39c12')}" stroke-width=".75" marker-end="url(#feedHead)" stroke-linecap="round" stroke-dasharray="2 2"></line>`;
   if(it.type==='ball') return `<circle cx="${x}" cy="${y}" r="3.2" fill="${esc(it.color||'#f4d35e')}" stroke="#000" stroke-width=".8"></circle>`;
   if(it.type==='target') return `<g><rect x="${x-5}" y="${y-5}" width="10" height="10" rx="1" fill="none" stroke="${esc(it.color||'#fff')}" stroke-width="1.5" stroke-dasharray="2 1"></rect><text x="${x}" y="${y+1.5}" text-anchor="middle" fill="${esc(it.color||'#fff')}" font-size="5">C</text></g>`;
   if(it.type==='zone'){const w=Number(it.w)||20,h=Number(it.h)||16;return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="${esc(it.color||'#27ae60')}22" stroke="${esc(it.color||'#27ae60')}" stroke-width="1.1" stroke-dasharray="3 2"></rect>`;}
@@ -2321,7 +2324,8 @@ function diagramHtml(s,blockIdx,editable=false){
   const pending=UI.diagramPending&&UI.diagramPending.sessionId===s.id&&UI.diagramPending.blockIdx===blockIdx?UI.diagramPending:null;
   const legend=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;margin-top:10px;font-size:9px;color:var(--gray);font-family:var(--font-body);line-height:1.35">
     <div><b style="color:var(--offwhite)">Course</b>: ligne blanche pointillée</div>
-    <div><b style="color:var(--offwhite)">Balle</b>: ligne jaune</div>
+    <div><b style="color:var(--offwhite)">Balle droite</b>: ligne jaune droite</div>
+    <div><b style="color:var(--offwhite)">Lob</b>: courbe jaune</div>
     <div><b style="color:var(--offwhite)">Lancer</b>: ligne orange pointillée</div>
     <div><b style="color:var(--offwhite)">CO/L/PAN</b>: coach, lanceur, panier</div>
   </div>`;
@@ -4475,7 +4479,7 @@ function diagramCourtClick(evt,sessionId,blockIdx){
   const x=Math.max(8,Math.min(92,((evt.clientX-r.left)/r.width)*100));
   const y=Math.max(8,Math.min(192,((evt.clientY-r.top)/r.height)*200));
   const tool=diagramToolData();
-  const twoClick=['run','shot','feed','zone'].includes(tool.type);
+  const twoClick=['run','shot','lob','feed','zone'].includes(tool.type);
   const pending=UI.diagramPending;
   if(twoClick&&(!pending||pending.sessionId!==sessionId||pending.blockIdx!==blockIdx||pending.tool!==tool.type)){
     UI.diagramPending={sessionId,blockIdx,tool:tool.type,label:tool.label,color:tool.color,x:+x.toFixed(1),y:+y.toFixed(1)};
@@ -4508,7 +4512,8 @@ function diagramSummaryText(block){
   const players=items.filter(i=>i.type==='player').map(i=>i.label).join(', ');
   if(players)lines.push(`Joueurs positionnés: ${players}.`);
   if(count('feed'))lines.push(`${count('feed')} ligne(s) de lancer indiquent les balles envoyées par le coach/lanceur.`);
-  if(count('shot'))lines.push(`${count('shot')} trajectoire(s) de balle montrent la direction recherchée.`);
+  if(count('shot'))lines.push(`${count('shot')} trajectoire(s) de balle droite montrent la direction recherchée.`);
+  if(count('lob'))lines.push(`${count('lob')} lob(s) courbe(s) montrent la trajectoire haute à chercher.`);
   if(count('run'))lines.push(`${count('run')} ligne(s) de course montrent les déplacements attendus.`);
   if(count('zone'))lines.push(`${count('zone')} zone(s) matérialisent les zones à viser ou à défendre.`);
   if(count('target'))lines.push(`${count('target')} cible(s) indiquent les objectifs de précision.`);
@@ -4533,7 +4538,8 @@ function diagramFromText(sessionId,blockIdx){
   ];
   if(/cible|zone|viser|objectif|pied|vitre|long/.test(text))items.push({type:'target',label:'C',color:'#ffffff',x:72,y:44},{type:'zone',label:'ZONE',color:'#27ae60',x:62,y:34,w:22,h:18});
   if(/lancer|panier|coach|envoi|envoy/.test(text))items.push({type:'feed',label:'Lancer',color:'#f39c12',x:42,y:106,x2:28,y2:156});
-  if(/balle|trajectoire|lob|volée|service|retour|frappe/.test(text))items.push({type:'shot',label:'Balle',color:'#f4d35e',x:28,y:156,x2:/lob/.test(text)?50:72,y2:/lob/.test(text)?38:44});
+  if(/lob/.test(text))items.push({type:'lob',label:'Lob courbe',color:'#f4d35e',x:28,y:156,x2:72,y2:44});
+  else if(/balle|trajectoire|volée|service|retour|frappe/.test(text))items.push({type:'shot',label:'Balle droite',color:'#f4d35e',x:28,y:156,x2:72,y2:44});
   if(/monte|replacement|déplacement|course|suivre|avancer|revenir/.test(text))items.push({type:'run',label:'Course',color:'#ffffff',x:28,y:156,x2:45,y2:128});
   if(/cone|cône|plot/.test(text))items.push({type:'cone',label:'△',color:'#ff7f50',x:35,y:126},{type:'cone',label:'△',color:'#ff7f50',x:65,y:126});
   b.diagramItems=items;
@@ -4550,7 +4556,7 @@ function addDiagramTemplate(sessionId,blockIdx){
     {type:'target',label:'C',color:'#ffffff',x:28,y:44},
     {type:'target',label:'C',color:'#ffffff',x:72,y:44},
     {type:'feed',label:'Lancer',color:'#f39c12',x:42,y:106,x2:28,y2:156},
-    {type:'shot',label:'Balle',color:'#f4d35e',x:28,y:156,x2:72,y2:44},
+    {type:'shot',label:'Balle droite',color:'#f4d35e',x:28,y:156,x2:72,y2:44},
     {type:'run',label:'Course',color:'#ffffff',x:28,y:156,x2:45,y2:128}
   ];
   saveState(); render();
