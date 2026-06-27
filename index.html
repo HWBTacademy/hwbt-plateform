@@ -2348,52 +2348,52 @@ function professionalPrepHtml(s){
   const steps=sessionStructure(s);
   const theme=aftThemeByKey(meta.themeKey);
   const workedSides=blocks.map(b=>{const pl=PILLARS.find(p=>p.id===b.pillar);return `${pl?.name||b.pillar}: ${b.aspect||'à définir'}`;});
-  const benefits=[
-    'Donner une intention claire avant le terrain: le joueur sait quoi chercher et le coach sait quoi observer.',
-    'Relier technique et tactique: le geste sert une décision de jeu, pas une correction isolée.',
-    'Garder un rythme actif: beaucoup de touches, peu d’attente, règles simples et score visible.',
-    'Mesurer la progression avec des critères courts: état acquis/non acquis, aspect principal et secondaire.',
-    'Créer une trace pour la prochaine séance: ce qui a été travaillé, ce qui reste à stabiliser et le ressenti joueur.'
-  ];
-  const quality=[
-    'Contrôle avant puissance: chercher une balle utile avant une balle spectaculaire.',
-    'Communication courte et tôt: moi, toi, derrière, collés, ils montent.',
-    'Déplacement en duo: fermer le centre, garder une distance raisonnable, bouger ensemble.',
-    'Filet avec intention: monter seulement si la balle permet de tenir ou mettre pression.',
-    'Lob et vitres: utiliser la hauteur, la profondeur et le temps gagné pour se replacer.',
-    'Méthode sandwich: valoriser, guider par question ou règle, terminer par un encouragement concret.'
-  ];
+  const materialSource=[meta.constraint||'',...blocks.map(b=>b.exercise||'')].join(' ').toLowerCase();
+  const materials=['Balles','Cônes','Cibles/zones','Tableau/flipchart'];
+  if(/panier|basket/.test(materialSource)) materials.push('Panier');
+  if(/câble|cable/.test(materialSource)) materials.push('Câbles');
+  if(/rubalise|marque|fl[eé]chage/.test(materialSource)) materials.push('Rubalises / marques au sol');
+  if(/balle rouge|balles rouges/.test(materialSource)) materials.push('Balles rouges');
+  const benefits=['Objectif clair','Beaucoup de touches','Technique liée à la tactique','Feedback sandwich','Trace pour la suite'];
+  const quality=['Contrôle avant puissance','Communication tôt et court','Placement en duo','Progression R-1/R0/R+1','Évaluation rapide'];
   const blockRows=blocks.map((b,i)=>{const pl=PILLARS.find(p=>p.id===b.pillar);const st=aft?steps[Math.min(i,3)]:steps[i];return `<section class="exercise">
-    <div class="ex-head"><span>${String(i+1).padStart(2,'0')}</span><div><h3>${esc(st?.name||pl?.name||'Bloc')}</h3><p>${esc(st?.time||'')} · ${esc(pl?.name||b.pillar)} · ${esc(b.aspect||'Aspect à définir')}</p></div></div>
-    <div class="grid2">
-      <div><h4>Consigne / Déroulement</h4><p>${nl2br(b.exercise||'Exercice à préciser.')}</p><h4>Critères coach</h4><ul><li>Objectif visible et compris par les joueurs.</li><li>Règle simple qui force le comportement attendu.</li><li>Progression R-1/R0/R+1 prête si le niveau change.</li></ul></div>
-      <div><h4>Schéma terrain</h4>${printDiagramSvg(b)}</div>
+    <div class="ex-title"><span>${String(i+1).padStart(2,'0')}</span><div><h3>${esc(st?.name||pl?.name||'Bloc')}</h3><p>${esc(st?.time||'')} · ${esc(pl?.name||b.pillar)} · ${esc(b.aspect||'Aspect à définir')}</p></div></div>
+    <div class="exercise-grid">
+      <div class="diagram-panel">${printDiagramSvg(b)}</div>
+      <div class="text-panel"><h4>Déroulement</h4><p>${nl2br(b.exercise||'Exercice à préciser.')}</p><div class="mini-check"><span>Objectif visible</span><span>Règle simple</span><span>R-/R0/R+</span></div></div>
     </div>
   </section>`}).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Dossier séance HWBT</title><style>
-    :root{--bronze:#b88935;--bg:#09090b;--ink:#151515;--muted:#666}
-    *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:var(--ink);margin:0;background:#f4f1eb;font-size:12px;line-height:1.45}
-    .page{max-width:980px;margin:0 auto;background:white;padding:34px 42px}
-    header{border-bottom:3px solid var(--bronze);padding-bottom:18px;margin-bottom:22px;display:flex;justify-content:space-between;gap:24px}
-    h1{font-size:32px;line-height:1;margin:0;text-transform:uppercase;letter-spacing:1px} h2{font-size:16px;margin:22px 0 10px;text-transform:uppercase;letter-spacing:1px;color:#8a5f1e} h3{font-size:18px;margin:0;text-transform:uppercase} h4{font-size:11px;margin:12px 0 5px;text-transform:uppercase;color:#8a5f1e;letter-spacing:.8px}
-    .meta{font-size:11px;color:#555;text-align:right}.pill{display:inline-block;border:1px solid #d8c29a;background:#fbf4e8;color:#8a5f1e;padding:4px 8px;border-radius:4px;margin:3px 4px 3px 0;font-size:10px;text-transform:uppercase;letter-spacing:.6px}
-    .box{border:1px solid #ddd;border-radius:8px;padding:14px;margin:10px 0;background:#fff}.grid2{display:grid;grid-template-columns:1.3fr .7fr;gap:18px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-    ul{margin:6px 0 0 18px;padding:0} li{margin:3px 0}.exercise{break-inside:avoid;border-top:1px solid #ddd;padding-top:15px;margin-top:15px}.ex-head{display:flex;gap:12px;align-items:flex-start;margin-bottom:8px}.ex-head>span{background:#111;color:#fff;border-radius:4px;padding:8px 10px;font-weight:bold}.ex-head p{margin:4px 0 0;color:#666;font-size:11px}
-    svg{--border2:#ddd;--border:#ddd;--bronze:#b88935;max-height:300px}.small{font-size:10px;color:#666}.sandwich{border-left:4px solid var(--bronze);padding-left:12px}
-    @media print{body{background:white}.page{padding:18mm;max-width:none}.no-print{display:none}.exercise{page-break-inside:avoid}}
+    :root{--gold:#b88935;--black:#09090b;--ink:#171717;--muted:#6f6f6f;--line:#ded7cc;--paper:#fbfaf7}
+    *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:var(--ink);margin:0;background:#ece6da;font-size:11px;line-height:1.35}
+    .page{max-width:1020px;margin:0 auto;background:var(--paper);padding:22px}
+    .hero{background:linear-gradient(135deg,#08080a,#1a1712);color:white;border-radius:12px;padding:22px 26px;display:flex;justify-content:space-between;gap:20px;align-items:flex-start;border:1px solid #2a2114}
+    .brand{font-size:10px;letter-spacing:2px;color:var(--gold);text-transform:uppercase}.hero h1{font-size:30px;line-height:.95;margin:6px 0 8px;text-transform:uppercase;letter-spacing:1px}.hero p{margin:0;color:#d8d2c8;max-width:620px}
+    .hero-meta{text-align:right;font-size:11px;color:#d8d2c8;min-width:170px}.hero-meta b{font-size:15px;color:white}
+    h2{font-size:13px;margin:0 0 9px;text-transform:uppercase;letter-spacing:1.4px;color:#7a551d} h3{font-size:15px;margin:0;text-transform:uppercase} h4{font-size:9px;margin:0 0 5px;text-transform:uppercase;color:#7a551d;letter-spacing:1px}
+    .top-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:10px;margin-top:10px}.box{background:white;border:1px solid var(--line);border-radius:10px;padding:12px;break-inside:avoid}.compact-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    .tag{display:inline-flex;align-items:center;border:1px solid #d7c396;background:#fbf1dd;color:#7a551d;border-radius:999px;padding:4px 8px;margin:2px;font-size:9px;text-transform:uppercase;letter-spacing:.6px;font-weight:700}.dark-tag{background:#111;color:white;border-color:#111}
+    .timeline{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}.step{border-left:3px solid var(--gold);background:#fff;border-radius:8px;padding:8px;min-height:58px}.step b{font-size:10px}.step span{display:block;color:var(--muted);font-size:9px;margin-top:3px}
+    .key-points{display:flex;flex-wrap:wrap;gap:5px}.key-points span{background:#f2eee7;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:10px}
+    .exercise{background:white;border:1px solid var(--line);border-radius:12px;margin-top:10px;padding:12px;break-inside:avoid}.ex-title{display:flex;gap:10px;align-items:center;margin-bottom:9px}.ex-title>span{background:#111;color:white;border-radius:7px;padding:8px 10px;font-weight:800}.ex-title p{margin:2px 0 0;color:var(--muted);font-size:10px}
+    .exercise-grid{display:grid;grid-template-columns:240px 1fr;gap:14px;align-items:start}.diagram-panel{background:#111;border-radius:10px;padding:8px}.text-panel p{margin:0 0 8px;white-space:normal}.mini-check{display:flex;gap:6px;flex-wrap:wrap}.mini-check span{background:#f2eee7;border:1px solid var(--line);border-radius:6px;padding:5px 7px;font-size:9px}
+    svg{--border2:#ddd;--border:#ddd;--bronze:#b88935;max-height:270px}.small{font-size:9px;color:var(--muted)}.print-tip{position:fixed;right:18px;top:18px;padding:10px 14px;background:#111;color:white;border:0;border-radius:8px;box-shadow:0 8px 20px #0004}
+    @media print{body{background:white}.page{padding:10mm;max-width:none}.no-print{display:none}.exercise{page-break-inside:avoid}.hero{border-radius:0}.top-grid{grid-template-columns:1fr 1fr}}
   </style></head><body><div class="page">
-    <button class="no-print" onclick="window.print()" style="position:fixed;right:20px;top:20px;padding:10px 14px;background:#111;color:white;border:0;border-radius:6px">Imprimer puis enregistrer en PDF</button>
-    <header><div><div class="pill">HWBT Academy</div><div class="pill">${sessionTypeLabel(s.sessionType)}</div><h1>Dossier de séance</h1><p>${esc(s.goal||'Objectif de séance à préciser.')}</p></div><div class="meta"><b>${esc(sessionTitle(s))}</b><br>${esc(s.date)}<br>${players.length} joueur${players.length>1?'s':''}</div></header>
-    <section class="box"><h2>Résumé du cours</h2><div class="grid3"><div><h4>Joueurs</h4><p>${players.map(p=>esc(p.name)).join('<br>')||'—'}</p></div><div><h4>Thème</h4><p>${esc(meta.theme||theme?.title||'Séance HWBT')}</p></div><div><h4>Niveau / contrainte</h4><p>${esc(meta.level||'À définir')}<br>${esc(meta.constraint||'Matériel selon terrain')}</p></div></div></section>
-    <section class="box"><h2>Côtés travaillés</h2><div class="grid4">${workedSides.map(x=>`<div><span class="pill">${esc(x)}</span></div>`).join('')}</div></section>
-    <section class="box"><h2>Légende des schémas</h2><div class="grid4"><div><b>J1-J4</b><br><span class="small">joueurs</span></div><div><b>CO / L / PAN</b><br><span class="small">coach, lanceur, panier</span></div><div><b>Ligne jaune</b><br><span class="small">trajectoire de balle</span></div><div><b>Ligne blanche pointillée</b><br><span class="small">course joueur</span></div></div></section>
-    ${aft?`<section class="box"><h2>Consignes AFT pour le prof</h2><div class="grid2"><div><h4>Tactique à transmettre</h4><p>${nl2br(meta.tactic||theme?.tactics?.join('\\n'))}</p><h4>Technique à transmettre</h4><p>${nl2br(meta.technique||theme?.techniques?.join('\\n'))}</p></div><div><h4>Autres infos prof</h4><p>${esc(meta.coachInfo||theme?.coachInfo||'Faire découvrir par le jeu et corriger par induction.')}</p></div></div></section>`:''}
-    <section class="box"><h2>Bienfaits de la préparation</h2><ul>${benefits.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></section>
-    <section class="box"><h2>Points qualité à observer</h2><ul>${quality.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></section>
-    <section class="box sandwich"><h2>Méthode sandwich</h2><p><b>1. Encourager:</b> nommer un comportement réussi. <b>2. Guider:</b> poser une question ou changer une règle pour faire découvrir. <b>3. Valoriser:</b> terminer avec un repère simple à répéter.</p></section>
-    <section class="box"><h2>Structure du cours</h2><div class="grid3">${steps.map(st=>`<div><span class="pill">${esc(st.num)} · ${esc(st.time)}</span><h4>${esc(st.name)}</h4><p class="small">${esc(st.desc)}</p></div>`).join('')}</div></section>
-    <h2>Déroulement des exercices</h2>${blockRows}
-    <section class="box"><h2>Évaluation rapide après séance</h2><p>Pour chaque aspect travaillé: choisir l’état observé, ajouter un aspect secondaire seulement s’il a réellement été vu/travaillé, puis noter une piste pour la prochaine séance.</p><div class="grid3"><div><h4>Pas acquis</h4><p class="small">À reprendre clairement.</p></div><div><h4>En évolution</h4><p class="small">Progrès visible mais pas stable.</p></div><div><h4>Acquis</h4><p class="small">Réutilisable en situation de jeu.</p></div></div></section>
+    <button class="no-print print-tip" onclick="window.print()">Enregistrer en PDF</button>
+    <section class="hero"><div><div class="brand">HWBT Academy · ${sessionTypeLabel(s.sessionType)}</div><h1>Dossier de séance</h1><p>${esc(s.goal||'Objectif de séance à préciser.')}</p></div><div class="hero-meta"><b>${esc(sessionTitle(s))}</b><br>${esc(s.date)}<br>${players.length} joueur${players.length>1?'s':''}<br>${esc(meta.level||'Niveau à définir')}</div></section>
+    <div class="top-grid">
+      <section class="box"><h2>Résumé</h2><span class="tag dark-tag">${esc(meta.theme||theme?.title||'Séance HWBT')}</span>${workedSides.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</section>
+      <section class="box"><h2>Matériel</h2>${materials.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}<div class="small" style="margin-top:6px">${esc(meta.constraint||'Adapter selon terrain, niveau et nombre de joueurs.')}</div></section>
+    </div>
+    <div class="top-grid">
+      <section class="box"><h2>Structure compacte</h2><div class="timeline">${steps.map(st=>`<div class="step"><b>${esc(st.name)}</b><span>${esc(st.time)}</span></div>`).join('')}</div></section>
+      <section class="box"><h2>Points coach</h2><div class="key-points">${quality.map(x=>`<span>${esc(x)}</span>`).join('')}</div></section>
+    </div>
+    ${aft?`<section class="box"><h2>Repères AFT</h2><div class="top-grid"><div><h4>Tactique</h4><p>${nl2br(meta.tactic||theme?.tactics?.join('\\n'))}</p></div><div><h4>Technique & infos prof</h4><p>${nl2br(meta.technique||theme?.techniques?.join('\\n'))}</p><p class="small">${esc(meta.coachInfo||theme?.coachInfo||'Faire découvrir par le jeu et corriger par induction.')}</p></div></div></section>`:''}
+    <section class="box"><h2>Légende schéma</h2><div class="compact-grid"><div><b>J1-J4</b><br><span class="small">joueurs</span></div><div><b>CO / L / PAN</b><br><span class="small">coach, lanceur, panier</span></div><div><b>Jaune / orange</b><br><span class="small">balle / lancer</span></div><div><b>Blanc pointillé</b><br><span class="small">course joueur</span></div></div></section>
+    <h2 style="margin-top:14px">Exercices</h2>${blockRows}
+    <section class="box"><h2>Bilan sandwich & évaluation</h2><div class="compact-grid"><div><b>1. Encourager</b><br><span class="small">comportement réussi</span></div><div><b>2. Guider</b><br><span class="small">question ou règle</span></div><div><b>3. Valoriser</b><br><span class="small">repère à répéter</span></div><div><b>Évaluer</b><br><span class="small">pas acquis / évolution / acquis</span></div></div></section>
   </div><script>setTimeout(()=>window.print(),300)<\/script></body></html>`;
 }
 function printSessionPdf(sessionId){
