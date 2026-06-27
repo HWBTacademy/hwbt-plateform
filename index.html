@@ -4324,13 +4324,14 @@ function newSessionModalHtml(extra){
   <div class="form-group"><label class="form-label">DATE</label><input class="form-input" id="m_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
   <div class="g2">
     <div class="form-group"><label class="form-label">THÈME AFT OFFICIEL</label><select class="form-select" id="m_aft_theme_key" onchange="applyAftThemeToModal(this.value)"><option value="">— Choisir un thème —</option>${AFT_THEMES.map(t=>`<option value="${t.key}">${esc(t.title)}</option>`).join('')}</select></div>
-    <div class="form-group"><label class="form-label">ASPECT TECHNIQUE CIBLÉ</label><input class="form-input" id="m_aft_technical" placeholder="Ex: revers à plat après vitre, volée contrôlée, lob de défense..."></div>
+    <div class="form-group"><label class="form-label">ASPECT TECHNIQUE CIBLÉ</label><select class="form-select" id="m_aft_technical"><option value="">— Choisir —</option>${(PILLARS.find(p=>p.id==='T')?.aspects||[]).map(a=>`<option value="${esc(a.name)}">${esc(a.name)} · ${esc(a.desc)}</option>`).join('')}</select></div>
   </div>
   <div class="form-group"><label class="form-label">THÈME / FIL ROUGE MODIFIABLE</label><input class="form-input" id="m_aft_theme" placeholder="Le thème choisi se mettra ici, tu peux l'adapter."></div>
   <div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
     <div style="font-size:10px;letter-spacing:1.5px;color:var(--bronze);margin-bottom:10px">QUESTIONS ASSISTANT AFT</div>
-    <div class="g3">
+    <div class="g2">
       <div class="form-group"><label class="form-label">NIVEAU DU GROUPE</label><select class="form-select" id="m_aft_level"><option>Débutant</option><option>Débutant +</option><option>Intermédiaire</option></select></div>
+      <div class="form-group"><label class="form-label">ASPECT MENTAL À STIMULER</label><select class="form-select" id="m_aft_mental"><option value="">— Choisir —</option>${(PILLARS.find(p=>p.id==='M')?.aspects||[]).map(a=>`<option value="${esc(a.name)}">${esc(a.name)} · ${esc(a.desc)}</option>`).join('')}</select></div>
       <div class="form-group"><label class="form-label">CE QUE LE PROF VEUT VOIR</label><input class="form-input" id="m_aft_teacher_goal" placeholder="Ex: plus de balles basses, moins de fautes, meilleure communication..."></div>
       <div class="form-group"><label class="form-label">CONTRAINTE / MATÉRIEL</label><input class="form-input" id="m_aft_constraint" placeholder="Ex: 4 joueurs, balles rouges, câbles, rubalises, peu de paniers..."></div>
     </div>
@@ -4385,27 +4386,51 @@ function applyAftThemeToModal(key){
   if(!theme) return;
   const type=document.querySelector('input[name="m_session_type"][value="aft"]');
   if(type) type.checked=true;
-  const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val||'';};
+  const set=(id,val)=>{const el=document.getElementById(id);if(!el)return;if(el.tagName==='SELECT'&&val&&![...el.options].some(o=>o.value===val))el.add(new Option(val,val));el.value=val||'';};
   set('m_aft_theme',theme.title);
   set('m_aft_technical',theme.technical);
+  set('m_aft_mental',theme.mental);
   set('m_aft_tactic',theme.tactics.join('\n'));
   set('m_aft_technique',theme.techniques.join('\n'));
   set('m_session_goal',`Séance AFT: ${theme.title}. Faire découvrir le thème par le jeu, puis transférer en situation réelle.`);
   showNotif('Thème AFT chargé');
 }
+function detailedAftExerciseText(stepTitle,theme,level,technicalAspect,mentalAspect,teacherGoal,constraint,baseText,focus){
+  return `${stepTitle}
+
+Intention pédagogique:
+Le but est de faire comprendre "${theme.title}" par l'action, sans donner trop de théorie au départ. Le coach observe si les joueurs trouvent naturellement la bonne solution: placement, choix de trajectoire, communication et qualité du geste. L'aspect technique prioritaire est "${technicalAspect}" et l'aspect mental à stimuler est "${mentalAspect}".
+
+Organisation:
+${baseText}
+Contexte prévu: ${level}. Contrainte/matériel: ${constraint}. Objectif particulier du prof: ${teacherGoal}.
+
+Consignes coach:
+Commencer avec une règle très simple et un critère visible. Si les joueurs réussissent trop facilement, ajouter une contrainte R+1: zone plus précise, score, adversaire plus actif ou décision plus rapide. Si les joueurs bloquent, passer en R-1: cible plus grande, vitesse plus lente, moins d'opposition ou consigne unique.
+
+Ce qu'il faut observer:
+${focus}. Le coach doit surtout regarder si le joueur comprend pourquoi il fait l'action, pas seulement s'il réussit le geste une fois. Finir avec un feedback sandwich: valoriser une réussite, poser une question qui guide, puis donner un repère simple à répéter.`;
+}
 function fillAftSessionAssistant(){
   const key=document.getElementById('m_aft_theme_key')?.value||'';
   const theme=aftThemeByKey(key);
   if(!theme){showNotif('Choisis d’abord un thème AFT');return;}
+  const chosenTech=document.getElementById('m_aft_technical')?.value||'';
+  const chosenMental=document.getElementById('m_aft_mental')?.value||'';
   applyAftThemeToModal(key);
   const level=document.getElementById('m_aft_level')?.value||'Débutant';
   const teacherGoal=document.getElementById('m_aft_teacher_goal')?.value.trim()||'faire découvrir le thème par le jeu';
   const constraint=document.getElementById('m_aft_constraint')?.value.trim()||'4 joueurs, beaucoup de touches, pas d’attente';
+  const technicalAspect=chosenTech||document.getElementById('m_aft_technical')?.value||theme.technical;
+  const mentalAspect=chosenMental||document.getElementById('m_aft_mental')?.value||theme.mental;
+  const setVal=(id,val)=>{const el=document.getElementById(id);if(!el)return;if(el.tagName==='SELECT'&&val&&![...el.options].some(o=>o.value===val))el.add(new Option(val,val));el.value=val||'';};
+  setVal('m_aft_technical',technicalAspect);
+  setVal('m_aft_mental',mentalAspect);
   const plan=[
-    {pillar:'T',aspect:theme.technical,exercise:`Échauffement (${level}) - ${theme.exercises[0]}`},
-    {pillar:'TA',aspect:theme.tacticAspect,exercise:`Jeu de départ - ${theme.exercises[1]}`},
-    {pillar:'P',aspect:theme.physical,exercise:`Jeu d'apprentissage - ${theme.exercises[2]}`},
-    {pillar:'M',aspect:theme.mental,exercise:`Jeu d'application - ${theme.exercises[3]}`}
+    {pillar:'T',aspect:technicalAspect,exercise:detailedAftExerciseText(`ÉCHAUFFEMENT (${level})`,theme,level,technicalAspect,mentalAspect,teacherGoal,constraint,theme.exercises[0],`Qualité du premier contact, disponibilité corporelle, repère technique "${technicalAspect}" sans surcorriger.`)},
+    {pillar:'TA',aspect:theme.tacticAspect,exercise:detailedAftExerciseText('JEU DE DÉPART',theme,level,technicalAspect,mentalAspect,teacherGoal,constraint,theme.exercises[1],`Décision tactique, placement avant/après frappe, lecture de la position adverse et cohérence avec le thème.`)},
+    {pillar:'P',aspect:theme.physical,exercise:detailedAftExerciseText("JEU D'APPRENTISSAGE",theme,level,technicalAspect,mentalAspect,teacherGoal,constraint,theme.exercises[2],`Répétition utile, déplacement, équilibre et capacité à garder la qualité quand le rythme augmente.`)},
+    {pillar:'M',aspect:mentalAspect,exercise:detailedAftExerciseText("JEU D'APPLICATION",theme,level,technicalAspect,mentalAspect,teacherGoal,constraint,theme.exercises[3],`Transfert en situation réelle, attitude, concentration, confiance et capacité à répéter le bon choix sous score.`)}
   ];
   plan.forEach(p=>{
     const sel=document.getElementById('m_aspect_'+p.pillar);
@@ -4440,7 +4465,7 @@ function openNextSessionFromSession(sessionId){
     applySmartSessionPlan();
   },0);
 }
-function createSession(){const playerIds=selectedSessionPlayerIds();const date=document.getElementById('m_date').value;const playerWishes=document.getElementById('m_player_wishes')?.value.trim()||'';const sessionType=document.querySelector('input[name="m_session_type"]:checked')?.value||'hwbt';const themeKey=document.getElementById('m_aft_theme_key')?.value||'';const theme=aftThemeByKey(themeKey);const aftMeta={themeKey,theme:document.getElementById('m_aft_theme')?.value.trim()||'',technical:document.getElementById('m_aft_technical')?.value.trim()||'',tactic:document.getElementById('m_aft_tactic')?.value.trim()||'',technique:document.getElementById('m_aft_technique')?.value.trim()||'',level:document.getElementById('m_aft_level')?.value||'',teacherGoal:document.getElementById('m_aft_teacher_goal')?.value.trim()||'',constraint:document.getElementById('m_aft_constraint')?.value.trim()||'',coachInfo:theme?.coachInfo||''};if(playerIds.length<1||playerIds.length>4||!date){showNotif('Choisis 1 à 4 joueurs et une date');return;}const blocks=PILLARS.map(pl=>{const aspect=document.getElementById('m_aspect_'+pl.id).value;const exercise=document.getElementById('m_exercise_'+pl.id).value.trim();return {pillar:pl.id,aspect,exercise,subAspects:aspect?{[aspect]:'travaille'}:{},scores:{},coachState:''};});if(blocks.some(b=>!b.aspect)){showNotif('Choisis 1 aspect par pilier');return;}let savedCount=0;blocks.forEach(b=>{const before=(STATE.customExercises||[]).length;saveCustomExerciseFromBlock(b,'session-create');if((STATE.customExercises||[]).length>before)savedCount++;});const id=Math.max(0,...STATE.sessions.map(s=>s.id))+1;STATE.sessions.push({id,playerId:playerIds[0],playerIds,date,status:'planned',sessionType,aftMeta,goal:document.getElementById('m_session_goal').value.trim(),playerWishes,blocks,futureAspects:[],coachFeedback:{},playerFeedback:{}});closeModal();showNotif(savedCount?`Séance ${sessionTypeLabel(sessionType)} créée · ${savedCount} exercice${savedCount>1?'s':''} sauvegardé${savedCount>1?'s':''}`:`Séance ${sessionTypeLabel(sessionType)} créée`);setUI({page:'sessions',selectedSessionId:id});}
+function createSession(){const playerIds=selectedSessionPlayerIds();const date=document.getElementById('m_date').value;const playerWishes=document.getElementById('m_player_wishes')?.value.trim()||'';const sessionType=document.querySelector('input[name="m_session_type"]:checked')?.value||'hwbt';const themeKey=document.getElementById('m_aft_theme_key')?.value||'';const theme=aftThemeByKey(themeKey);const aftMeta={themeKey,theme:document.getElementById('m_aft_theme')?.value.trim()||'',technical:document.getElementById('m_aft_technical')?.value.trim()||'',mental:document.getElementById('m_aft_mental')?.value||'',tactic:document.getElementById('m_aft_tactic')?.value.trim()||'',technique:document.getElementById('m_aft_technique')?.value.trim()||'',level:document.getElementById('m_aft_level')?.value||'',teacherGoal:document.getElementById('m_aft_teacher_goal')?.value.trim()||'',constraint:document.getElementById('m_aft_constraint')?.value.trim()||'',coachInfo:theme?.coachInfo||''};if(playerIds.length<1||playerIds.length>4||!date){showNotif('Choisis 1 à 4 joueurs et une date');return;}const blocks=PILLARS.map(pl=>{const aspect=document.getElementById('m_aspect_'+pl.id).value;const exercise=document.getElementById('m_exercise_'+pl.id).value.trim();return {pillar:pl.id,aspect,exercise,subAspects:aspect?{[aspect]:'travaille'}:{},scores:{},coachState:''};});if(blocks.some(b=>!b.aspect)){showNotif('Choisis 1 aspect par pilier');return;}let savedCount=0;blocks.forEach(b=>{const before=(STATE.customExercises||[]).length;saveCustomExerciseFromBlock(b,'session-create');if((STATE.customExercises||[]).length>before)savedCount++;});const id=Math.max(0,...STATE.sessions.map(s=>s.id))+1;STATE.sessions.push({id,playerId:playerIds[0],playerIds,date,status:'planned',sessionType,aftMeta,goal:document.getElementById('m_session_goal').value.trim(),playerWishes,blocks,futureAspects:[],coachFeedback:{},playerFeedback:{}});closeModal();showNotif(savedCount?`Séance ${sessionTypeLabel(sessionType)} créée · ${savedCount} exercice${savedCount>1?'s':''} sauvegardé${savedCount>1?'s':''}`:`Séance ${sessionTypeLabel(sessionType)} créée`);setUI({page:'sessions',selectedSessionId:id});}
 function limitSessionPlayers(input){const checked=[...document.querySelectorAll('.m_session_player:checked')];if(checked.length>4){input.checked=false;showNotif('Maximum 4 joueurs par séance');}updateSessionPlanningSuggestions();}
 function updateSessionBlock(sessionId,blockIdx,field,value){const s=STATE.sessions.find(s=>s.id===sessionId);if(!s)return;if(!s.blocks[blockIdx])s.blocks[blockIdx]={pillar:PILLARS[blockIdx].id,aspect:'',exercise:'',scores:{},coachState:''};if(field==='exercise')s.blocks[blockIdx].exercise=value;else if(field==='aspect')s.blocks[blockIdx].aspect=value;saveState();}
 function diagramCourtClick(evt,sessionId,blockIdx){
