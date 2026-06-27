@@ -2284,13 +2284,13 @@ function courtBaseSvg(inner='',editable=false,sessionId=null,blockIdx=null){
   return `<svg viewBox="0 0 100 200" style="width:100%;max-width:330px;aspect-ratio:1/2;background:#0d1117;border:1px solid var(--border2);border-radius:8px;touch-action:manipulation;display:block;margin:auto" ${editable?`onclick="diagramCourtClick(event,${sessionId},${blockIdx})"`:''}>
     <defs>
       <marker id="arrowHead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#d4a017"></path></marker>
-      <marker id="runHead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#ffffff"></path></marker>
-      <marker id="shotHead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#f4d35e"></path></marker>
-      <marker id="feedHead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#f39c12"></path></marker>
+      <marker id="runHead" markerWidth="5" markerHeight="5" refX="4.4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#ffffff"></path></marker>
+      <marker id="shotHead" markerWidth="5" markerHeight="5" refX="4.4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#f4d35e"></path></marker>
+      <marker id="feedHead" markerWidth="5" markerHeight="5" refX="4.4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#f39c12"></path></marker>
     </defs>
     <rect x="8" y="8" width="84" height="184" rx="2" fill="#101820" stroke="#d4a017" stroke-width="1.3"></rect>
     <line x1="8" y1="100" x2="92" y2="100" stroke="#eee" stroke-width="1.2"></line>
-    <line x1="50" y1="8" x2="50" y2="192" stroke="#ffffff55" stroke-width=".6"></line>
+    <line x1="50" y1="70" x2="50" y2="130" stroke="#ffffff66" stroke-width=".55"></line>
     <line x1="8" y1="70" x2="92" y2="70" stroke="#ffffff88" stroke-width=".8"></line>
     <line x1="8" y1="130" x2="92" y2="130" stroke="#ffffff88" stroke-width=".8"></line>
     <line x1="8" y1="30" x2="92" y2="30" stroke="#ffffff22" stroke-width=".8"></line>
@@ -2302,13 +2302,13 @@ function courtBaseSvg(inner='',editable=false,sessionId=null,blockIdx=null){
 }
 function diagramItemSvg(it){
   const x=Number(it.x)||50, y=Number(it.y)||100;
-  if(it.type==='run') return `<line x1="${x}" y1="${y}" x2="${Number(it.x2)||Math.min(92,x+22)}" y2="${Number(it.y2)||Math.max(8,y-18)}" stroke="${esc(it.color||'#fff')}" stroke-width="2.2" marker-end="url(#runHead)" stroke-linecap="round" stroke-dasharray="4 2"></line>`;
-  if(it.type==='shot') return `<line x1="${x}" y1="${y}" x2="${Number(it.x2)||Math.min(92,x+24)}" y2="${Number(it.y2)||y}" stroke="${esc(it.color||'#f4d35e')}" stroke-width="2.2" marker-end="url(#shotHead)" stroke-linecap="round"></line>`;
-  if(it.type==='feed') return `<line x1="${x}" y1="${y}" x2="${Number(it.x2)||Math.min(92,x+22)}" y2="${Number(it.y2)||Math.min(192,y+15)}" stroke="${esc(it.color||'#f39c12')}" stroke-width="2.2" marker-end="url(#feedHead)" stroke-linecap="round" stroke-dasharray="2 2"></line>`;
+  if(it.type==='run') return `<line x1="${x}" y1="${y}" x2="${Number(it.x2)||Math.min(92,x+22)}" y2="${Number(it.y2)||Math.max(8,y-18)}" stroke="${esc(it.color||'#fff')}" stroke-width="1.25" marker-end="url(#runHead)" stroke-linecap="round" stroke-dasharray="3 2"></line>`;
+  if(it.type==='shot') return `<line x1="${x}" y1="${y}" x2="${Number(it.x2)||Math.min(92,x+24)}" y2="${Number(it.y2)||y}" stroke="${esc(it.color||'#f4d35e')}" stroke-width="1.25" marker-end="url(#shotHead)" stroke-linecap="round"></line>`;
+  if(it.type==='feed') return `<line x1="${x}" y1="${y}" x2="${Number(it.x2)||Math.min(92,x+22)}" y2="${Number(it.y2)||Math.min(192,y+15)}" stroke="${esc(it.color||'#f39c12')}" stroke-width="1.15" marker-end="url(#feedHead)" stroke-linecap="round" stroke-dasharray="2 2"></line>`;
   if(it.type==='ball') return `<circle cx="${x}" cy="${y}" r="3.2" fill="${esc(it.color||'#f4d35e')}" stroke="#000" stroke-width=".8"></circle>`;
   if(it.type==='target') return `<g><rect x="${x-5}" y="${y-5}" width="10" height="10" rx="1" fill="none" stroke="${esc(it.color||'#fff')}" stroke-width="1.5" stroke-dasharray="2 1"></rect><text x="${x}" y="${y+1.5}" text-anchor="middle" fill="${esc(it.color||'#fff')}" font-size="5">C</text></g>`;
-  if(it.type==='zone') return `<rect x="${x-10}" y="${y-8}" width="20" height="16" rx="2" fill="${esc(it.color||'#27ae60')}22" stroke="${esc(it.color||'#27ae60')}" stroke-width="1.4" stroke-dasharray="3 2"></rect>`;
-  if(it.type==='cone') return `<path d="M${x},${y-6} L${x-6},${y+6} L${x+6},${y+6} Z" fill="${esc(it.color||'#ff7f50')}" stroke="#000" stroke-width=".6"></path>`;
+  if(it.type==='zone'){const w=Number(it.w)||20,h=Number(it.h)||16;return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="${esc(it.color||'#27ae60')}22" stroke="${esc(it.color||'#27ae60')}" stroke-width="1.1" stroke-dasharray="3 2"></rect>`;}
+  if(it.type==='cone') return `<path d="M${x},${y-4} L${x-4},${y+4} L${x+4},${y+4} Z" fill="${esc(it.color||'#ff7f50')}" stroke="#000" stroke-width=".45"></path>`;
   if(it.type==='basket') return `<g><rect x="${x-6}" y="${y-5}" width="12" height="10" rx="2" fill="${esc(it.color||'#a67c52')}" stroke="#fff" stroke-width=".7"></rect><line x1="${x-5}" y1="${y-1}" x2="${x+5}" y2="${y-1}" stroke="#fff" stroke-width=".7"></line><text x="${x}" y="${y+2.4}" text-anchor="middle" fill="#fff" font-size="4">P</text></g>`;
   if(it.type==='coach'||it.type==='feeder') return `<g><rect x="${x-6}" y="${y-5}" width="12" height="10" rx="2" fill="${esc(it.color||'#fff')}" stroke="#111" stroke-width=".8"></rect><text x="${x}" y="${y+1.8}" text-anchor="middle" fill="${it.type==='coach'?'#111':'#fff'}" font-size="4.5" font-weight="700">${esc(it.label||'CO')}</text></g>`;
   return `<g><circle cx="${x}" cy="${y}" r="5.2" fill="${esc(it.color||'#c0392b')}" stroke="#fff" stroke-width=".8"></circle><text x="${x}" y="${y+1.8}" text-anchor="middle" fill="#fff" font-size="5" font-weight="700">${esc(it.label||'J')}</text></g>`;
@@ -2318,6 +2318,7 @@ function diagramHtml(s,blockIdx,editable=false){
   const items=b.diagramItems||[];
   const body=items.map(diagramItemSvg).join('');
   const tools=DIAGRAM_TOOLS.map(t=>`<button type="button" title="${esc(t.name)}" class="status-choice ${diagramTool()===t.id?'sel':''}" onclick="setUI({diagramTool:'${t.id}'})">${esc(t.label)}</button>`).join('');
+  const pending=UI.diagramPending&&UI.diagramPending.sessionId===s.id&&UI.diagramPending.blockIdx===blockIdx?UI.diagramPending:null;
   const legend=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;margin-top:10px;font-size:9px;color:var(--gray);font-family:var(--font-body);line-height:1.35">
     <div><b style="color:var(--offwhite)">Course</b>: ligne blanche pointillée</div>
     <div><b style="color:var(--offwhite)">Balle</b>: ligne jaune</div>
@@ -2326,8 +2327,8 @@ function diagramHtml(s,blockIdx,editable=false){
   </div>`;
   return `<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:10px">
     <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-      <div><div style="font-size:9px;letter-spacing:1.5px;color:var(--bronze)">SCHÉMA TERRAIN</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45">${editable?'1. Choisis un outil. 2. Clique sur le terrain. Les lignes partent du point cliqué.':'Déroulement visuel de l’exercice.'}</div></div>
-      ${editable?`<div style="display:flex;gap:6px;flex-wrap:wrap">${tools}<button type="button" class="status-choice" onclick="addDiagramTemplate(${s.id},${blockIdx})">MODÈLE</button><button type="button" class="status-choice" onclick="undoDiagramItem(${s.id},${blockIdx})">UNDO</button><button type="button" class="status-choice" onclick="clearDiagram(${s.id},${blockIdx})">VIDER</button></div>`:''}
+      <div><div style="font-size:9px;letter-spacing:1.5px;color:var(--bronze)">SCHÉMA TERRAIN</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45">${editable?'Joueur/coach/panier = 1 clic. Course/balle/lancer/zone = 2 clics: départ puis arrivée/taille.':'Déroulement visuel de l’exercice.'}${pending?`<br><b style="color:var(--bronze)">Clique maintenant l’arrivée / la taille.</b>`:''}</div></div>
+      ${editable?`<div style="display:flex;gap:6px;flex-wrap:wrap">${tools}<button type="button" class="status-choice" onclick="diagramFromText(${s.id},${blockIdx})">TEXTE → SCHÉMA</button><button type="button" class="status-choice" onclick="diagramToText(${s.id},${blockIdx})">SCHÉMA → TEXTE</button><button type="button" class="status-choice" onclick="addDiagramTemplate(${s.id},${blockIdx})">MODÈLE</button><button type="button" class="status-choice" onclick="undoDiagramItem(${s.id},${blockIdx})">UNDO</button><button type="button" class="status-choice" onclick="clearDiagram(${s.id},${blockIdx})">VIDER</button></div>`:''}
     </div>
     ${courtBaseSvg(body,editable,s.id,blockIdx)}
     ${editable?legend:''}
@@ -4474,13 +4475,69 @@ function diagramCourtClick(evt,sessionId,blockIdx){
   const x=Math.max(8,Math.min(92,((evt.clientX-r.left)/r.width)*100));
   const y=Math.max(8,Math.min(192,((evt.clientY-r.top)/r.height)*200));
   const tool=diagramToolData();
+  const twoClick=['run','shot','feed','zone'].includes(tool.type);
+  const pending=UI.diagramPending;
+  if(twoClick&&(!pending||pending.sessionId!==sessionId||pending.blockIdx!==blockIdx||pending.tool!==tool.type)){
+    UI.diagramPending={sessionId,blockIdx,tool:tool.type,label:tool.label,color:tool.color,x:+x.toFixed(1),y:+y.toFixed(1)};
+    showNotif(tool.type==='zone'?'Premier coin placé · clique le coin opposé':'Départ placé · clique l’arrivée');
+    render();
+    return;
+  }
   const item={type:tool.type,label:tool.label,color:tool.color,x:+x.toFixed(1),y:+y.toFixed(1)};
-  if(tool.type==='run'){item.x2=Math.min(92,item.x+18);item.y2=Math.max(8,item.y-20);}
-  if(tool.type==='shot'){item.x2=item.x<50?Math.min(92,item.x+30):Math.max(8,item.x-30);item.y2=item.y<100?Math.min(192,item.y+45):Math.max(8,item.y-45);}
-  if(tool.type==='feed'){item.x2=item.x<50?Math.min(92,item.x+25):Math.max(8,item.x-25);item.y2=Math.min(192,item.y+25);}
+  if(twoClick&&pending){
+    item.x=pending.x; item.y=pending.y; item.label=pending.label; item.color=pending.color;
+    if(tool.type==='zone'){
+      item.x=+Math.min(pending.x,x).toFixed(1); item.y=+Math.min(pending.y,y).toFixed(1);
+      item.w=+Math.max(4,Math.abs(x-pending.x)).toFixed(1); item.h=+Math.max(4,Math.abs(y-pending.y)).toFixed(1);
+    }else{
+      item.x2=+x.toFixed(1); item.y2=+y.toFixed(1);
+    }
+    UI.diagramPending=null;
+  }
   s.blocks[blockIdx].diagramItems=Array.isArray(s.blocks[blockIdx].diagramItems)?s.blocks[blockIdx].diagramItems:[];
   s.blocks[blockIdx].diagramItems.push(item);
   saveState(); render();
+}
+function diagramSummaryText(block){
+  const items=block.diagramItems||[];
+  const count=t=>items.filter(i=>i.type===t).length;
+  const lines=[];
+  if(count('coach'))lines.push('Coach placé sur le terrain pour guider et observer.');
+  if(count('feeder'))lines.push('Lanceur prévu pour alimenter l’exercice.');
+  if(count('basket'))lines.push('Panier placé à proximité du lanceur/coach.');
+  const players=items.filter(i=>i.type==='player').map(i=>i.label).join(', ');
+  if(players)lines.push(`Joueurs positionnés: ${players}.`);
+  if(count('feed'))lines.push(`${count('feed')} ligne(s) de lancer indiquent les balles envoyées par le coach/lanceur.`);
+  if(count('shot'))lines.push(`${count('shot')} trajectoire(s) de balle montrent la direction recherchée.`);
+  if(count('run'))lines.push(`${count('run')} ligne(s) de course montrent les déplacements attendus.`);
+  if(count('zone'))lines.push(`${count('zone')} zone(s) matérialisent les zones à viser ou à défendre.`);
+  if(count('target'))lines.push(`${count('target')} cible(s) indiquent les objectifs de précision.`);
+  return lines.join(' ');
+}
+function diagramToText(sessionId,blockIdx){
+  const s=STATE.sessions.find(s=>s.id===sessionId); const b=s?.blocks?.[blockIdx]; if(!b)return;
+  const summary=diagramSummaryText(b);
+  if(!summary){showNotif('Ajoute d’abord des éléments sur le schéma');return;}
+  b.exercise=`${b.exercise||''}\n\nLecture du schéma:\n${summary}`.trim();
+  saveState(); render(); showNotif('Schéma traduit dans le texte');
+}
+function diagramFromText(sessionId,blockIdx){
+  const s=STATE.sessions.find(s=>s.id===sessionId); const b=s?.blocks?.[blockIdx]; if(!b)return;
+  const text=String(b.exercise||'').toLowerCase();
+  const items=[
+    {type:'coach',label:'CO',color:'#ffffff',x:50,y:103},
+    {type:'basket',label:'PAN',color:'#a67c52',x:58,y:106},
+    {type:'feeder',label:'L',color:'#f39c12',x:42,y:106},
+    {type:'player',label:'J1',color:'#c0392b',x:28,y:156},
+    {type:'player',label:'J2',color:'#2980b9',x:72,y:156}
+  ];
+  if(/cible|zone|viser|objectif|pied|vitre|long/.test(text))items.push({type:'target',label:'C',color:'#ffffff',x:72,y:44},{type:'zone',label:'ZONE',color:'#27ae60',x:62,y:34,w:22,h:18});
+  if(/lancer|panier|coach|envoi|envoy/.test(text))items.push({type:'feed',label:'Lancer',color:'#f39c12',x:42,y:106,x2:28,y2:156});
+  if(/balle|trajectoire|lob|volée|service|retour|frappe/.test(text))items.push({type:'shot',label:'Balle',color:'#f4d35e',x:28,y:156,x2:/lob/.test(text)?50:72,y2:/lob/.test(text)?38:44});
+  if(/monte|replacement|déplacement|course|suivre|avancer|revenir/.test(text))items.push({type:'run',label:'Course',color:'#ffffff',x:28,y:156,x2:45,y2:128});
+  if(/cone|cône|plot/.test(text))items.push({type:'cone',label:'△',color:'#ff7f50',x:35,y:126},{type:'cone',label:'△',color:'#ff7f50',x:65,y:126});
+  b.diagramItems=items;
+  saveState(); render(); showNotif('Schéma généré depuis le texte');
 }
 function addDiagramTemplate(sessionId,blockIdx){
   const s=STATE.sessions.find(s=>s.id===sessionId); const b=s?.blocks?.[blockIdx]; if(!b)return;
