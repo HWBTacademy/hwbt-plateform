@@ -2317,10 +2317,10 @@ function courtBaseSvg(inner='',editable=false,sessionId=null,blockIdx=null){
     </defs>
     <rect x="8" y="8" width="84" height="184" rx="2" fill="#101820" stroke="#d4a017" stroke-width="1.3"></rect>
     <line x1="8" y1="100" x2="92" y2="100" stroke="#eee" stroke-width="1.2"></line>
-    <line x1="50" y1="62" x2="50" y2="100" stroke="#ffffff66" stroke-width=".55"></line>
-    <line x1="50" y1="100" x2="50" y2="138" stroke="#ffffff66" stroke-width=".55"></line>
-    <line x1="8" y1="62" x2="92" y2="62" stroke="#ffffff88" stroke-width=".8"></line>
-    <line x1="8" y1="138" x2="92" y2="138" stroke="#ffffff88" stroke-width=".8"></line>
+    <line x1="50" y1="36" x2="50" y2="100" stroke="#ffffff66" stroke-width=".55"></line>
+    <line x1="50" y1="100" x2="50" y2="164" stroke="#ffffff66" stroke-width=".55"></line>
+    <line x1="8" y1="36" x2="92" y2="36" stroke="#ffffff88" stroke-width=".8"></line>
+    <line x1="8" y1="164" x2="92" y2="164" stroke="#ffffff88" stroke-width=".8"></line>
     <text x="11" y="19" fill="#ffffff55" font-size="5">VITRE</text>
     <text x="72" y="188" fill="#ffffff55" font-size="5">VITRE</text>
     ${inner}
@@ -2377,53 +2377,51 @@ function professionalPrepHtml(s){
   const meta=s.aftMeta||{};
   const steps=sessionStructure(s);
   const theme=aftThemeByKey(meta.themeKey);
-  const workedSides=blocks.map(b=>{const pl=PILLARS.find(p=>p.id===b.pillar);return `${pl?.name||b.pillar}: ${b.aspect||'à définir'}`;});
   const materialSource=[meta.constraint||'',...blocks.map(b=>b.exercise||'')].join(' ').toLowerCase();
-  const materials=['Balles','Cônes','Cibles/zones','Tableau/flipchart'];
+  const materials=['Balles','Cônes','Cibles/zones'];
   if(/panier|basket/.test(materialSource)) materials.push('Panier');
   if(/câble|cable/.test(materialSource)) materials.push('Câbles');
   if(/rubalise|marque|fl[eé]chage/.test(materialSource)) materials.push('Rubalises / marques au sol');
+  if(/lichette/.test(materialSource)) materials.push('Lichettes');
   if(/balle rouge|balles rouges/.test(materialSource)) materials.push('Balles rouges');
-  const benefits=['Objectif clair','Beaucoup de touches','Technique liée à la tactique','Feedback sandwich','Trace pour la suite'];
-  const quality=['Contrôle avant puissance','Communication tôt et court','Placement en duo','Progression R-1/R0/R+1','Évaluation rapide'];
+  const coachPoints=(theme?[...(theme.tactics||[]).slice(0,3),...(theme.techniques||[]).slice(0,2)]:['Règle simple et visible','Beaucoup de touches','Questionner avant de corriger','Feedback sandwich','Progression R-1 / R0 / R+1']).slice(0,5);
+  const tacticalTheme=meta.theme||theme?.title||s.goal||'Thème tactique à préciser';
   const blockRows=blocks.map((b,i)=>{const pl=PILLARS.find(p=>p.id===b.pillar);const st=aft?steps[Math.min(i,steps.length-1)]:steps[i];return `<section class="exercise">
-    <div class="ex-title"><span>${String(i+1).padStart(2,'0')}</span><div><h3>${esc(st?.name||pl?.name||'Bloc')}</h3><p>${esc(st?.time||'')} · ${esc(pl?.name||b.pillar)} · ${esc(b.aspect||'Aspect à définir')}</p></div></div>
+    <div class="ex-title"><span>${String(i+1).padStart(2,'0')}</span><div><h3>${esc(st?.name||pl?.name||'Bloc')}</h3><p>${esc(st?.time||'')} · ${esc(st?.focus||pl?.name||b.pillar)} · ${esc(b.aspect||'Aspect à définir')}</p></div></div>
     <div class="exercise-grid">
       <div class="diagram-panel">${printDiagramSvg(b)}</div>
-      <div class="text-panel"><h4>Déroulement</h4><p>${nl2br(b.exercise||'Exercice à préciser.')}</p><div class="mini-check"><span>Objectif visible</span><span>Règle simple</span><span>R-/R0/R+</span></div></div>
+      <div class="text-panel"><h4>Déroulement & consignes</h4><p>${nl2br(b.exercise||'Exercice à préciser.')}</p></div>
     </div>
   </section>`}).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Dossier séance HWBT</title><style>
-    :root{--gold:#b88935;--black:#09090b;--ink:#171717;--muted:#6f6f6f;--line:#ded7cc;--paper:#fbfaf7}
-    *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:var(--ink);margin:0;background:#ece6da;font-size:11px;line-height:1.35}
-    .page{max-width:1020px;margin:0 auto;background:var(--paper);padding:22px}
-    .hero{background:linear-gradient(135deg,#08080a,#1a1712);color:white;border-radius:12px;padding:22px 26px;display:flex;justify-content:space-between;gap:20px;align-items:flex-start;border:1px solid #2a2114}
-    .brand{font-size:10px;letter-spacing:2px;color:var(--gold);text-transform:uppercase}.hero h1{font-size:30px;line-height:.95;margin:6px 0 8px;text-transform:uppercase;letter-spacing:1px}.hero p{margin:0;color:#d8d2c8;max-width:620px}
-    .hero-meta{text-align:right;font-size:11px;color:#d8d2c8;min-width:170px}.hero-meta b{font-size:15px;color:white}
-    h2{font-size:13px;margin:0 0 9px;text-transform:uppercase;letter-spacing:1.4px;color:#7a551d} h3{font-size:15px;margin:0;text-transform:uppercase} h4{font-size:9px;margin:0 0 5px;text-transform:uppercase;color:#7a551d;letter-spacing:1px}
-    .top-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:10px;margin-top:10px}.box{background:white;border:1px solid var(--line);border-radius:10px;padding:12px;break-inside:avoid}.compact-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-    .tag{display:inline-flex;align-items:center;border:1px solid #d7c396;background:#fbf1dd;color:#7a551d;border-radius:999px;padding:4px 8px;margin:2px;font-size:9px;text-transform:uppercase;letter-spacing:.6px;font-weight:700}.dark-tag{background:#111;color:white;border-color:#111}
-    .timeline{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}.step{border-left:3px solid var(--gold);background:#fff;border-radius:8px;padding:8px;min-height:58px}.step b{font-size:10px}.step span{display:block;color:var(--muted);font-size:9px;margin-top:3px}
-    .key-points{display:flex;flex-wrap:wrap;gap:5px}.key-points span{background:#f2eee7;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:10px}
-    .exercise{background:white;border:1px solid var(--line);border-radius:12px;margin-top:10px;padding:12px;break-inside:avoid}.ex-title{display:flex;gap:10px;align-items:center;margin-bottom:9px}.ex-title>span{background:#111;color:white;border-radius:7px;padding:8px 10px;font-weight:800}.ex-title p{margin:2px 0 0;color:var(--muted);font-size:10px}
-    .exercise-grid{display:grid;grid-template-columns:240px 1fr;gap:14px;align-items:start}.diagram-panel{background:#111;border-radius:10px;padding:8px}.text-panel p{margin:0 0 8px;white-space:normal}.mini-check{display:flex;gap:6px;flex-wrap:wrap}.mini-check span{background:#f2eee7;border:1px solid var(--line);border-radius:6px;padding:5px 7px;font-size:9px}
-    svg{--border2:#ddd;--border:#ddd;--bronze:#b88935;max-height:270px}.small{font-size:9px;color:var(--muted)}.print-tip{position:fixed;right:18px;top:18px;padding:10px 14px;background:#111;color:white;border:0;border-radius:8px;box-shadow:0 8px 20px #0004}
-    @media print{body{background:white}.page{padding:10mm;max-width:none}.no-print{display:none}.exercise{page-break-inside:avoid}.hero{border-radius:0}.top-grid{grid-template-columns:1fr 1fr}}
+    :root{--gold:#b88935;--black:#09090b;--ink:#151515;--muted:#666;--line:#d7d0c4;--paper:#fbfaf7;--orange:#e95400;--navy:#0d2b4d}
+    *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:var(--ink);margin:0;background:#e9e2d7;font-size:10.5px;line-height:1.34}
+    .page{max-width:1040px;margin:0 auto;background:var(--paper);padding:20px 22px 28px}
+    .hero{display:grid;grid-template-columns:110px 1fr 238px;align-items:stretch;background:#fff;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+    .hero-num{background:var(--orange);color:#fff;font-size:18px;font-weight:900;display:flex;align-items:center;justify-content:center}
+    .hero-main{background:var(--navy);color:white;padding:14px 18px}.brand{font-size:9px;letter-spacing:2px;color:#d9b36a;text-transform:uppercase}.hero h1{font-size:23px;margin:2px 0 4px;text-transform:uppercase;letter-spacing:.8px}.hero p{margin:0;color:#cfd8e3}
+    .hero-side{background:var(--orange);color:white;padding:15px 18px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;display:flex;align-items:center}
+    h2{font-size:12px;margin:0 0 9px;text-transform:uppercase;letter-spacing:1.2px;color:var(--orange)} h3{font-size:15px;margin:0;text-transform:uppercase} h4{font-size:9px;margin:0 0 5px;text-transform:uppercase;color:var(--orange);letter-spacing:1px}
+    .meta-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;margin:14px 0;border:1px solid var(--line);background:white}.meta-cell{display:grid;grid-template-columns:92px 1fr;border-right:1px solid var(--line);min-height:38px}.meta-cell:last-child{border-right:0}.meta-label{background:var(--orange);color:white;font-weight:800;text-transform:uppercase;padding:10px 8px}.meta-value{padding:9px 10px}
+    .box{background:white;border:1px solid var(--line);border-radius:4px;padding:12px;break-inside:avoid;margin-top:10px}.tag{display:inline-flex;align-items:center;border:1px solid #d7c396;background:#fbf1dd;color:#7a551d;border-radius:999px;padding:4px 8px;margin:2px;font-size:9px;text-transform:uppercase;letter-spacing:.6px;font-weight:700}.dark-tag{background:#111;color:white;border-color:#111}
+    .timeline{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.step{background:#f8f4ec;border:1px solid #e0d3bd;border-top:4px solid var(--orange);border-radius:4px;padding:9px;min-height:72px}.step b{font-size:10px;text-transform:uppercase}.step span{display:block;color:var(--muted);font-size:9px;margin-top:4px}.step em{display:block;color:#7a551d;font-style:normal;font-size:8.5px;margin-top:3px}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}.key-points{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.key-points span{background:#f2eee7;border:1px solid var(--line);border-radius:4px;padding:7px;font-size:9px}
+    .repere-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.repere-grid p{margin:0;white-space:pre-line}.small{font-size:9px;color:var(--muted)}
+    .exercise-page{break-before:page;page-break-before:always;margin-top:18px}.section-banner{display:grid;grid-template-columns:110px 1fr;background:#111;color:white;border-radius:4px;overflow:hidden;margin-bottom:12px}.section-banner span{background:var(--orange);display:flex;align-items:center;justify-content:center;font-weight:900}.section-banner h2{color:white;font-size:22px;margin:0;padding:14px 18px}
+    .exercise{background:white;border:1px solid var(--line);border-radius:4px;margin-top:12px;padding:0;break-inside:avoid;overflow:hidden}.ex-title{display:grid;grid-template-columns:70px 1fr;background:#f5f0e8;border-bottom:1px solid var(--line)}.ex-title>span{background:var(--orange);color:white;font-size:18px;font-weight:900;display:flex;align-items:center;justify-content:center}.ex-title div{padding:10px 12px}.ex-title p{margin:2px 0 0;color:var(--muted);font-size:10px}
+    .exercise-grid{display:grid;grid-template-columns:265px 1fr;gap:0}.diagram-panel{background:#111;padding:10px;border-right:1px solid var(--line)}.text-panel{padding:12px 14px}.text-panel p{margin:0;white-space:normal}
+    svg{--border2:#ddd;--border:#ddd;--bronze:#b88935;max-height:295px}.print-tip{position:fixed;right:18px;top:18px;padding:10px 14px;background:#111;color:white;border:0;border-radius:8px;box-shadow:0 8px 20px #0004}
+    @media print{body{background:white}.page{padding:9mm;max-width:none}.no-print{display:none}.box,.exercise{page-break-inside:avoid}.exercise-page{page-break-before:always}.hero{border-radius:0}}
   </style></head><body><div class="page">
     <button class="no-print print-tip" onclick="window.print()">Enregistrer en PDF</button>
-    <section class="hero"><div><div class="brand">HWBT Academy · ${sessionTypeLabel(s.sessionType)}</div><h1>Dossier de séance</h1><p>${esc(s.goal||'Objectif de séance à préciser.')}</p></div><div class="hero-meta"><b>${esc(sessionTitle(s))}</b><br>${esc(s.date)}<br>${players.length} joueur${players.length>1?'s':''}<br>${esc(meta.level||'Niveau à définir')}</div></section>
-    <div class="top-grid">
-      <section class="box"><h2>Résumé</h2><span class="tag dark-tag">${esc(meta.theme||theme?.title||'Séance HWBT')}</span>${workedSides.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</section>
-      <section class="box"><h2>Matériel</h2>${materials.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}<div class="small" style="margin-top:6px">${esc(meta.constraint||'Adapter selon terrain, niveau et nombre de joueurs.')}</div></section>
-    </div>
-    <div class="top-grid">
-      <section class="box"><h2>Structure compacte</h2><div class="timeline">${steps.map(st=>`<div class="step"><b>${esc(st.name)}</b><span>${esc(st.time)}</span></div>`).join('')}</div></section>
-      <section class="box"><h2>Points coach</h2><div class="key-points">${quality.map(x=>`<span>${esc(x)}</span>`).join('')}</div></section>
-    </div>
-    ${aft?`<section class="box"><h2>Repères AFT</h2><div class="top-grid"><div><h4>Tactique</h4><p>${nl2br(meta.tactic||theme?.tactics?.join('\\n'))}</p></div><div><h4>Technique & infos prof</h4><p>${nl2br(meta.technique||theme?.techniques?.join('\\n'))}</p><p class="small">${esc(meta.coachInfo||theme?.coachInfo||'Faire découvrir par le jeu et corriger par induction.')}</p></div></div></section>`:''}
-    <section class="box"><h2>Légende schéma</h2><div class="compact-grid"><div><b>J1-J4</b><br><span class="small">joueurs</span></div><div><b>CO / L / PAN</b><br><span class="small">coach, lanceur, panier</span></div><div><b>Jaune / orange</b><br><span class="small">balle / lancer</span></div><div><b>Blanc pointillé</b><br><span class="small">course joueur</span></div></div></section>
-    <h2 style="margin-top:14px">Exercices</h2>${blockRows}
-    <section class="box"><h2>Bilan sandwich & évaluation</h2><div class="compact-grid"><div><b>1. Encourager</b><br><span class="small">comportement réussi</span></div><div><b>2. Guider</b><br><span class="small">question ou règle</span></div><div><b>3. Valoriser</b><br><span class="small">repère à répéter</span></div><div><b>Évaluer</b><br><span class="small">pas acquis / évolution / acquis</span></div></div></section>
+    <section class="hero"><div class="hero-num">1 / 2</div><div class="hero-main"><div class="brand">HWBT Academy · ${sessionTypeLabel(s.sessionType)}</div><h1>Dossier de séance</h1><p>${esc(sessionTitle(s))} · ${esc(s.date)} · ${players.length} joueur${players.length>1?'s':''}</p></div><div class="hero-side">${esc(sessionTypeLabel(s.sessionType))}</div></section>
+    <div class="meta-grid"><div class="meta-cell"><div class="meta-label">Thème</div><div class="meta-value">${esc(tacticalTheme)}</div></div><div class="meta-cell"><div class="meta-label">Niveau</div><div class="meta-value">${esc(meta.level||'À définir')}</div></div><div class="meta-cell"><div class="meta-label">Matériel</div><div class="meta-value">${materials.map(esc).join(' · ')}</div></div></div>
+    <section class="box"><h2>Structure compacte</h2><div class="timeline">${steps.map(st=>`<div class="step"><b>${esc(st.name)}</b><span>${esc(st.time)}</span><em>${esc(st.focus||'')}</em></div>`).join('')}</div></section>
+    <section class="box"><h2>Points coach liés au thème</h2><div class="key-points">${coachPoints.map(x=>`<span>${esc(x)}</span>`).join('')}</div></section>
+    ${aft?`<section class="box"><h2>Repères AFT</h2><div class="repere-grid"><div><h4>Tactique</h4><p>${nl2br(meta.tactic||theme?.tactics?.join('\\n')||'')}</p></div><div><h4>Technique & infos prof</h4><p>${nl2br(meta.technique||theme?.techniques?.join('\\n')||'')}</p><p class="small">${esc(meta.coachInfo||theme?.coachInfo||'Faire découvrir par le jeu et corriger par induction.')}</p></div></div></section>`:''}
+    <section class="box"><h2>Légende schéma</h2><div class="key-points"><span>J1-J4: joueurs</span><span>CO / L / PAN: coach, lanceur, panier</span><span>Jaune: balle</span><span>Orange: lancer</span><span>Blanc pointillé: course</span></div></section>
+    <div class="exercise-page"><div class="section-banner"><span>2 / 2</span><h2>Exercices</h2></div>${blockRows}</div>
+    <section class="box"><h2>Bilan sandwich & évaluation</h2><div class="key-points"><span><b>1. Encourager</b><br>comportement réussi</span><span><b>2. Guider</b><br>question ou règle</span><span><b>3. Valoriser</b><br>repère à répéter</span><span><b>Évaluer</b><br>pas acquis / évolution / acquis</span><span><b>Suite</b><br>point à reprendre</span></div></section>
   </div><script>setTimeout(()=>window.print(),300)<\/script></body></html>`;
 }
 function printSessionPdf(sessionId){
