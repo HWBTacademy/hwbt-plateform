@@ -2258,6 +2258,125 @@ function sessionStructureCard(s){
     </div>
   </div>`;
 }
+const DIAGRAM_TOOLS=[
+  {id:'p1',label:'J1',color:'#c0392b',type:'player'},
+  {id:'p2',label:'J2',color:'#2980b9',type:'player'},
+  {id:'p3',label:'J3',color:'#27ae60',type:'player'},
+  {id:'p4',label:'J4',color:'#d4a017',type:'player'},
+  {id:'ball',label:'B',color:'#f4d35e',type:'ball'},
+  {id:'target',label:'C',color:'#ffffff',type:'target'},
+  {id:'arrow',label:'→',color:'#d4a017',type:'arrow'}
+];
+function diagramTool(){
+  return UI.diagramTool||'p1';
+}
+function diagramToolData(){
+  return DIAGRAM_TOOLS.find(t=>t.id===diagramTool())||DIAGRAM_TOOLS[0];
+}
+function courtBaseSvg(inner='',editable=false,sessionId=null,blockIdx=null){
+  return `<svg viewBox="0 0 100 200" style="width:100%;max-width:330px;aspect-ratio:1/2;background:#0d1117;border:1px solid var(--border2);border-radius:8px;touch-action:manipulation;display:block;margin:auto" ${editable?`onclick="diagramCourtClick(event,${sessionId},${blockIdx})"`:''}>
+    <defs><marker id="arrowHead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#d4a017"></path></marker></defs>
+    <rect x="8" y="8" width="84" height="184" rx="2" fill="#101820" stroke="#d4a017" stroke-width="1.3"></rect>
+    <line x1="8" y1="100" x2="92" y2="100" stroke="#eee" stroke-width="1.2"></line>
+    <line x1="50" y1="8" x2="50" y2="192" stroke="#ffffff55" stroke-width=".6"></line>
+    <line x1="8" y1="70" x2="92" y2="70" stroke="#ffffff88" stroke-width=".8"></line>
+    <line x1="8" y1="130" x2="92" y2="130" stroke="#ffffff88" stroke-width=".8"></line>
+    <line x1="8" y1="30" x2="92" y2="30" stroke="#ffffff22" stroke-width=".8"></line>
+    <line x1="8" y1="170" x2="92" y2="170" stroke="#ffffff22" stroke-width=".8"></line>
+    <text x="11" y="19" fill="#ffffff55" font-size="5">VITRE</text>
+    <text x="72" y="188" fill="#ffffff55" font-size="5">VITRE</text>
+    ${inner}
+  </svg>`;
+}
+function diagramItemSvg(it){
+  const x=Number(it.x)||50, y=Number(it.y)||100;
+  if(it.type==='arrow') return `<line x1="${x}" y1="${y}" x2="${Number(it.x2)||Math.min(92,x+20)}" y2="${Number(it.y2)||y}" stroke="${esc(it.color||'#d4a017')}" stroke-width="2.4" marker-end="url(#arrowHead)" stroke-linecap="round"></line>`;
+  if(it.type==='ball') return `<circle cx="${x}" cy="${y}" r="3.2" fill="${esc(it.color||'#f4d35e')}" stroke="#000" stroke-width=".8"></circle>`;
+  if(it.type==='target') return `<g><rect x="${x-5}" y="${y-5}" width="10" height="10" rx="1" fill="none" stroke="${esc(it.color||'#fff')}" stroke-width="1.5" stroke-dasharray="2 1"></rect><text x="${x}" y="${y+1.5}" text-anchor="middle" fill="${esc(it.color||'#fff')}" font-size="5">C</text></g>`;
+  return `<g><circle cx="${x}" cy="${y}" r="5.2" fill="${esc(it.color||'#c0392b')}" stroke="#fff" stroke-width=".8"></circle><text x="${x}" y="${y+1.8}" text-anchor="middle" fill="#fff" font-size="5" font-weight="700">${esc(it.label||'J')}</text></g>`;
+}
+function diagramHtml(s,blockIdx,editable=false){
+  const b=(s.blocks||[])[blockIdx]||{};
+  const items=b.diagramItems||[];
+  const body=items.map(diagramItemSvg).join('');
+  const tools=DIAGRAM_TOOLS.map(t=>`<button type="button" class="status-choice ${diagramTool()===t.id?'sel':''}" onclick="setUI({diagramTool:'${t.id}'})">${t.label}</button>`).join('');
+  return `<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:10px">
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <div><div style="font-size:9px;letter-spacing:1.5px;color:var(--bronze)">SCHÉMA TERRAIN</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45">${editable?'Choisis un élément puis touche le terrain. Flèche = trajectoire vers la droite.':'Déroulement visuel de l’exercice.'}</div></div>
+      ${editable?`<div style="display:flex;gap:6px;flex-wrap:wrap">${tools}<button type="button" class="status-choice" onclick="undoDiagramItem(${s.id},${blockIdx})">UNDO</button><button type="button" class="status-choice" onclick="clearDiagram(${s.id},${blockIdx})">VIDER</button></div>`:''}
+    </div>
+    ${courtBaseSvg(body,editable,s.id,blockIdx)}
+  </div>`;
+}
+function nl2br(v){
+  return esc(v||'').replace(/\n/g,'<br>');
+}
+function printDiagramSvg(block){
+  const body=(block.diagramItems||[]).map(diagramItemSvg).join('');
+  return courtBaseSvg(body,false);
+}
+function professionalPrepHtml(s){
+  const players=sessionPlayers(s);
+  const blocks=s.blocks||[];
+  const aft=s.sessionType==='aft';
+  const meta=s.aftMeta||{};
+  const steps=sessionStructure(s);
+  const theme=aftThemeByKey(meta.themeKey);
+  const benefits=[
+    'Donner une intention claire avant le terrain: le joueur sait quoi chercher et le coach sait quoi observer.',
+    'Relier technique et tactique: le geste sert une décision de jeu, pas une correction isolée.',
+    'Garder un rythme actif: beaucoup de touches, peu d’attente, règles simples et score visible.',
+    'Mesurer la progression avec des critères courts: état acquis/non acquis, aspect principal et secondaire.',
+    'Créer une trace pour la prochaine séance: ce qui a été travaillé, ce qui reste à stabiliser et le ressenti joueur.'
+  ];
+  const quality=[
+    'Contrôle avant puissance: chercher une balle utile avant une balle spectaculaire.',
+    'Communication courte et tôt: moi, toi, derrière, collés, ils montent.',
+    'Déplacement en duo: fermer le centre, garder une distance raisonnable, bouger ensemble.',
+    'Filet avec intention: monter seulement si la balle permet de tenir ou mettre pression.',
+    'Lob et vitres: utiliser la hauteur, la profondeur et le temps gagné pour se replacer.',
+    'Méthode sandwich: valoriser, guider par question ou règle, terminer par un encouragement concret.'
+  ];
+  const blockRows=blocks.map((b,i)=>{const pl=PILLARS.find(p=>p.id===b.pillar);const st=aft?steps[Math.min(i,3)]:steps[i];return `<section class="exercise">
+    <div class="ex-head"><span>${String(i+1).padStart(2,'0')}</span><div><h3>${esc(st?.name||pl?.name||'Bloc')}</h3><p>${esc(st?.time||'')} · ${esc(pl?.name||b.pillar)} · ${esc(b.aspect||'Aspect à définir')}</p></div></div>
+    <div class="grid2">
+      <div><h4>Consigne / Déroulement</h4><p>${nl2br(b.exercise||'Exercice à préciser.')}</p><h4>Critères coach</h4><ul><li>Objectif visible et compris par les joueurs.</li><li>Règle simple qui force le comportement attendu.</li><li>Progression R-1/R0/R+1 prête si le niveau change.</li></ul></div>
+      <div><h4>Schéma terrain</h4>${printDiagramSvg(b)}</div>
+    </div>
+  </section>`}).join('');
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Préparation séance HWBT</title><style>
+    :root{--bronze:#b88935;--bg:#09090b;--ink:#151515;--muted:#666}
+    *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:var(--ink);margin:0;background:#f4f1eb;font-size:12px;line-height:1.45}
+    .page{max-width:980px;margin:0 auto;background:white;padding:34px 42px}
+    header{border-bottom:3px solid var(--bronze);padding-bottom:18px;margin-bottom:22px;display:flex;justify-content:space-between;gap:24px}
+    h1{font-size:32px;line-height:1;margin:0;text-transform:uppercase;letter-spacing:1px} h2{font-size:16px;margin:22px 0 10px;text-transform:uppercase;letter-spacing:1px;color:#8a5f1e} h3{font-size:18px;margin:0;text-transform:uppercase} h4{font-size:11px;margin:12px 0 5px;text-transform:uppercase;color:#8a5f1e;letter-spacing:.8px}
+    .meta{font-size:11px;color:#555;text-align:right}.pill{display:inline-block;border:1px solid #d8c29a;background:#fbf4e8;color:#8a5f1e;padding:4px 8px;border-radius:4px;margin:3px 4px 3px 0;font-size:10px;text-transform:uppercase;letter-spacing:.6px}
+    .box{border:1px solid #ddd;border-radius:8px;padding:14px;margin:10px 0;background:#fff}.grid2{display:grid;grid-template-columns:1.3fr .7fr;gap:18px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    ul{margin:6px 0 0 18px;padding:0} li{margin:3px 0}.exercise{break-inside:avoid;border-top:1px solid #ddd;padding-top:15px;margin-top:15px}.ex-head{display:flex;gap:12px;align-items:flex-start;margin-bottom:8px}.ex-head>span{background:#111;color:#fff;border-radius:4px;padding:8px 10px;font-weight:bold}.ex-head p{margin:4px 0 0;color:#666;font-size:11px}
+    svg{--border2:#ddd;--border:#ddd;--bronze:#b88935;max-height:300px}.small{font-size:10px;color:#666}.sandwich{border-left:4px solid var(--bronze);padding-left:12px}
+    @media print{body{background:white}.page{padding:18mm;max-width:none}.no-print{display:none}.exercise{page-break-inside:avoid}}
+  </style></head><body><div class="page">
+    <button class="no-print" onclick="window.print()" style="position:fixed;right:20px;top:20px;padding:10px 14px;background:#111;color:white;border:0;border-radius:6px">Imprimer / PDF</button>
+    <header><div><div class="pill">HWBT Academy</div><div class="pill">${sessionTypeLabel(s.sessionType)}</div><h1>Préparation de cours</h1><p>${esc(s.goal||'Objectif de séance à préciser.')}</p></div><div class="meta"><b>${esc(sessionTitle(s))}</b><br>${esc(s.date)}<br>${players.length} joueur${players.length>1?'s':''}</div></header>
+    <section class="box"><h2>Résumé du cours</h2><div class="grid3"><div><h4>Joueurs</h4><p>${players.map(p=>esc(p.name)).join('<br>')||'—'}</p></div><div><h4>Thème</h4><p>${esc(meta.theme||theme?.title||'Séance HWBT')}</p></div><div><h4>Niveau / contrainte</h4><p>${esc(meta.level||'À définir')}<br>${esc(meta.constraint||'Matériel selon terrain')}</p></div></div></section>
+    ${aft?`<section class="box"><h2>Consignes AFT pour le prof</h2><div class="grid2"><div><h4>Tactique à transmettre</h4><p>${nl2br(meta.tactic||theme?.tactics?.join('\\n'))}</p><h4>Technique à transmettre</h4><p>${nl2br(meta.technique||theme?.techniques?.join('\\n'))}</p></div><div><h4>Autres infos prof</h4><p>${esc(meta.coachInfo||theme?.coachInfo||'Faire découvrir par le jeu et corriger par induction.')}</p></div></div></section>`:''}
+    <section class="box"><h2>Bienfaits de la préparation</h2><ul>${benefits.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></section>
+    <section class="box"><h2>Points qualité à observer</h2><ul>${quality.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></section>
+    <section class="box sandwich"><h2>Méthode sandwich</h2><p><b>1. Encourager:</b> nommer un comportement réussi. <b>2. Guider:</b> poser une question ou changer une règle pour faire découvrir. <b>3. Valoriser:</b> terminer avec un repère simple à répéter.</p></section>
+    <section class="box"><h2>Structure du cours</h2><div class="grid3">${steps.map(st=>`<div><span class="pill">${esc(st.num)} · ${esc(st.time)}</span><h4>${esc(st.name)}</h4><p class="small">${esc(st.desc)}</p></div>`).join('')}</div></section>
+    <h2>Déroulement des exercices</h2>${blockRows}
+    <section class="box"><h2>Évaluation rapide après séance</h2><p>Pour chaque aspect travaillé: choisir l’état observé, ajouter un aspect secondaire seulement s’il a réellement été vu/travaillé, puis noter une piste pour la prochaine séance.</p><div class="grid3"><div><h4>Pas acquis</h4><p class="small">À reprendre clairement.</p></div><div><h4>En évolution</h4><p class="small">Progrès visible mais pas stable.</p></div><div><h4>Acquis</h4><p class="small">Réutilisable en situation de jeu.</p></div></div></section>
+  </div><script>setTimeout(()=>window.print(),300)<\/script></body></html>`;
+}
+function printSessionPdf(sessionId){
+  const s=STATE.sessions.find(x=>x.id===sessionId);
+  if(!s){showNotif('Séance introuvable');return;}
+  const w=window.open('','_blank');
+  if(!w){showNotif('Autorise les popups pour générer le PDF');return;}
+  w.document.open();
+  w.document.write(professionalPrepHtml(s));
+  w.document.close();
+}
 function scoreBar(label,val,color='var(--bronze)'){
   const v=val||0; const pct=Math.round((v/20)*100);
   return `<div class="score-row"><span class="score-label">${label}</span><div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div><span class="score-num">${v}</span></div>`;
@@ -3282,9 +3401,10 @@ function pageSessionDetail(sessionId){
   const aspectCards=PILLARS.map((pl,idx)=>{const b=(s.blocks||[])[idx]||{pillar:pl.id,aspect:'',exercise:'',scores:{},coachState:''};const closed=s.status==='closed_coach'||s.status==='completed';const canEdit=STATE.role==='coach'&&(!closed||s.editMode);const score=measuredBlockScore(b);return `<div class="aspect-input-block">
     <div class="aib-header"><span class="aib-pillar" style="background:${pl.color}22;color:${pl.color}">${pl.name}</span><span class="aib-name">${esc(b.aspect||'Aspect à définir')}</span>${closed&&b.coachState?`<span style="margin-left:auto;font-size:10px;color:${pl.color};font-weight:700">${ASPECT_STATE_LABEL[b.coachState]} · ${score}/20</span>`:''}</div>
     ${canEdit?`<div class="form-group"><label class="form-label">EXERCICE / CONSIGNE</label><textarea class="form-input" rows="2" oninput="updateSessionBlock(${s.id},${idx},'exercise',this.value)">${esc(b.exercise||'')}</textarea><div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="saveBlockExerciseToLibrary(${s.id},${idx})">ENREGISTRER EN BIBLIOTHÈQUE</button></div></div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);background:var(--bg4);border:1px solid var(--border);padding:10px;border-radius:6px">Modification d'information uniquement. La progression déjà appliquée ne sera pas comptée une deuxième fois.</div>`:`${b.exercise?`<div class="exercise-card"><div style="font-size:8px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:5px">EXERCICE DONNÉ</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.5">${esc(b.exercise)}</div></div>`:''}`}
+    ${diagramHtml(s,idx,canEdit)}
   </div>`}).join('');
   return `<div class="content">${quoteBand()}
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:null,sessionMode:null})">← RETOUR</button><div style="flex:1"><div style="font-size:18px;font-weight:700;letter-spacing:1px">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2)">${s.date} · ${sessionTypeLabel(s.sessionType)} · ${statusBadge(s.status)}</div></div>${STATE.role==='coach'&&(s.status==='planned'||s.status==='open')?`<button class="btn btn-primary" onclick="enterFieldMode(${s.id})">MODE TERRAIN</button>`:''}${STATE.role==='coach'&&(s.status==='closed_coach'||s.status==='completed')?`<button class="btn btn-ghost" onclick="toggleSessionEdit(${s.id})">${s.editMode?'TERMINER MODIF':'MODIFIER'}</button>`:''}</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:null,sessionMode:null})">← RETOUR</button><div style="flex:1"><div style="font-size:18px;font-weight:700;letter-spacing:1px">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2)">${s.date} · ${sessionTypeLabel(s.sessionType)} · ${statusBadge(s.status)}</div></div>${STATE.role==='coach'?`<button class="btn btn-ghost" onclick="printSessionPdf(${s.id})">PDF PRÉPA</button>`:''}${STATE.role==='coach'&&(s.status==='planned'||s.status==='open')?`<button class="btn btn-primary" onclick="enterFieldMode(${s.id})">MODE TERRAIN</button>`:''}${STATE.role==='coach'&&(s.status==='closed_coach'||s.status==='completed')?`<button class="btn btn-ghost" onclick="toggleSessionEdit(${s.id})">${s.editMode?'TERMINER MODIF':'MODIFIER'}</button>`:''}</div>
     ${sessionBriefing(s,main||{},pr)}
     ${sessionStructureCard(s)}
     ${sessionSynthesisHtml(s)}
@@ -3349,7 +3469,7 @@ function pageFieldMode(s){
           <div style="font-size:9px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:8px">CONSIGNE / EXERCICE</div>
           <textarea class="form-input" rows="5" style="font-size:16px;line-height:1.55" oninput="updateSessionBlock(${s.id},${blockIdx},'exercise',this.value)">${esc(b.exercise||'')}</textarea>
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="saveBlockExerciseToLibrary(${s.id},${blockIdx})">ENREGISTRER EN BIBLIOTHÈQUE</button></div>
-        </div>`}
+        </div>${diagramHtml(s,blockIdx,true)}`}
         <div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.65">Pendant l'exercice, reste sur la consigne, le rythme et la communication. L'évaluation se fait ensuite en une seule étape rapide, sur base du test ou de la situation jouée.</div>`}
       </div>
       <div>
@@ -4293,6 +4413,20 @@ function openNextSessionFromSession(sessionId){
 function createSession(){const playerIds=selectedSessionPlayerIds();const date=document.getElementById('m_date').value;const playerWishes=document.getElementById('m_player_wishes')?.value.trim()||'';const sessionType=document.querySelector('input[name="m_session_type"]:checked')?.value||'hwbt';const themeKey=document.getElementById('m_aft_theme_key')?.value||'';const theme=aftThemeByKey(themeKey);const aftMeta={themeKey,theme:document.getElementById('m_aft_theme')?.value.trim()||'',technical:document.getElementById('m_aft_technical')?.value.trim()||'',tactic:document.getElementById('m_aft_tactic')?.value.trim()||'',technique:document.getElementById('m_aft_technique')?.value.trim()||'',level:document.getElementById('m_aft_level')?.value||'',teacherGoal:document.getElementById('m_aft_teacher_goal')?.value.trim()||'',constraint:document.getElementById('m_aft_constraint')?.value.trim()||'',coachInfo:theme?.coachInfo||''};if(playerIds.length<1||playerIds.length>4||!date){showNotif('Choisis 1 à 4 joueurs et une date');return;}const blocks=PILLARS.map(pl=>{const aspect=document.getElementById('m_aspect_'+pl.id).value;const exercise=document.getElementById('m_exercise_'+pl.id).value.trim();return {pillar:pl.id,aspect,exercise,subAspects:aspect?{[aspect]:'travaille'}:{},scores:{},coachState:''};});if(blocks.some(b=>!b.aspect)){showNotif('Choisis 1 aspect par pilier');return;}let savedCount=0;blocks.forEach(b=>{const before=(STATE.customExercises||[]).length;saveCustomExerciseFromBlock(b,'session-create');if((STATE.customExercises||[]).length>before)savedCount++;});const id=Math.max(0,...STATE.sessions.map(s=>s.id))+1;STATE.sessions.push({id,playerId:playerIds[0],playerIds,date,status:'planned',sessionType,aftMeta,goal:document.getElementById('m_session_goal').value.trim(),playerWishes,blocks,futureAspects:[],coachFeedback:{},playerFeedback:{}});closeModal();showNotif(savedCount?`Séance ${sessionTypeLabel(sessionType)} créée · ${savedCount} exercice${savedCount>1?'s':''} sauvegardé${savedCount>1?'s':''}`:`Séance ${sessionTypeLabel(sessionType)} créée`);setUI({page:'sessions',selectedSessionId:id});}
 function limitSessionPlayers(input){const checked=[...document.querySelectorAll('.m_session_player:checked')];if(checked.length>4){input.checked=false;showNotif('Maximum 4 joueurs par séance');}updateSessionPlanningSuggestions();}
 function updateSessionBlock(sessionId,blockIdx,field,value){const s=STATE.sessions.find(s=>s.id===sessionId);if(!s)return;if(!s.blocks[blockIdx])s.blocks[blockIdx]={pillar:PILLARS[blockIdx].id,aspect:'',exercise:'',scores:{},coachState:''};if(field==='exercise')s.blocks[blockIdx].exercise=value;else if(field==='aspect')s.blocks[blockIdx].aspect=value;saveState();}
+function diagramCourtClick(evt,sessionId,blockIdx){
+  const s=STATE.sessions.find(s=>s.id===sessionId); if(!s||!s.blocks?.[blockIdx]) return;
+  const svg=evt.currentTarget, r=svg.getBoundingClientRect();
+  const x=Math.max(8,Math.min(92,((evt.clientX-r.left)/r.width)*100));
+  const y=Math.max(8,Math.min(192,((evt.clientY-r.top)/r.height)*200));
+  const tool=diagramToolData();
+  const item={type:tool.type,label:tool.label,color:tool.color,x:+x.toFixed(1),y:+y.toFixed(1)};
+  if(tool.type==='arrow'){item.x2=Math.min(92,item.x+22);item.y2=item.y;}
+  s.blocks[blockIdx].diagramItems=Array.isArray(s.blocks[blockIdx].diagramItems)?s.blocks[blockIdx].diagramItems:[];
+  s.blocks[blockIdx].diagramItems.push(item);
+  saveState(); render();
+}
+function undoDiagramItem(sessionId,blockIdx){const s=STATE.sessions.find(s=>s.id===sessionId);const b=s?.blocks?.[blockIdx];if(!b)return;b.diagramItems=Array.isArray(b.diagramItems)?b.diagramItems:[];b.diagramItems.pop();saveState();render();}
+function clearDiagram(sessionId,blockIdx){const s=STATE.sessions.find(s=>s.id===sessionId);const b=s?.blocks?.[blockIdx];if(!b)return;if(!confirm('Vider le schéma de cet exercice ?'))return;b.diagramItems=[];saveState();render();}
 function toggleSessionEdit(id){const s=STATE.sessions.find(s=>s.id===id);if(!s)return;s.editMode=!s.editMode;showNotif(s.editMode?'Modification activée':'Modification terminée');render();}
 function enterFieldMode(id){const s=STATE.sessions.find(s=>s.id===id);if(!s)return;if(s.status==='planned')s.status='open';showNotif('Mode terrain ouvert');setUI({page:'sessions',selectedSessionId:id,sessionMode:'field',fieldBlock:0});}
 function saveFieldNotes(id,value){const s=STATE.sessions.find(s=>s.id===id);if(s){s.fieldNotes=value;saveState();}}
