@@ -1814,6 +1814,51 @@ function playerFeedbackForSession(s,playerId){
 function missingFeedbackPlayers(s){
   return sessionPlayers(s).filter(p=>!playerFeedbackForSession(s,p.id).submitted);
 }
+function feedbackSessionFromUrl(){
+  try{return parseInt(new URLSearchParams(location.search).get('feedback'))||null;}catch(e){return null;}
+}
+function feedbackUserFromUrl(){
+  try{return new URLSearchParams(location.search).get('user')||'';}catch(e){return '';}
+}
+function platformBaseUrl(){
+  try{return `${location.origin}${location.pathname}`;}catch(e){return 'https://hwbtplatform.netlify.app/';}
+}
+function sessionFeedbackLink(s,p){
+  return `${platformBaseUrl()}?feedback=${encodeURIComponent(s.id)}&user=${encodeURIComponent(p.code||p.name||'')}`;
+}
+function playerPhoneForWhatsapp(p){
+  const raw=p.phone||p.parentPhone||p.parent2Phone||'';
+  const digits=String(raw).replace(/[^\d+]/g,'');
+  if(!digits) return '';
+  if(digits.startsWith('+')) return digits.replace('+','');
+  if(digits.startsWith('00')) return digits.slice(2);
+  if(digits.startsWith('0')) return `32${digits.slice(1)}`;
+  return digits;
+}
+function whatsappFeedbackMessage(s,p){
+  const link=sessionFeedbackLink(s,p);
+  const pass=p.playerPassword||String(p.code||'').toLowerCase();
+  return `Salut ${p.firstName||p.name}, peux-tu prendre 1 minute pour évaluer ta séance HWBT du ${s.date} ?\n\nLien: ${link}\nIdentifiant: ${p.code||p.name}\nMot de passe: ${pass}\n\nTu choisis ton ressenti et ce que tu veux retravailler. Merci !`;
+}
+function whatsappFeedbackUrl(s,p){
+  const text=encodeURIComponent(whatsappFeedbackMessage(s,p));
+  const phone=playerPhoneForWhatsapp(p);
+  return phone?`https://wa.me/${phone}?text=${text}`:`https://wa.me/?text=${text}`;
+}
+function openWhatsappFeedback(sessionId,playerId){
+  const s=STATE.sessions.find(s=>s.id===sessionId);
+  const p=STATE.players.find(p=>p.id===playerId);
+  if(!s||!p) return;
+  window.open(whatsappFeedbackUrl(s,p),'_blank');
+}
+function copyWhatsappFeedback(sessionId,playerId){
+  const s=STATE.sessions.find(s=>s.id===sessionId);
+  const p=STATE.players.find(p=>p.id===playerId);
+  if(!s||!p) return;
+  const msg=whatsappFeedbackMessage(s,p);
+  if(navigator.clipboard) navigator.clipboard.writeText(msg).then(()=>showNotif('Message WhatsApp copié')).catch(()=>showNotif(msg,5000));
+  else showNotif(msg,5000);
+}
 function feedbackLabel(feeling){
   const map={1:'Difficile',2:'Mitigé',3:'Correct',4:'Bon',5:'Très bon'};
   return map[feeling]||'Non donné';
@@ -2666,6 +2711,10 @@ function pagePlayerPortal(){
   const last=esc(player.lastName||player.name.split(' ').slice(1).join(' ')||'HWBT');
   const progressState=playerProgressState(measured.level);
   const objectivePillar=PILLARS.find(p=>p.id===objective.pillar);
+  const lastProgress=progress[0]||null;
+  const lastProgressPillar=lastProgress?PILLARS.find(p=>p.id===lastProgress.pillar):null;
+  const nextSessionAspects=nextSession?(nextSession.blocks||[]).filter(b=>b.aspect).map(b=>b.aspect).slice(0,3):[];
+  const timeline=mySessions.slice(0,6);
   return `<div class="content">
     ${quoteBand()}
     <div class="notebook-cover">
@@ -2684,37 +2733,40 @@ function pagePlayerPortal(){
         </div>
       </div>
     </div>
+    <div class="card" style="border-color:${pendingFeedback?'var(--bronze)':'var(--border)'};background:${pendingFeedback?'linear-gradient(90deg,var(--bronze-dim),var(--bg2))':'var(--bg2)'}">
+      <div class="card-title">AUJOURD'HUI DANS MON CARNET</div>
+      <div class="g4">
+        <div class="notebook-action ${pendingFeedback?'hot':''}">
+          <div style="font-size:9px;color:var(--bronze);letter-spacing:1.4px;margin-bottom:8px">À FAIRE</div>
+          ${pendingFeedback?`<div style="font-size:18px;font-weight:800;line-height:1.15">Donner mon ressenti</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin:8px 0 12px">${esc(formatShortDate(pendingFeedback.date)||pendingFeedback.date)} · séance clôturée par le coach.</div><button class="btn btn-primary btn-sm" onclick="setUI({page:'sessions',selectedSessionId:${pendingFeedback.id}})">RÉPONDRE</button>`:`<div style="font-size:18px;font-weight:800;line-height:1.15">Rien en attente</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-top:8px">Ton carnet est à jour.</div>`}
+        </div>
+        <div class="notebook-action">
+          <div style="font-size:9px;color:var(--bronze);letter-spacing:1.4px;margin-bottom:8px">PROCHAINE SÉANCE</div>
+          ${nextSession?`<div style="font-size:18px;font-weight:800;line-height:1.15">${esc(formatShortDate(nextSession.date)||nextSession.date)}</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin:8px 0 12px">${esc(nextSessionAspects.join(' · ')||nextSession.goal||'Séance à préparer')}</div><button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:${nextSession.id}})">VOIR</button>`:`<div style="font-size:18px;font-weight:800;line-height:1.15">Pas encore prévue</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-top:8px">Choisis déjà tes priorités.</div>`}
+        </div>
+        <div class="notebook-action" style="border-color:${objectivePillar?objectivePillar.color+'55':'var(--border)'}">
+          <div style="font-size:9px;color:${objectivePillar?objectivePillar.color:'var(--bronze)'};letter-spacing:1.4px;margin-bottom:8px">OBJECTIF ACTUEL</div>
+          <div style="font-size:18px;font-weight:800;line-height:1.15">${esc(objective.aspect)}</div>
+          <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin:8px 0 12px">${esc(objective.source)} · ${objectivePillar?objectivePillar.name:'HWBT'}</div>
+          <button class="btn btn-ghost btn-sm" onclick="setUI({page:'players',selectedPlayerId:${player.id},subpage:'aspects'})">AJUSTER</button>
+        </div>
+        <div class="notebook-action">
+          <div style="font-size:9px;color:var(--bronze);letter-spacing:1.4px;margin-bottom:8px">DERNIER PROGRÈS</div>
+          ${lastProgress?`<div style="font-size:18px;font-weight:800;line-height:1.15;color:${lastProgressPillar?lastProgressPillar.color:'var(--white)'}">${esc(lastProgress.aspect)}</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-top:8px">${lastProgress.progressDelta>=0?'+':''}${formatScore(lastProgress.progressDelta)} · ${ASPECT_STATE_LABEL[lastProgress.state]||lastProgress.state}</div>`:`<div style="font-size:18px;font-weight:800;line-height:1.15">À mesurer</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-top:8px">Les progrès apparaîtront après les évaluations.</div>`}
+        </div>
+      </div>
+    </div>
     <div class="g2">
       <div class="card" style="border-color:${objectivePillar?objectivePillar.color+'66':'var(--bronze-dim2)'};background:linear-gradient(90deg,${objectivePillar?objectivePillar.color+'12':'var(--bronze-dim)'},var(--bg2))">
         <div class="card-title">MON OBJECTIF DU MOMENT</div>
         <div style="font-size:10px;letter-spacing:1.6px;color:${objectivePillar?objectivePillar.color:'var(--bronze)'};margin-bottom:7px">${objectivePillar?objectivePillar.name:'HWBT'} · ${esc(objective.source)}</div>
         <div style="font-size:26px;font-weight:800;line-height:1.05;margin-bottom:10px">${esc(objective.aspect)}</div>
         <div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.75">${esc(objective.reason)}</div>
-        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-primary btn-sm" onclick="setUI({page:'players',selectedPlayerId:${player.id},subpage:'aspects'})">AJUSTER MES PRIORITÉS</button>
-          ${nextSession?`<button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:${nextSession.id}})">VOIR LA SÉANCE</button>`:''}
-        </div>
       </div>
       <div class="card">
         <div class="card-title">MON REPÈRE HWBT</div>
         <div style="font-size:15px;font-weight:700;line-height:1.45;margin-bottom:10px">"${esc(playerMotivationPhrase(player,objective))}"</div>
         <div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7">${esc(lastProgressSentence(progress[0]))}</div>
-      </div>
-    </div>
-    <div class="g2">
-      ${pendingFeedback?`<div class="notebook-action hot">
-        <div class="card-title">À FAIRE MAINTENANT</div>
-        <div style="font-size:19px;font-weight:700;line-height:1.2">${esc(formatShortDate(pendingFeedback.date)||pendingFeedback.date)} · retour après séance</div>
-        <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin:8px 0 14px">Ton coach a clôturé la séance. Réponds avec quelques boutons pour que ton carnet reste juste.</div>
-        <button class="btn btn-primary" onclick="setUI({page:'sessions',selectedSessionId:${pendingFeedback.id}})">DONNER MON RESSENTI</button>
-      </div>`:`<div class="notebook-action">
-        <div class="card-title">PROCHAINE ACTION</div>
-        ${nextSession?`<div style="font-size:19px;font-weight:700;line-height:1.2">${esc(formatShortDate(nextSession.date)||nextSession.date)} · ${esc((nextSession.blocks||[]).filter(b=>b.aspect).map(b=>b.aspect).slice(0,2).join(' + ')||'séance HWBT')}</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin:8px 0 14px">${esc(nextSession.goal||'Prépare-toi à travailler les aspects choisis avec ton coach.')}</div><button class="btn btn-primary" onclick="setUI({page:'sessions',selectedSessionId:${nextSession.id}})">VOIR MA SÉANCE</button>`:`<div style="font-size:13px;color:var(--gray);font-family:var(--font-body);line-height:1.7">Aucune séance prévue pour l’instant. Tu peux déjà choisir les aspects que tu veux travailler.</div>`}
-      </div>`}
-      <div class="card">
-        <div class="card-title">MA PROGRESSION</div>
-        <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:12px"><div style="font-size:42px;font-weight:800;line-height:.9">${measured.level||'—'}</div><div><div class="progress-word" style="color:var(--bronze)">${progressState}</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);margin-top:3px">${measured.measured} aspect${measured.measured>1?'s':''} mesuré${measured.measured>1?'s':''}</div></div></div>
-        ${progress.length?progress.map(e=>{const pl=PILLARS.find(p=>p.id===e.pillar);const delta=Number(e.progressDelta||0);return `<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-top:1px solid var(--border)"><div style="width:7px;height:7px;border-radius:50%;background:${pl?pl.color:'var(--bronze)'}"></div><div style="flex:1"><div style="font-size:12px;font-weight:700">${esc(e.aspect)}</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body)">${esc(pl?pl.name:e.pillar)} · ${ASPECT_STATE_LABEL[e.state]||e.state}</div></div><div style="font-size:13px;color:${delta>=0?'var(--vert)':'var(--rouge)'};font-weight:700">${delta>=0?'+':''}${formatScore(delta)}</div></div>`}).join(''):`<div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7">Tes progrès apparaîtront après les premières séances évaluées.</div>`}
       </div>
     </div>
     <div class="g2">
@@ -2730,11 +2782,11 @@ function pagePlayerPortal(){
     </div>
     <div class="g2">
       <div class="card">
-        <div class="card-title">MES SÉANCES</div>
-        ${mySessions.length?mySessions.slice(0,5).map(s=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="setUI({page:'sessions',selectedSessionId:${s.id}})">
-          <div style="flex:1"><div style="font-size:12px;font-weight:600">${formatShortDate(s.date)||s.date}</div><div style="font-size:10px;color:var(--gray2)">${(s.blocks||[]).filter(b=>b.aspect).map(b=>b.aspect).join(' · ')}</div></div>
-          ${statusBadge(s.status)}
-        </div>`).join(''):`<div style="font-size:12px;color:var(--gray);font-family:var(--font-body)">Aucune séance pour le moment.</div>`}
+        <div class="card-title">MON HISTORIQUE DE CARNET</div>
+        ${timeline.length?timeline.map((s,i)=>{const aspects=(s.blocks||[]).filter(b=>b.aspect).map(b=>b.aspect).slice(0,3);const pf=playerFeedbackForSession(s,player.id);return `<div style="display:grid;grid-template-columns:26px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="setUI({page:'sessions',selectedSessionId:${s.id}})">
+          <div style="position:relative;display:flex;justify-content:center"><div style="width:11px;height:11px;border-radius:50%;background:${s.status==='completed'?'var(--vert)':s.status==='closed_coach'?'var(--bronze)':'var(--border3)'};margin-top:4px"></div>${i<timeline.length-1?`<div style="position:absolute;top:18px;bottom:-12px;width:1px;background:var(--border2)"></div>`:''}</div>
+          <div><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div style="font-size:13px;font-weight:700">${formatShortDate(s.date)||s.date}</div>${statusBadge(s.status)}</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:4px">${esc(aspects.join(' · ')||s.goal||'Séance HWBT')}</div>${pf.submitted?`<div style="font-size:9px;color:var(--vert);letter-spacing:1px;margin-top:5px">RESSENTI DONNÉ · ${feedbackLabel(pf.feeling)}</div>`:''}</div>
+        </div>`}).join(''):`<div style="font-size:12px;color:var(--gray);font-family:var(--font-body)">Aucune séance pour le moment.</div>`}
       </div>
       <div class="card">
         <div class="card-title">MON PROFIL MENTAL</div>
@@ -3430,6 +3482,14 @@ function sessionSynthesisHtml(s){
     <div style="font-size:13px;font-weight:700">${esc(it.aspect)}</div>
     <div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:5px">${esc(it.reason)}</div>
   </button>`}).join(''):`<div style="font-size:11px;color:var(--gray);font-family:var(--font-body)">Aucune priorité automatique claire. Utilise les priorités joueur/coach dans les fiches.</div>`;
+  const whatsappRows=STATE.role==='coach'&&data.missing.length?`<div style="margin-top:14px;background:var(--bg4);border:1px solid var(--bronze-dim2);border-radius:8px;padding:12px">
+    <div class="card-title">RELANCE WHATSAPP RETOUR JOUEUR</div>
+    <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-bottom:10px">Ouvre WhatsApp avec un message prêt: lien vers la séance, identifiant joueur et mot de passe. Le joueur se connecte puis arrive directement sur son évaluation.</div>
+    <div style="display:grid;gap:8px">${data.missing.map(p=>`<div style="display:flex;align-items:center;gap:10px;justify-content:space-between;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px;flex-wrap:wrap">
+      <div><div style="font-size:12px;font-weight:700">${esc(p.name)}</div><div style="font-size:9px;color:var(--gray3);font-family:var(--font-body)">${esc(p.code||'code manquant')} · ${playerPhoneForWhatsapp(p)?'téléphone prêt':'pas de téléphone: partage manuel'}</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="openWhatsappFeedback(${s.id},${p.id})">WHATSAPP</button><button class="btn btn-ghost btn-sm" onclick="copyWhatsappFeedback(${s.id},${p.id})">COPIER</button></div>
+    </div>`).join('')}</div>
+  </div>`:'';
   return `<div class="card" style="border-color:var(--bronze-dim2)">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px">
       <div>
@@ -3446,6 +3506,7 @@ function sessionSynthesisHtml(s){
       <div><div class="card-title">RESSENTI JOUEUR</div>${feedbackRows}</div>
       <div><div class="card-title">PISTES POUR LA SUITE</div><div style="display:grid;gap:8px">${nextRows}</div></div>
     </div>
+    ${whatsappRows}
   </div>`;
 }
 
@@ -4842,9 +4903,9 @@ function playerLoginMatches(p,u){const n=norm(u);return [p.code,p.name,p.firstNa
 function showLogin(){document.getElementById('authOverlay').style.display='flex';}
 function hideLogin(){document.getElementById('authOverlay').style.display='none';}
 function loginCoach(){const u=document.getElementById('loginUser').value;const p=document.getElementById('loginPass').value;if(norm(u)==='coach'&&(norm(p)==='hwbt'||norm(p)==='coach')){STATE.coachUnlocked=true;STATE.role='coach';STATE.activePlayerId=null;hideLogin();setUI({page:'dashboard',selectedPlayerId:null,selectedSessionId:null});}else showNotif('Accès coach: coach / hwbt');}
-function loginPlayer(){const u=document.getElementById('loginUser').value;const pass=document.getElementById('loginPass').value;const p=STATE.players.find(pl=>playerLoginMatches(pl,u));if(!p){showNotif('Joueur introuvable. Essaie le code joueur, ex: MD300');return;}const expected=p.playerPassword||p.code||'';if(!expected||norm(pass)!==norm(expected)){showNotif('Mot de passe joueur incorrect');return;}STATE.coachUnlocked=false;STATE.role='player';STATE.activePlayerId=p.id;hideLogin();setUI({page:'dashboard',selectedPlayerId:p.id,selectedSessionId:null});}
+function loginPlayer(){const u=document.getElementById('loginUser').value;const pass=document.getElementById('loginPass').value;const p=STATE.players.find(pl=>playerLoginMatches(pl,u));if(!p){showNotif('Joueur introuvable. Essaie le code joueur, ex: MD300');return;}const expected=p.playerPassword||p.code||'';if(!expected||norm(pass)!==norm(expected)){showNotif('Mot de passe joueur incorrect');return;}STATE.coachUnlocked=false;STATE.role='player';STATE.activePlayerId=p.id;hideLogin();const targetId=feedbackSessionFromUrl();const target=targetId?STATE.sessions.find(s=>s.id===targetId&&playerInSession(s,p.id)):null;if(target)setUI({page:'sessions',selectedPlayerId:p.id,selectedSessionId:target.id});else setUI({page:'dashboard',selectedPlayerId:p.id,selectedSessionId:null});}
 function logout(){showLogin();}
-async function initApp(){loadState();await loadRemoteState();document.documentElement.lang=STATE.lang;document.getElementById('mainContent').innerHTML='';document.getElementById('pageTitle').textContent='';document.getElementById('roleTag').textContent='';if(!document.getElementById('authOverlay')){document.body.insertAdjacentHTML('beforeend',`<div id="authOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px"><div class="card" style="width:min(460px,94vw);margin:0"><div style="font-size:34px;font-weight:700;letter-spacing:5px;margin-bottom:4px">HWBT</div><div class="card-title">ACCÈS PLATEFORME</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7;margin-bottom:16px">Entre ton identifiant et ton mot de passe personnel. Les accès sont fournis par le coach.</div><div class="form-group"><label class="form-label">NOM D'UTILISATEUR / CODE JOUEUR</label><input class="form-input" id="loginUser" placeholder="Code joueur ou accès coach"></div><div class="form-group"><label class="form-label">MOT DE PASSE</label><input class="form-input" id="loginPass" type="password" placeholder="Mot de passe"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="loginPlayer()">ENTRER JOUEUR</button><button class="btn btn-ghost" onclick="loginCoach()">ENTRER COACH</button><button class="btn btn-ghost" onclick="setLang(STATE.lang==='fr'?'en':'fr')">FR / EN</button></div><div style="font-size:10px;color:var(--bronze);margin-top:14px;font-family:var(--font-body);letter-spacing:.6px">Login à demander au coach.</div></div></div>`);}render();showLogin();}
+async function initApp(){loadState();await loadRemoteState();document.documentElement.lang=STATE.lang;document.getElementById('mainContent').innerHTML='';document.getElementById('pageTitle').textContent='';document.getElementById('roleTag').textContent='';if(!document.getElementById('authOverlay')){document.body.insertAdjacentHTML('beforeend',`<div id="authOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px"><div class="card" style="width:min(460px,94vw);margin:0"><div style="font-size:34px;font-weight:700;letter-spacing:5px;margin-bottom:4px">HWBT</div><div class="card-title">ACCÈS PLATEFORME</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7;margin-bottom:16px">Entre ton identifiant et ton mot de passe personnel. Les accès sont fournis par le coach.</div><div class="form-group"><label class="form-label">NOM D'UTILISATEUR / CODE JOUEUR</label><input class="form-input" id="loginUser" placeholder="Code joueur ou accès coach"></div><div class="form-group"><label class="form-label">MOT DE PASSE</label><input class="form-input" id="loginPass" type="password" placeholder="Mot de passe"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="loginPlayer()">ENTRER JOUEUR</button><button class="btn btn-ghost" onclick="loginCoach()">ENTRER COACH</button><button class="btn btn-ghost" onclick="setLang(STATE.lang==='fr'?'en':'fr')">FR / EN</button></div><div style="font-size:10px;color:var(--bronze);margin-top:14px;font-family:var(--font-body);letter-spacing:.6px">Login à demander au coach.</div></div></div>`);}render();showLogin();const prefill=feedbackUserFromUrl();if(prefill){const el=document.getElementById('loginUser');if(el)el.value=prefill;}}
 window.addEventListener('DOMContentLoaded',initApp);
 </script>
 </body>
