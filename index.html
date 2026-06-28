@@ -1372,58 +1372,112 @@ function insightStyleAnswer(energy, text, question='', idx=0){
     else if(lower.includes('liberté')) clean="Je veux jouer avec liberté";
     else clean=`Je choisis une option simple: ${clean.toLowerCase()}`;
   }
+  const q=String(question||'').toLowerCase();
+  const contexts=[
+    [/service|servir|première/,'sur le service'],
+    [/retour/,'sur le retour'],
+    [/lob/,'sur le lob'],
+    [/smash|bandeja|v[ií]bora/,'sur la balle haute'],
+    [/volée|filet/,'près du filet'],
+    [/vitre/,'après la vitre'],
+    [/balle basse|défense|défendre/,'en défense'],
+    [/centre|milieu/,'sur la balle au centre'],
+    [/revers/,'sur le revers'],
+    [/partenaire|équipe|duo/,'avec mon partenaire'],
+    [/score|tie-break|5-5|30-30|balle de match|balle de break|set/,'sur ce score'],
+    [/fatigu|long|énergie/,'quand la fatigue arrive'],
+    [/public|monde|regarde/,'avec les regards autour'],
+    [/colère|crie|chaud|tendu|pression/,'quand la tension monte'],
+    [/plan|tactique|solution|adversaire|faiblesse/,'dans la lecture du jeu']
+  ];
+  const fallbackContext=(()=>{
+    if(/rate|faute|erreur/.test(q)) return 'après cette erreur';
+    if(/perds|perdu|mené|série négative/.test(q)) return 'après cette mauvaise série';
+    if(/gagne|victoire|beau point/.test(q)) return 'après ce bon passage';
+    if(/nerveux|tendu|stress|peur/.test(q)) return 'quand je sens la pression';
+    if(/début|commence|premier/.test(q)) return 'au début du match';
+    if(/finir|balle pour finir|winner/.test(q)) return 'au moment de conclure';
+    if(/court|terrain/.test(q)) return 'sur ce terrain';
+    if(/rythme|lent|vite/.test(q)) return 'dans ce rythme de jeu';
+    if(/choisis|choisir|priorité/.test(q)) return 'au moment du choix';
+    return 'sur ce point précis';
+  })();
+  const context=(contexts.find(([re])=>re.test(q))||[])[1]||fallbackContext;
+  const details={
+    rouge:[
+      `et je prends la responsabilité ${context}`,
+      `en assumant une décision claire ${context}`,
+      `pour remettre de l’impact tout de suite ${context}`,
+      `sans attendre que l’adversaire choisisse à ma place ${context}`,
+      `avec l’idée de reprendre le contrôle ${context}`,
+      `en montrant que je reste présent dans le moment important`,
+      `pour faire basculer l’échange par mon intention ${context}`,
+      `en cherchant une action nette plutôt qu’une demi-solution ${context}`
+    ],
+    jaune:[
+      `en changeant l’énergie ${context}`,
+      `avec une option plus libre et moins prévisible ${context}`,
+      `pour remettre du mouvement et de la créativité ${context}`,
+      `en gardant du plaisir même quand la situation est serrée ${context}`,
+      `pour surprendre sans rester bloqué dans le même schéma ${context}`,
+      `en cherchant une solution qui redonne de l’élan au duo ${context}`,
+      `avec une attitude positive qui peut relancer le point`,
+      `en osant une variation qui casse la routine adverse ${context}`
+    ],
+    vert:[
+      `en gardant une balle fiable ${context}`,
+      `pour éviter de donner un point gratuit ${context}`,
+      `avec une réponse simple qui remet l’équipe en sécurité ${context}`,
+      `en acceptant de reconstruire avant de vouloir finir ${context}`,
+      `pour rester stable même si le moment est inconfortable ${context}`,
+      `en choisissant la régularité avant le coup parfait ${context}`,
+      `avec une balle propre qui laisse une suite possible ${context}`,
+      `pour reprendre une base claire et solide ${context}`
+    ],
+    bleu:[
+      `après avoir lu ce qui se passe ${context}`,
+      `en choisissant la zone qui a le plus de sens ${context}`,
+      `pour prendre une décision utile plutôt qu’instinctive ${context}`,
+      `en reliant mon choix au placement des adversaires ${context}`,
+      `avec l’idée de comprendre avant d’accélérer ${context}`,
+      `en gardant une logique claire dans le point ${context}`,
+      `pour adapter mon coup au score et à la position ${context}`,
+      `en cherchant le meilleur rapport risque-résultat ${context}`
+    ]
+  };
+  const seed=String(question+energy+idx).split('').reduce((a,c)=>a+c.charCodeAt(0),idx);
+  const detail=(details[energy]||details.vert)[seed%(details[energy]||details.vert).length];
   const noPunc=clean.replace(/[.?!]+$/,'').trim();
-  if(noPunc.length<58){
-    const tails={
-      rouge:[
-        'pour reprendre l’avantage dans le point',
-        'pour montrer que je ne subis pas',
-        'pour mettre plus de pression sur l’adversaire',
-        'pour décider plus vite et assumer mon choix',
-        'pour faire avancer le point dans mon sens',
-        'pour prendre ma place dans le jeu'
-      ],
-      jaune:[
-        'pour changer l’énergie du point',
-        'pour garder du plaisir et de la liberté',
-        'pour surprendre sans rester bloqué',
-        'pour relancer la dynamique avec mon partenaire',
-        'pour créer une option différente',
-        'pour remettre du mouvement dans le jeu'
-      ],
-      vert:[
-        'pour rester solide et éviter la faute facile',
-        'pour revenir à une base simple',
-        'pour garder le point sous contrôle',
-        'pour construire sans me précipiter',
-        'pour donner une balle fiable à mon équipe',
-        'pour retrouver de la stabilité'
-      ],
-      bleu:[
-        'pour faire le bon choix au bon moment',
-        'pour comprendre ce qui se passe avant d’agir',
-        'pour jouer selon la situation',
-        'pour utiliser la bonne zone au bon moment',
-        'pour éviter une décision prise trop vite',
-        'pour garder un plan clair'
-      ]
-    };
-    const seed=String(question||'').split('').reduce((a,c)=>a+c.charCodeAt(0),idx);
-    const tail=(tails[energy]||tails.vert)[seed%(tails[energy]||tails.vert).length];
-    const low=noPunc.toLowerCase();
-    if(!/\b(pour|avant|sans|selon|quand|parce)\b/.test(low)&&!low.includes(tail.toLowerCase())&&!low.includes('pour '+tail.split(' ').slice(1,4).join(' ').toLowerCase())){
-      clean=`${noPunc} ${tail}`;
-    }
+  const low=noPunc.toLowerCase();
+  if(!low.includes(detail.toLowerCase())&&noPunc.length<96){
+    clean=`${noPunc} ${detail}`;
   }
   return /[.!?]$/.test(clean)?clean:`${clean}.`;
 }
-const BASE44_FIELD_TEST = SIMPLE_FIELD_ROWS.map((row,i)=>({
-  id:'b44-'+String(i+1).padStart(3,'0'),
-  pillar:row[0],
-  pillarName:row[0].toUpperCase(),
-  text:row[1],
-  opts:ENERGY_ORDER.map((energy,idx)=>({e:energy,t:insightStyleAnswer(energy,row[idx+2],row[1],idx)}))
-}));
+function duplicateAnswerNuance(question, energy, count){
+  const q=String(question||'').toLowerCase();
+  if(/centre|milieu/.test(q)) return energy==='rouge'?'en annonçant clairement que je la prends':'en clarifiant la priorité avec le duo';
+  if(/partenaire|duo/.test(q)) return 'sans perdre le lien avec mon partenaire';
+  if(/score|tie-break|balle de match|30-30|5-5/.test(q)) return 'en tenant compte du score';
+  if(/fatigue|long/.test(q)) return 'en gardant assez d’énergie pour la suite';
+  return count%2?'avec une intention adaptée au point':'en restant fidèle à ce que la situation demande';
+}
+const BASE44_FIELD_TEST = (()=>{
+  const generated=SIMPLE_FIELD_ROWS.map((row,i)=>({
+    id:'b44-'+String(i+1).padStart(3,'0'),
+    pillar:row[0],
+    pillarName:row[0].toUpperCase(),
+    text:row[1],
+    opts:ENERGY_ORDER.map((energy,idx)=>({e:energy,t:insightStyleAnswer(energy,row[idx+2],row[1],idx)}))
+  }));
+  const seen={};
+  generated.forEach(q=>q.opts.forEach(opt=>{
+    const key=opt.t.toLowerCase();
+    seen[key]=(seen[key]||0)+1;
+    if(seen[key]>1) opt.t=`${opt.t.replace(/[.?!]+$/,'')} ${duplicateAnswerNuance(q.text,opt.e,seen[key])}.`;
+  }));
+  return generated;
+})();
 
 // Profile scoring map: which energy combo → profile id
 const PROFILE_MAP = {
@@ -2313,18 +2367,22 @@ function sessionWorkBlocksHtml(s){
   const note=aft?'Ici tu prépares le vrai déroulement du cours: échauffement, jeu de départ, jeu d’apprentissage, jeu d’application et cooling down. Les aspects HWBT restent utilisés plus bas pour évaluer les stats.':'Ici tu prépares les exercices par pilier HWBT.';
   const cards=(aft?steps:PILLARS).map((item,idx)=>{
     const b=blocks[idx]||{};
+    const isCooling=aft&&idx===steps.length-1;
     const pl=aft?(PILLARS.find(p=>p.id===b.pillar)||PILLARS[idx]||PILLARS[0]):item;
     const step=aft?item:null;
     const label=aft?step.name:pl.name;
     const sub=aft?`${step.time}${step.focus?` · ${step.focus}`:''}`:`${b.aspect||'Aspect à définir'}`;
     const desc=aft?step.desc:(b.aspect?`Aspect mesuré: ${b.aspect}`:'Choisis ou précise l’exercice.');
     const score=measuredBlockScore(b);
+    const actionButtons=isCooling
+      ? `<button class="btn btn-primary btn-sm" onclick="enhanceSessionBlockAft(${s.id},${idx})">CORRIGER + COMPLÉTER LE BILAN</button>`
+      : `${aft?`<button class="btn btn-primary btn-sm" onclick="enhanceSessionBlockAft(${s.id},${idx})">CORRIGER + COMPLÉTER AFT</button>`:''}<button class="btn btn-ghost btn-sm" onclick="diagramToText(${s.id},${idx})">SCHÉMA → TEXTE</button><button class="btn btn-ghost btn-sm" onclick="diagramFromText(${s.id},${idx})">TEXTE → SCHÉMA</button><button class="btn btn-ghost btn-sm" onclick="saveBlockExerciseToLibrary(${s.id},${idx})">ENREGISTRER EN BIBLIOTHÈQUE</button>`;
     return `<div class="aspect-input-block">
       <div class="aib-header"><span class="aib-pillar" style="background:var(--bronze-dim);color:var(--bronze)">${String(idx+1).padStart(2,'0')}</span><span class="aib-name">${esc(label)}</span>${!aft&&closed&&b.coachState?`<span style="margin-left:auto;font-size:10px;color:${pl.color};font-weight:700">${ASPECT_STATE_LABEL[b.coachState]} · ${score}/20</span>`:''}</div>
       <div style="font-size:10px;color:var(--bronze);letter-spacing:1.4px;margin-bottom:8px">${esc(sub)}</div>
       <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:10px">${esc(desc)}</div>
-      ${canEdit?`<div class="form-group"><label class="form-label">${aft?'EXERCICE / DÉROULEMENT':'EXERCICE / CONSIGNE'}</label><textarea class="form-input" rows="${aft?7:2}" oninput="updateSessionBlock(${s.id},${idx},'exercise',this.value)">${esc(b.exercise||'')}</textarea><div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${aft?`<button class="btn btn-primary btn-sm" onclick="enhanceSessionBlockAft(${s.id},${idx})">CORRIGER + COMPLÉTER AFT</button>`:''}<button class="btn btn-ghost btn-sm" onclick="diagramToText(${s.id},${idx})">SCHÉMA → TEXTE</button><button class="btn btn-ghost btn-sm" onclick="diagramFromText(${s.id},${idx})">TEXTE → SCHÉMA</button><button class="btn btn-ghost btn-sm" onclick="saveBlockExerciseToLibrary(${s.id},${idx})">ENREGISTRER EN BIBLIOTHÈQUE</button></div></div>`:`${b.exercise?`<div class="exercise-card"><div style="font-size:8px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:5px">EXERCICE DONNÉ</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.5;white-space:pre-wrap">${esc(b.exercise)}</div></div>`:''}`}
-      ${diagramHtml(s,idx,canEdit)}
+      ${canEdit?`<div class="form-group"><label class="form-label">${isCooling?'BILAN / RETOUR AU CALME':(aft?'EXERCICE / DÉROULEMENT':'EXERCICE / CONSIGNE')}</label><textarea class="form-input" rows="${aft?7:2}" oninput="updateSessionBlock(${s.id},${idx},'exercise',this.value)" placeholder="${isCooling?'Question ouverte, feedback sandwich, point retenu par les joueurs...':''}">${esc(b.exercise||'')}</textarea><div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${actionButtons}</div></div>`:`${b.exercise?`<div class="exercise-card"><div style="font-size:8px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:5px">${isCooling?'BILAN DONNÉ':'EXERCICE DONNÉ'}</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.5;white-space:pre-wrap">${esc(b.exercise)}</div></div>`:''}`}
+      ${isCooling?`<div style="background:var(--bg4);border-left:3px solid var(--bronze);border-radius:0 8px 8px 0;padding:12px;font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.65"><b style="color:var(--offwhite)">Pas de schéma terrain pour cette étape.</b><br>Le cooling down sert à revenir au calme, vérifier ce que les joueurs retiennent et fermer la séance avec un feedback sandwich.</div>`:diagramHtml(s,idx,canEdit)}
     </div>`;
   }).join('');
   return `<div class="card"><div class="card-title">${title}</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-bottom:12px">${note}</div>${cards}</div>`;
@@ -2456,10 +2514,10 @@ function professionalPrepHtml(s){
   const techniqueBullets=pdfTextLines(meta.technique||'').slice(0,3).length?pdfTextLines(meta.technique).slice(0,3):(theme?.techniques||[]).slice(0,3);
   const tacticalTheme=meta.theme||theme?.title||s.goal||'Thème tactique à préciser';
   const heroSummary=`${players.length} joueur${players.length>1?'s':''} · ${esc(meta.level||'niveau à définir')} · ${materials.slice(0,3).map(esc).join(' / ')}`;
-  const blockRows=blocks.map((b,i)=>{const pl=PILLARS.find(p=>p.id===b.pillar);const st=aft?steps[Math.min(i,steps.length-1)]:steps[i];const flow=pdfBulletsFrom(b.exercise,['DÉROULEMENT DU JEU','DEROULEMENT DU JEU','ORGANISATION'],['MISE EN PLACE','RÈGLE PRINCIPALE','REGLE PRINCIPALE','REPÈRES'],[b.exercise||'Exercice à préciser.'],4);const attention=pdfBulletsFrom(b.exercise,['POINTS D’ATTENTION',"POINTS D'ATTENTION",'OBSERVATION COACH','CRITÈRES DE RÉUSSITE'],['QUESTIONS À POSER','PROGRESSION','FEEDBACK','BIENFAITS'],['Observer le choix tactique avant de corriger.','Garder une consigne courte.','Adapter en R-1/R+1 selon réussite.'],4);const benefits=pdfBulletsFrom(b.exercise,['BIENFAITS POUR LE JOUEUR','CE QUE J’APPRENDS'],['DÉROULEMENT','MISE EN PLACE','RÈGLE','REPÈRES'],['Comprendre le jeu avant le geste parfait.','Relier technique, tactique et décision.','Repartir avec un repère clair.'],4);return `<section class="exercise">
+  const blockRows=blocks.map((b,i)=>{const pl=PILLARS.find(p=>p.id===b.pillar);const st=aft?steps[Math.min(i,steps.length-1)]:steps[i];const isCooling=aft&&i===steps.length-1;const flow=pdfBulletsFrom(b.exercise,['DÉROULEMENT DU JEU','DEROULEMENT DU JEU','ORGANISATION'],['MISE EN PLACE','RÈGLE PRINCIPALE','REGLE PRINCIPALE','REPÈRES'],[b.exercise||'Exercice à préciser.'],4);const attention=pdfBulletsFrom(b.exercise,['POINTS D’ATTENTION',"POINTS D'ATTENTION",'OBSERVATION COACH','CRITÈRES DE RÉUSSITE'],['QUESTIONS À POSER','PROGRESSION','FEEDBACK','BIENFAITS'],isCooling?['Question ouverte: qu’avez-vous retenu ?','Feedback sandwich: réussite, correction, encouragement.','Retour au calme et fermeture positive.']:['Observer le choix tactique avant de corriger.','Garder une consigne courte.','Adapter en R-1/R+1 selon réussite.'],4);const benefits=pdfBulletsFrom(b.exercise,['BIENFAITS POUR LE JOUEUR','CE QUE J’APPRENDS'],['DÉROULEMENT','MISE EN PLACE','RÈGLE','REPÈRES'],isCooling?['Ancrer l’apprentissage avant de quitter le terrain.','Donner au joueur une image claire de sa progression.','Préparer le prochain entraînement avec une priorité simple.']:['Comprendre le jeu avant le geste parfait.','Relier technique, tactique et décision.','Repartir avec un repère clair.'],4);const diagramPanel=isCooling?`<div class="cooldown-panel"><b>Cooling down</b><span>Pas de schéma terrain</span><p>Retour au calme, bilan sandwich et question ouverte pour vérifier ce que les joueurs retiennent.</p></div>`:printDiagramSvg(b);return `<section class="exercise">
     <div class="ex-title"><span>${String(i+1).padStart(2,'0')}</span><div><h3>${esc(st?.name||pl?.name||'Bloc')}</h3><p>${esc(st?.time||'')} · ${esc(st?.focus||pl?.name||b.pillar)} · ${esc(b.aspect||'Aspect à définir')}</p></div></div>
     <div class="exercise-grid">
-      <div class="diagram-panel">${printDiagramSvg(b)}</div>
+      <div class="diagram-panel">${diagramPanel}</div>
       <div class="text-panel"><div class="exercise-cols"><div><h4>Déroulement</h4>${pdfBulletList(flow)}</div><div><h4>Points d'attention</h4>${pdfBulletList(attention)}</div><div><h4>Bienfaits</h4>${pdfBulletList(benefits)}</div></div></div>
     </div>
   </section>`}).join('');
@@ -2479,7 +2537,7 @@ function professionalPrepHtml(s){
     .key-points{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.key-points span{background:#111;color:#eee;border:1px solid #2a2a2a;border-radius:6px;padding:7px;font-size:8.7px;min-height:48px}.repere-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.repere-grid p{margin:0;white-space:pre-line}.repere-grid ul{margin:0;padding-left:15px}.repere-grid li{margin-bottom:4px}.small{font-size:8.5px;color:var(--muted)}
     .legend span{background:#f4eddf;color:#171717;border-color:#dfcfb5}.exercise-page{break-before:page;page-break-before:always;margin-top:18px;page:exercisePage}.section-banner{background:linear-gradient(135deg,#070708,#1c1308);color:white;border-radius:8px;border:1px solid #b8893566;padding:18px 22px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}.section-banner h2{color:white;font-size:30px;margin:0;letter-spacing:2px}.section-banner span{color:var(--gold2);font-weight:900;letter-spacing:2px}
     .exercise{background:white;border:1px solid var(--line);border-radius:9px;margin-top:12px;padding:0;break-inside:avoid;overflow:hidden}.ex-title{display:grid;grid-template-columns:74px 1fr;background:#111;color:white;border-bottom:3px solid var(--gold)}.ex-title>span{background:var(--gold);color:#000;font-size:22px;font-weight:900;display:flex;align-items:center;justify-content:center}.ex-title div{padding:10px 14px}.ex-title p{margin:3px 0 0;color:#c9c9c9;font-size:9.5px}
-    .exercise-grid{display:grid;grid-template-columns:315px 1fr;gap:0}.diagram-panel{background:#0b0b0f;padding:12px;border-right:1px solid var(--line)}.text-panel{padding:13px 15px}.exercise-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.exercise-cols ul{margin:0;padding-left:15px}.exercise-cols li{margin:0 0 6px;font-size:9.2px;line-height:1.32}.text-panel p{margin:0;white-space:normal}.text-panel p b,.text-panel p strong{color:#111}
+    .exercise-grid{display:grid;grid-template-columns:315px 1fr;gap:0}.diagram-panel{background:#0b0b0f;padding:12px;border-right:1px solid var(--line);display:flex;align-items:center;justify-content:center}.cooldown-panel{border:1px solid #b8893566;background:linear-gradient(180deg,#151515,#080808);color:white;border-radius:8px;padding:22px;text-align:center;min-height:210px;display:flex;flex-direction:column;justify-content:center}.cooldown-panel b{font-size:24px;text-transform:uppercase}.cooldown-panel span{color:#c99a3b;font-size:10px;letter-spacing:1.4px;margin:8px 0}.cooldown-panel p{color:#d8d8d8;font-size:11px;line-height:1.55;margin:0}.text-panel{padding:13px 15px}.exercise-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.exercise-cols ul{margin:0;padding-left:15px}.exercise-cols li{margin:0 0 6px;font-size:9.2px;line-height:1.32}.text-panel p{margin:0;white-space:normal}.text-panel p b,.text-panel p strong{color:#111}
     svg{--border2:#ddd;--border:#ddd;--bronze:#b88935;max-height:305px}.print-tip{position:fixed;right:18px;top:18px;padding:10px 14px;background:#111;color:white;border:0;border-radius:8px;box-shadow:0 8px 20px #0004}
     @page{size:A4 landscape;margin:8mm}
     @media print{body{background:white}.page{padding:0;max-width:none;box-shadow:none}.no-print{display:none}.box,.exercise{page-break-inside:avoid}.exercise-page{page-break-before:always}.exercise-grid{grid-template-columns:300px 1fr}.exercise-cols li{font-size:8.8px}.cover{min-height:160px}.cover h1{font-size:32px}}
