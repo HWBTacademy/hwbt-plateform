@@ -2415,6 +2415,28 @@ function printDiagramSvg(block){
   const body=(block.diagramItems||[]).map(diagramItemSvg).join('');
   return courtBaseSvg(body,false);
 }
+function pdfTextLines(text){
+  return String(text||'').split(/\n+/).map(x=>x.replace(/^[-•]\s*/,'').trim()).filter(Boolean);
+}
+function pdfSection(text,startLabels,endLabels=[]){
+  const lines=pdfTextLines(text);
+  const start=lines.findIndex(line=>startLabels.some(label=>line.toUpperCase().startsWith(label)));
+  if(start<0) return [];
+  const out=[];
+  for(let i=start+1;i<lines.length;i++){
+    const up=lines[i].toUpperCase();
+    if(endLabels.some(label=>up.startsWith(label))) break;
+    if(!/^[A-ZÉÈÀÙÂÊÎÔÛÇ0-9 /’'·:-]{5,}$/.test(lines[i])) out.push(lines[i]);
+  }
+  return out;
+}
+function pdfBulletsFrom(text,startLabels,endLabels,fallback=[],limit=4){
+  const items=pdfSection(text,startLabels,endLabels);
+  return (items.length?items:fallback).slice(0,limit);
+}
+function pdfBulletList(items){
+  return `<ul>${(items||[]).filter(Boolean).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
+}
 function professionalPrepHtml(s){
   const players=sessionPlayers(s);
   const blocks=s.blocks||[];
@@ -2430,43 +2452,53 @@ function professionalPrepHtml(s){
   if(/lichette/.test(materialSource)) materials.push('Lichettes');
   if(/balle rouge|balles rouges/.test(materialSource)) materials.push('Balles rouges');
   const coachPoints=(theme?[...(theme.tactics||[]).slice(0,3),...(theme.techniques||[]).slice(0,2)]:['Règle simple et visible','Beaucoup de touches','Questionner avant de corriger','Feedback sandwich','Progression R-1 / R0 / R+1']).slice(0,5);
+  const tacticBullets=pdfTextLines(meta.tactic||'').slice(0,3).length?pdfTextLines(meta.tactic).slice(0,3):(theme?.tactics||[]).slice(0,3);
+  const techniqueBullets=pdfTextLines(meta.technique||'').slice(0,3).length?pdfTextLines(meta.technique).slice(0,3):(theme?.techniques||[]).slice(0,3);
   const tacticalTheme=meta.theme||theme?.title||s.goal||'Thème tactique à préciser';
-  const blockRows=blocks.map((b,i)=>{const pl=PILLARS.find(p=>p.id===b.pillar);const st=aft?steps[Math.min(i,steps.length-1)]:steps[i];return `<section class="exercise">
+  const heroSummary=`${players.length} joueur${players.length>1?'s':''} · ${esc(meta.level||'niveau à définir')} · ${materials.slice(0,3).map(esc).join(' / ')}`;
+  const blockRows=blocks.map((b,i)=>{const pl=PILLARS.find(p=>p.id===b.pillar);const st=aft?steps[Math.min(i,steps.length-1)]:steps[i];const flow=pdfBulletsFrom(b.exercise,['DÉROULEMENT DU JEU','DEROULEMENT DU JEU','ORGANISATION'],['MISE EN PLACE','RÈGLE PRINCIPALE','REGLE PRINCIPALE','REPÈRES'],[b.exercise||'Exercice à préciser.'],4);const attention=pdfBulletsFrom(b.exercise,['POINTS D’ATTENTION',"POINTS D'ATTENTION",'OBSERVATION COACH','CRITÈRES DE RÉUSSITE'],['QUESTIONS À POSER','PROGRESSION','FEEDBACK','BIENFAITS'],['Observer le choix tactique avant de corriger.','Garder une consigne courte.','Adapter en R-1/R+1 selon réussite.'],4);const benefits=pdfBulletsFrom(b.exercise,['BIENFAITS POUR LE JOUEUR','CE QUE J’APPRENDS'],['DÉROULEMENT','MISE EN PLACE','RÈGLE','REPÈRES'],['Comprendre le jeu avant le geste parfait.','Relier technique, tactique et décision.','Repartir avec un repère clair.'],4);return `<section class="exercise">
     <div class="ex-title"><span>${String(i+1).padStart(2,'0')}</span><div><h3>${esc(st?.name||pl?.name||'Bloc')}</h3><p>${esc(st?.time||'')} · ${esc(st?.focus||pl?.name||b.pillar)} · ${esc(b.aspect||'Aspect à définir')}</p></div></div>
     <div class="exercise-grid">
       <div class="diagram-panel">${printDiagramSvg(b)}</div>
-      <div class="text-panel"><h4>Déroulement & consignes</h4><p>${nl2br(b.exercise||'Exercice à préciser.')}</p></div>
+      <div class="text-panel"><div class="exercise-cols"><div><h4>Déroulement</h4>${pdfBulletList(flow)}</div><div><h4>Points d'attention</h4>${pdfBulletList(attention)}</div><div><h4>Bienfaits</h4>${pdfBulletList(benefits)}</div></div></div>
     </div>
   </section>`}).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Dossier séance HWBT</title><style>
-    :root{--gold:#b88935;--black:#09090b;--ink:#151515;--muted:#666;--line:#d7d0c4;--paper:#fbfaf7;--orange:#e95400;--navy:#0d2b4d}
-    *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:var(--ink);margin:0;background:#e9e2d7;font-size:10.5px;line-height:1.34}
-    .page{max-width:1040px;margin:0 auto;background:var(--paper);padding:20px 22px 28px}
-    .hero{display:grid;grid-template-columns:110px 1fr 238px;align-items:stretch;background:#fff;border:1px solid var(--line);border-radius:4px;overflow:hidden}
-    .hero-num{background:var(--orange);color:#fff;font-size:18px;font-weight:900;display:flex;align-items:center;justify-content:center}
-    .hero-main{background:var(--navy);color:white;padding:14px 18px}.brand{font-size:9px;letter-spacing:2px;color:#d9b36a;text-transform:uppercase}.hero h1{font-size:23px;margin:2px 0 4px;text-transform:uppercase;letter-spacing:.8px}.hero p{margin:0;color:#cfd8e3}
-    .hero-side{background:var(--orange);color:white;padding:15px 18px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;display:flex;align-items:center}
-    h2{font-size:12px;margin:0 0 9px;text-transform:uppercase;letter-spacing:1.2px;color:var(--orange)} h3{font-size:15px;margin:0;text-transform:uppercase} h4{font-size:9px;margin:0 0 5px;text-transform:uppercase;color:var(--orange);letter-spacing:1px}
-    .meta-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;margin:14px 0;border:1px solid var(--line);background:white}.meta-cell{display:grid;grid-template-columns:92px 1fr;border-right:1px solid var(--line);min-height:38px}.meta-cell:last-child{border-right:0}.meta-label{background:var(--orange);color:white;font-weight:800;text-transform:uppercase;padding:10px 8px}.meta-value{padding:9px 10px}
-    .box{background:white;border:1px solid var(--line);border-radius:4px;padding:12px;break-inside:avoid;margin-top:10px}.tag{display:inline-flex;align-items:center;border:1px solid #d7c396;background:#fbf1dd;color:#7a551d;border-radius:999px;padding:4px 8px;margin:2px;font-size:9px;text-transform:uppercase;letter-spacing:.6px;font-weight:700}.dark-tag{background:#111;color:white;border-color:#111}
-    .timeline{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.step{background:#f8f4ec;border:1px solid #e0d3bd;border-top:4px solid var(--orange);border-radius:4px;padding:9px;min-height:72px}.step b{font-size:10px;text-transform:uppercase}.step span{display:block;color:var(--muted);font-size:9px;margin-top:4px}.step em{display:block;color:#7a551d;font-style:normal;font-size:8.5px;margin-top:3px}
-    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}.key-points{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.key-points span{background:#f2eee7;border:1px solid var(--line);border-radius:4px;padding:7px;font-size:9px}
-    .repere-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.repere-grid p{margin:0;white-space:pre-line}.small{font-size:9px;color:var(--muted)}
-    .exercise-page{break-before:page;page-break-before:always;margin-top:18px}.section-banner{display:grid;grid-template-columns:110px 1fr;background:#111;color:white;border-radius:4px;overflow:hidden;margin-bottom:12px}.section-banner span{background:var(--orange);display:flex;align-items:center;justify-content:center;font-weight:900}.section-banner h2{color:white;font-size:22px;margin:0;padding:14px 18px}
-    .exercise{background:white;border:1px solid var(--line);border-radius:4px;margin-top:12px;padding:0;break-inside:avoid;overflow:hidden}.ex-title{display:grid;grid-template-columns:70px 1fr;background:#f5f0e8;border-bottom:1px solid var(--line)}.ex-title>span{background:var(--orange);color:white;font-size:18px;font-weight:900;display:flex;align-items:center;justify-content:center}.ex-title div{padding:10px 12px}.ex-title p{margin:2px 0 0;color:var(--muted);font-size:10px}
-    .exercise-grid{display:grid;grid-template-columns:265px 1fr;gap:0}.diagram-panel{background:#111;padding:10px;border-right:1px solid var(--line)}.text-panel{padding:12px 14px}.text-panel p{margin:0;white-space:normal}
-    svg{--border2:#ddd;--border:#ddd;--bronze:#b88935;max-height:295px}.print-tip{position:fixed;right:18px;top:18px;padding:10px 14px;background:#111;color:white;border:0;border-radius:8px;box-shadow:0 8px 20px #0004}
-    @media print{body{background:white}.page{padding:9mm;max-width:none}.no-print{display:none}.box,.exercise{page-break-inside:avoid}.exercise-page{page-break-before:always}.hero{border-radius:0}}
+    :root{--gold:#b88935;--gold2:#d4a017;--black:#070708;--ink:#161616;--muted:#737373;--line:#d7d0c4;--paper:#f7f3ea}
+    *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:var(--ink);margin:0;background:#ded7ca;font-size:10px;line-height:1.32}
+    .page{max-width:1280px;margin:0 auto;background:var(--paper);padding:0 0 22px;box-shadow:0 24px 80px #0004}
+    .cover{min-height:178px;background:linear-gradient(135deg,#050505 0%,#101010 58%,#211608 100%);color:white;position:relative;overflow:hidden;padding:22px 28px;border-bottom:5px solid var(--gold)}
+    .cover:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,#fff1 0 1px,#0000 1px 8px),linear-gradient(90deg,#0000 0,#0000 72%,#0008 73%,#000 77%,#0000 82%);opacity:.45}
+    .cover:after{content:"HWBT";position:absolute;right:24px;top:8px;font-size:86px;font-weight:900;letter-spacing:8px;color:#b8893518}
+    .cover-inner{position:relative;z-index:1;display:grid;grid-template-columns:1fr 250px;gap:24px;align-items:end;min-height:125px}
+    .brand{font-size:9px;letter-spacing:3px;color:var(--gold2);text-transform:uppercase;margin-bottom:10px}.cover h1{font-size:36px;line-height:.9;margin:0;text-transform:uppercase;letter-spacing:2px}.cover .theme{font-size:20px;color:var(--gold2);text-transform:uppercase;letter-spacing:1.5px;margin-top:8px}.cover p{margin:8px 0 0;color:#d7d7d7;max-width:760px}
+    .cover-card{border:1px solid #b8893566;background:#0008;padding:16px;border-radius:6px}.cover-card b{display:block;color:white;font-size:20px;margin-bottom:8px}.cover-card span{display:block;color:#c9c9c9;font-size:11px;line-height:1.7}
+    .sheet{padding:14px 22px 0} h2{font-size:11px;margin:0 0 8px;text-transform:uppercase;letter-spacing:1.8px;color:#8b5d20} h3{font-size:16px;margin:0;text-transform:uppercase;letter-spacing:.6px} h4{font-size:8.5px;margin:0 0 5px;text-transform:uppercase;color:#8b5d20;letter-spacing:1.3px}
+    .dashboard-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:10px}.meta-grid{display:grid;grid-template-columns:1.1fr .75fr 1.4fr;gap:8px;margin-bottom:10px}.meta-cell{background:#fff;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:6px;padding:9px}.meta-label{font-size:8px;color:#8b5d20;letter-spacing:1.5px;text-transform:uppercase;font-weight:800;margin-bottom:4px}.meta-value{font-size:10.5px}
+    .box{background:white;border:1px solid var(--line);border-radius:8px;padding:11px;break-inside:avoid;margin-top:10px}.box:first-child{margin-top:0}.timeline{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.step{background:linear-gradient(180deg,#fff,#f4eddf);border:1px solid #dfcfb5;border-radius:7px;padding:8px;min-height:66px;position:relative;overflow:hidden}.step:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--gold)}.step b{font-size:9px;text-transform:uppercase}.step span{display:block;color:var(--muted);font-size:8.5px;margin-top:4px}.step em{display:block;color:#8b5d20;font-style:normal;font-size:8px;margin-top:3px}
+    .key-points{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.key-points span{background:#111;color:#eee;border:1px solid #2a2a2a;border-radius:6px;padding:7px;font-size:8.7px;min-height:48px}.repere-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.repere-grid p{margin:0;white-space:pre-line}.repere-grid ul{margin:0;padding-left:15px}.repere-grid li{margin-bottom:4px}.small{font-size:8.5px;color:var(--muted)}
+    .legend span{background:#f4eddf;color:#171717;border-color:#dfcfb5}.exercise-page{break-before:page;page-break-before:always;margin-top:18px;page:exercisePage}.section-banner{background:linear-gradient(135deg,#070708,#1c1308);color:white;border-radius:8px;border:1px solid #b8893566;padding:18px 22px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}.section-banner h2{color:white;font-size:30px;margin:0;letter-spacing:2px}.section-banner span{color:var(--gold2);font-weight:900;letter-spacing:2px}
+    .exercise{background:white;border:1px solid var(--line);border-radius:9px;margin-top:12px;padding:0;break-inside:avoid;overflow:hidden}.ex-title{display:grid;grid-template-columns:74px 1fr;background:#111;color:white;border-bottom:3px solid var(--gold)}.ex-title>span{background:var(--gold);color:#000;font-size:22px;font-weight:900;display:flex;align-items:center;justify-content:center}.ex-title div{padding:10px 14px}.ex-title p{margin:3px 0 0;color:#c9c9c9;font-size:9.5px}
+    .exercise-grid{display:grid;grid-template-columns:315px 1fr;gap:0}.diagram-panel{background:#0b0b0f;padding:12px;border-right:1px solid var(--line)}.text-panel{padding:13px 15px}.exercise-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.exercise-cols ul{margin:0;padding-left:15px}.exercise-cols li{margin:0 0 6px;font-size:9.2px;line-height:1.32}.text-panel p{margin:0;white-space:normal}.text-panel p b,.text-panel p strong{color:#111}
+    svg{--border2:#ddd;--border:#ddd;--bronze:#b88935;max-height:305px}.print-tip{position:fixed;right:18px;top:18px;padding:10px 14px;background:#111;color:white;border:0;border-radius:8px;box-shadow:0 8px 20px #0004}
+    @page{size:A4 landscape;margin:8mm}
+    @media print{body{background:white}.page{padding:0;max-width:none;box-shadow:none}.no-print{display:none}.box,.exercise{page-break-inside:avoid}.exercise-page{page-break-before:always}.exercise-grid{grid-template-columns:300px 1fr}.exercise-cols li{font-size:8.8px}.cover{min-height:160px}.cover h1{font-size:32px}}
   </style></head><body><div class="page">
     <button class="no-print print-tip" onclick="window.print()">Enregistrer en PDF</button>
-    <section class="hero"><div class="hero-num">1 / 2</div><div class="hero-main"><div class="brand">HWBT Academy · ${sessionTypeLabel(s.sessionType)}</div><h1>Dossier de séance</h1><p>${esc(sessionTitle(s))} · ${esc(s.date)} · ${players.length} joueur${players.length>1?'s':''}</p></div><div class="hero-side">${esc(sessionTypeLabel(s.sessionType))}</div></section>
-    <div class="meta-grid"><div class="meta-cell"><div class="meta-label">Thème</div><div class="meta-value">${esc(tacticalTheme)}</div></div><div class="meta-cell"><div class="meta-label">Niveau</div><div class="meta-value">${esc(meta.level||'À définir')}</div></div><div class="meta-cell"><div class="meta-label">Matériel</div><div class="meta-value">${materials.map(esc).join(' · ')}</div></div></div>
-    <section class="box"><h2>Structure compacte</h2><div class="timeline">${steps.map(st=>`<div class="step"><b>${esc(st.name)}</b><span>${esc(st.time)}</span><em>${esc(st.focus||'')}</em></div>`).join('')}</div></section>
-    <section class="box"><h2>Points coach liés au thème</h2><div class="key-points">${coachPoints.map(x=>`<span>${esc(x)}</span>`).join('')}</div></section>
-    ${aft?`<section class="box"><h2>Repères AFT</h2><div class="repere-grid"><div><h4>Tactique</h4><p>${nl2br(meta.tactic||theme?.tactics?.join('\\n')||'')}</p></div><div><h4>Technique & infos prof</h4><p>${nl2br(meta.technique||theme?.techniques?.join('\\n')||'')}</p><p class="small">${esc(meta.coachInfo||theme?.coachInfo||'Faire découvrir par le jeu et corriger par induction.')}</p></div></div></section>`:''}
-    <section class="box"><h2>Légende schéma</h2><div class="key-points"><span>J1-J4: joueurs</span><span>CO / L / PAN: coach, lanceur, panier</span><span>Jaune: balle</span><span>Orange: lancer</span><span>Blanc pointillé: course</span></div></section>
-    <div class="exercise-page"><div class="section-banner"><span>2 / 2</span><h2>Exercices</h2></div>${blockRows}</div>
-    <section class="box"><h2>Bilan sandwich & évaluation</h2><div class="key-points"><span><b>1. Encourager</b><br>comportement réussi</span><span><b>2. Guider</b><br>question ou règle</span><span><b>3. Valoriser</b><br>repère à répéter</span><span><b>Évaluer</b><br>pas acquis / évolution / acquis</span><span><b>Suite</b><br>point à reprendre</span></div></section>
+    <section class="cover"><div class="cover-inner"><div><div class="brand">HWBT Academy · préparation terrain</div><h1>Dossier<br>de séance</h1><div class="theme">${esc(tacticalTheme)}</div><p>${heroSummary}</p></div><div class="cover-card"><b>${esc(sessionTypeLabel(s.sessionType))}</b><span>${esc(sessionTitle(s))}<br>${esc(s.date)}<br>${players.map(p=>esc(p.name)).join('<br>')}</span></div></div></section>
+    <div class="sheet"><div class="meta-grid"><div class="meta-cell"><div class="meta-label">Thème tactique</div><div class="meta-value">${esc(tacticalTheme)}</div></div><div class="meta-cell"><div class="meta-label">Niveau</div><div class="meta-value">${esc(meta.level||'À définir')}</div></div><div class="meta-cell"><div class="meta-label">Matériel</div><div class="meta-value">${materials.map(esc).join(' · ')}</div></div></div>
+    <div class="dashboard-grid">
+      <div>
+        <section class="box"><h2>Structure compacte</h2><div class="timeline">${steps.map(st=>`<div class="step"><b>${esc(st.name)}</b><span>${esc(st.time)}</span><em>${esc(st.focus||'')}</em></div>`).join('')}</div></section>
+        <section class="box"><h2>Points coach liés au thème</h2><div class="key-points">${coachPoints.map(x=>`<span>${esc(x)}</span>`).join('')}</div></section>
+      </div>
+      <div>
+        ${aft?`<section class="box"><h2>Repères AFT courts</h2><div class="repere-grid"><div><h4>Tactique</h4>${pdfBulletList(tacticBullets)}</div><div><h4>Technique</h4>${pdfBulletList(techniqueBullets)}</div></div><p class="small" style="margin-top:8px">${esc(meta.coachInfo||theme?.coachInfo||'Faire découvrir par le jeu et corriger par induction.')}</p></section>`:''}
+        <section class="box"><h2>Légende schéma</h2><div class="key-points legend"><span>J1-J4: joueurs</span><span>CO / L / PAN: coach, lanceur, panier</span><span>Jaune: balle</span><span>Orange: lancer</span><span>Blanc pointillé: course</span></div></section>
+      </div>
+    </div>
+    <div class="exercise-page"><div class="section-banner"><h2>Exercices</h2><span>FICHES TERRAIN</span></div>${blockRows}</div>
+    <section class="box"><h2>Bilan sandwich & évaluation</h2><div class="key-points legend"><span><b>1. Encourager</b><br>comportement réussi</span><span><b>2. Guider</b><br>question ou règle</span><span><b>3. Valoriser</b><br>repère à répéter</span><span><b>Évaluer</b><br>pas acquis / évolution / acquis</span><span><b>Suite</b><br>point à reprendre</span></div></section></div>
   </div><script>setTimeout(()=>window.print(),300)<\/script></body></html>`;
 }
 function printSessionPdf(sessionId){
@@ -2619,7 +2651,7 @@ function setRole(r){
   if(r==='player'&&!STATE.activePlayerId&&!STATE.coachUnlocked){showLogin();return;}
   STATE.role=r;
   if(r==='player'&&!STATE.activePlayerId) STATE.activePlayerId=STATE.players[0]?.id||null;
-  if(r==='player'&&!['dashboard','players','sessions','test'].includes(UI.page)) UI.page='dashboard';
+  if(r==='player'&&!['dashboard','players','sessions','profiles','communication','shop'].includes(UI.page)) UI.page='dashboard';
   document.getElementById('rb-coach').classList.toggle('active',r==='coach');
   document.getElementById('rb-player').classList.toggle('active',r==='player');
   document.getElementById('roleTag').textContent=tr(r==='coach'?'COACH':'JOUEUR');
@@ -2657,7 +2689,8 @@ function setUI(obj){
 function render(){
   if(STATE.role==='player'){
     if(!STATE.activePlayerId) STATE.activePlayerId=STATE.players[0]?.id||null;
-    if(['profiles','exercises','aspectsLibrary','communication'].includes(UI.page)) UI.page='dashboard';
+    const linkedPlayerTest=UI.page==='test'&&UI.testState&&UI.testState.playerId===STATE.activePlayerId;
+    if(['exercises','aspectsLibrary'].includes(UI.page)||(UI.page==='test'&&!linkedPlayerTest)) UI.page='dashboard';
     if(UI.page==='players') UI.selectedPlayerId=STATE.activePlayerId;
   }
   document.getElementById('lb-fr').classList.toggle('active',STATE.lang==='fr');
@@ -2668,8 +2701,9 @@ function render(){
   document.getElementById('roleTag').textContent=tr(STATE.role==='coach'?'COACH':'JOUEUR');
   const nav=document.querySelectorAll('.nav-item');
   nav.forEach(n=>{
-    const coachOnly=['profiles','exercises','aspectsLibrary','communication'].includes(n.dataset.page);
-    n.style.display=STATE.role==='player'&&coachOnly?'none':'flex';
+    const coachOnly=['exercises','aspectsLibrary'].includes(n.dataset.page);
+    const playerHidden=['test'].includes(n.dataset.page);
+    n.style.display=STATE.role==='player'&&(coachOnly||playerHidden)?'none':'flex';
     n.classList.toggle('active',n.dataset.page===UI.page);
   });
   const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
@@ -4236,7 +4270,7 @@ function pageTest(){
         <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:18px">
           ${player?`<button class="btn btn-primary" onclick="UI.testState=null;setUI({page:'players',selectedPlayerId:${player.id},subpage:'profil'})">RETOUR À LA FICHE JOUEUR</button>`:''}
           ${pr?`<button class="btn btn-ghost" onclick="UI.testState=null;setUI({page:'profiles',selectedProfileId:${pr.id}})">VOIR LE PROFIL COMPLET</button>`:''}
-          <button class="btn btn-ghost" onclick="UI.testState=null;setUI({page:'test'})">REFAIRE UN TEST</button>
+          <button class="btn btn-ghost" onclick="${player?`startTest(${player.id})`:`UI.testState=null;setUI({page:'test'})`}">REFAIRE UN TEST</button>
         </div>
       </div>
     </div>`;
@@ -4302,8 +4336,10 @@ function previousTestQuestion(){
   render();
 }
 function cancelTest(){
+  const playerId=UI.testState?.playerId||null;
   UI.testState=null;
-  render();
+  if(playerId) setUI({page:'players',selectedPlayerId:playerId,subpage:'profil'});
+  else render();
 }
 function finishTest(){
   const ts=UI.testState;
@@ -4322,6 +4358,7 @@ function finishTest(){
       player.lastTestDate=new Date().toISOString().slice(0,10);
     }
   }
+  saveState();
   render();
 }
 
@@ -4428,7 +4465,7 @@ function newSessionModalHtml(extra){
     <div class="form-group"><label class="form-label">TECHNIQUE À TRANSMETTRE</label><textarea class="form-input" id="m_aft_technique" rows="2" placeholder="Repères simples du geste, sans surcorriger."></textarea></div>
   </div>
   <div style="background:var(--bg4);border-left:3px solid var(--bronze);padding:10px 12px;border-radius:0 6px 6px 0;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:14px">Pour une séance AFT, choisis un thème officiel puis lance l’assistant. Il prépare le fil conducteur, les consignes tactiques/techniques et les exercices. Les 4 aspects HWBT restent utiles pour mesurer la progression après la séance.</div>
-  <div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button type="button" class="btn btn-primary btn-sm" onclick="fillAftSessionAssistant()">ASSISTANT AFT · GÉNÉRER LE PLAN</button></div>
+  <div style="display:flex;justify-content:flex-end;margin-bottom:14px;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-ghost btn-sm" onclick="fillAftSessionAssistant()">ASSISTANT AFT · GÉNÉRER LE PLAN</button><button type="button" class="btn btn-primary btn-sm" onclick="enhanceAllModalAftSteps()">MODE EXPRESS · FICHE PRO COMPLÈTE</button></div>
   <div class="form-group"><label class="form-label">RETOUR / DEMANDES JOUEURS</label><textarea class="form-input" id="m_player_wishes" rows="3" placeholder="Ex: Julie veut travailler la confiance au filet. Marc veut mieux gérer les points importants."></textarea></div>
   <div id="sessionPlanningSuggestions" style="margin-bottom:16px">${sessionPlanningSuggestionsHtml(selected)}</div>
   <div style="background:var(--bg4);border:1px solid var(--bronze-dim2);border-radius:8px;padding:12px;margin-bottom:14px">
@@ -4628,6 +4665,18 @@ function enhanceModalAftStep(idx){
   if(!el) return;
   el.value=enhanceAftText(el.value,currentModalAftContext(idx));
   showNotif('Texte corrigé et complété en fiche AFT');
+}
+function enhanceAllModalAftSteps(){
+  const key=document.getElementById('m_aft_theme_key')?.value||'';
+  if(!key){
+    showNotif('Choisis d’abord un thème AFT officiel');
+    return;
+  }
+  fillAftSessionAssistant();
+  setTimeout(()=>{
+    sessionStructure({sessionType:'aft'}).forEach((_,idx)=>enhanceModalAftStep(idx));
+    showNotif('Séance complète préparée en fiche AFT pro');
+  },0);
 }
 function enhanceSessionBlockAft(sessionId,idx){
   const s=STATE.sessions.find(s=>s.id===sessionId);
