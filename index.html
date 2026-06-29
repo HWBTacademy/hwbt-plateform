@@ -1670,6 +1670,22 @@ function sessionTitle(s){
   if(ps.length===1) return ps[0].name;
   return ps.map(p=>p.firstName||p.name.split(' ')[0]||p.name).join(' + ');
 }
+function sessionDateLine(s){
+  return [s.date,s.time,s.location].filter(Boolean).join(' · ');
+}
+function sessionThemeLabel(s){
+  if(s?.sessionType==='aft') return s.aftMeta?.theme||aftThemeByKey(s.aftMeta?.themeKey)?.title||s.goal||'Thème AFT à préciser';
+  return s.goal||'Séance HWBT';
+}
+function sessionPublicAspects(s){
+  const seen=new Set();
+  return (s.blocks||[]).filter(b=>b&&b.aspect).filter(b=>{
+    const k=`${b.pillar}-${b.aspect}`;
+    if(seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  }).slice(0,4);
+}
 function sessionPrimaryPlayer(s){
   return sessionPlayers(s)[0]||null;
 }
@@ -2320,7 +2336,7 @@ function sessionBriefing(s,player,pr){
   return `<div class="briefing-grid">
     <div class="card" style="margin-bottom:0">
       <div class="card-title">BRIEFING RAPIDE DE SÉANCE</div>
-      <div style="font-size:13px;color:var(--white);font-weight:600;margin-bottom:8px">${esc(sessionTitle(s))} · ${s.date} · ${sessionTypeLabel(s.sessionType)} · ${statusBadge(s.status)}</div>
+      <div style="font-size:13px;color:var(--white);font-weight:600;margin-bottom:8px">${esc(sessionTitle(s))} · ${esc(sessionDateLine(s))} · ${sessionTypeLabel(s.sessionType)} · ${statusBadge(s.status)}</div>
       ${group.length>1?`<div class="session-group-line">${group.map(p=>`<span class="session-group-chip">${esc(p.name)}</span>`).join('')}</div>`:''}
       <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6">${s.goal?esc(s.goal):'Objectif: travailler un aspect précis par pilier et garder une trace claire pour la progression.'}</div>
       ${aft?`<div style="margin-top:10px;background:var(--bg4);border-left:3px solid var(--bronze);padding:10px 12px;border-radius:0 6px 6px 0;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.55">Séance AFT: faire découvrir par le jeu, questionner avant de corriger, puis valoriser. Prévoir R-1, R0 et R+1 pour garder le cours fluide.</div>`:''}
@@ -2543,7 +2559,7 @@ function professionalPrepHtml(s){
     @media print{body{background:white}.page{padding:0;max-width:none;box-shadow:none}.no-print{display:none}.box,.exercise{page-break-inside:avoid}.exercise-page{page-break-before:always}.exercise-grid{grid-template-columns:300px 1fr}.exercise-cols li{font-size:8.8px}.cover{min-height:160px}.cover h1{font-size:32px}}
   </style></head><body><div class="page">
     <button class="no-print print-tip" onclick="window.print()">Enregistrer en PDF</button>
-    <section class="cover"><div class="cover-inner"><div><div class="brand">HWBT Academy · préparation terrain</div><h1>Dossier<br>de séance</h1><div class="theme">${esc(tacticalTheme)}</div><p>${heroSummary}</p></div><div class="cover-card"><b>${esc(sessionTypeLabel(s.sessionType))}</b><span>${esc(sessionTitle(s))}<br>${esc(s.date)}<br>${players.map(p=>esc(p.name)).join('<br>')}</span></div></div></section>
+    <section class="cover"><div class="cover-inner"><div><div class="brand">HWBT Academy · préparation terrain</div><h1>Dossier<br>de séance</h1><div class="theme">${esc(tacticalTheme)}</div><p>${heroSummary}</p></div><div class="cover-card"><b>${esc(sessionTypeLabel(s.sessionType))}</b><span>${esc(sessionTitle(s))}<br>${esc(sessionDateLine(s))}<br>${players.map(p=>esc(p.name)).join('<br>')}</span></div></div></section>
     <div class="sheet"><div class="meta-grid"><div class="meta-cell"><div class="meta-label">Thème tactique</div><div class="meta-value">${esc(tacticalTheme)}</div></div><div class="meta-cell"><div class="meta-label">Niveau</div><div class="meta-value">${esc(meta.level||'À définir')}</div></div><div class="meta-cell"><div class="meta-label">Matériel</div><div class="meta-value">${materials.map(esc).join(' · ')}</div></div></div>
     <div class="dashboard-grid">
       <div>
@@ -3520,22 +3536,54 @@ function pagePlayerDetail(playerId){
 // ══════════════════════════════════════════════════
 // SESSIONS LIST
 // ══════════════════════════════════════════════════
+function sessionFilterKey(s){
+  const today=new Date().toISOString().slice(0,10);
+  if(s.status==='closed_coach') return 'feedback';
+  if(s.status==='completed') return 'done';
+  if(s.status==='open') return 'open';
+  if(s.status==='planned'&&s.date===today) return 'today';
+  if(s.status==='planned') return 'prep';
+  return 'all';
+}
+function sessionFilterLabel(key){
+  return ({all:'TOUTES',prep:'À PRÉPARER',today:"AUJOURD'HUI",open:'OUVERTES',feedback:'RETOUR JOUEUR',done:'CLÔTURÉES'})[key]||key.toUpperCase();
+}
+function sessionCardScoreHtml(s){
+  return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:12px">${PILLARS.map(pl=>{const b=(s.blocks||[]).find(x=>x.pillar===pl.id);const score=b?measuredBlockScore(b):null;const label=b?.aspect||pl.name;const pct=score!==null?Math.max(6,Math.min(100,(score/20)*100)):0;return `<div style="background:var(--bg4);border:1px solid ${pl.color}44;border-radius:7px;padding:8px;min-width:0"><div style="font-size:8px;letter-spacing:1.1px;color:${pl.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pl.name}</div><div style="font-size:16px;font-weight:800;margin-top:4px">${score!==null?formatScore(score):'—'}</div><div style="font-size:8px;color:var(--gray3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">${esc(label)}</div><div style="height:2px;background:var(--border2);border-radius:2px;margin-top:6px"><div style="height:2px;width:${pct}%;background:${pl.color};border-radius:2px"></div></div></div>`}).join('')}</div>`;
+}
+function sessionCardActions(s){
+  if(STATE.role==='player') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'briefing'})">OUVRIR</button>`;
+  if(s.status==='planned') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'preparation'})">PRÉPARER</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();enterFieldMode(${s.id})">TERRAIN</button>`;
+  if(s.status==='open') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'evaluation'})">ÉVALUER</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();enterFieldMode(${s.id})">TERRAIN</button>`;
+  if(s.status==='closed_coach') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'retours'})">RETOURS</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();printSessionPdf(${s.id})">PDF</button>`;
+  return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'resume'})">RÉSUMÉ</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();printSessionPdf(${s.id})">PDF</button>`;
+}
 function pageSessionsList(){
   const visible=STATE.role==='player'&&STATE.activePlayerId?STATE.sessions.filter(s=>playerInSession(s,STATE.activePlayerId)):STATE.sessions;
-  const sorted=visible.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const active=UI.sessionFilter||'all';
+  const counts={all:visible.length,prep:0,today:0,open:0,feedback:0,done:0};
+  visible.forEach(s=>{const k=sessionFilterKey(s); if(counts[k]!==undefined) counts[k]++;});
+  const filtered=active==='all'?visible:visible.filter(s=>sessionFilterKey(s)===active);
+  const sorted=filtered.slice().sort((a,b)=>`${b.date||''} ${b.time||''}`.localeCompare(`${a.date||''} ${a.time||''}`));
+  const filters=['all','prep','today','open','feedback','done'];
   return `<div class="content">
     ${quoteBand()}
-    ${STATE.role==='coach'?`<div style="display:flex;justify-content:flex-end;margin-bottom:18px"><button class="btn btn-primary" onclick="openModal('newSession')">+ NOUVELLE SÉANCE</button></div>`:''}
-    ${sorted.length?sorted.map(s=>{const ps=sessionPlayers(s);const p=ps[0];if(!p)return '';const pr=PROFILES.find(pr=>pr.id===p.profileId);const c1=pr?ENERGY_COLORS[pr.c1]:'#A67C52';const blocks=(s.blocks||[]).filter(b=>b.aspect);return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:10px;cursor:pointer" onclick="setUI({page:'sessions',selectedSessionId:${s.id}})">
-      <div style="display:flex;align-items:center;gap:14px">
-        <div style="width:3px;height:48px;background:${c1};border-radius:2px;flex-shrink:0"></div>${avatar(ps.length>1?String(ps.length):p.name,'av44')}
-        <div style="flex:1"><div style="font-size:14px;font-weight:600;letter-spacing:.5px">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2);margin-top:2px">${s.date} · ${sessionTypeLabel(s.sessionType)} · ${ps.length} joueur${ps.length>1?'s':''} · ${blocks.length} aspect${blocks.length>1?'s':''}</div>
-        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${blocks.map(b=>{const pl=PILLARS.find(p=>p.id===b.pillar);return `<span style="font-size:9px;padding:2px 8px;border-radius:2px;background:${pl?pl.color+'22':'var(--border)'};color:${pl?pl.color:'var(--gray)'}">${esc(b.aspect)}</span>`}).join('')}</div></div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">${statusBadge(s.status)}${STATE.role==='coach'?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteSession(${s.id})">SUPPRIMER</button>`:''}</div>
-      </div></div>`}).join(''):`<div class="card" style="color:var(--gray);font-family:var(--font-body)">Aucune séance.</div>`}
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:18px">
+      <div><div style="font-size:30px;font-weight:800;letter-spacing:1px;line-height:1">Sessions</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-top:6px">Scan rapide: thème, joueurs, statut, piliers et actions utiles.</div></div>
+      ${STATE.role==='coach'?`<button class="btn btn-primary" onclick="openModal('newSession')">+ NOUVELLE SÉANCE</button>`:''}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">${filters.map(f=>`<button class="tab ${active===f?'active':''}" onclick="setUI({sessionFilter:'${f}'})">${sessionFilterLabel(f)} <span style="opacity:.65">${counts[f]||0}</span></button>`).join('')}</div>
+    <div class="g2">
+      ${sorted.length?sorted.map(s=>{const ps=sessionPlayers(s);const p=ps[0];if(!p)return '';const pr=PROFILES.find(pr=>pr.id===p.profileId);const c1=pr?ENERGY_COLORS[pr.c1]:'var(--bronze)';const theme=sessionThemeLabel(s);const players=ps.map(x=>x.firstName||x.name.split(' ')[0]||x.name).join(' · ');return `<div onclick="setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'briefing'})" style="position:relative;overflow:hidden;background:linear-gradient(135deg,var(--bg2),#08090d);border:1px solid ${c1}55;border-radius:10px;padding:16px;cursor:pointer;min-height:230px">
+        <div style="position:absolute;inset:0;border-top:3px solid ${c1};pointer-events:none"></div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px"><div style="display:flex;gap:12px;align-items:center;min-width:0">${avatar(ps.length>1?String(ps.length):p.name,'av44')}<div style="min-width:0"><div style="font-size:16px;font-weight:800;letter-spacing:.6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2);margin-top:3px">${esc(players)} · ${esc(sessionDateLine(s))}</div></div></div>${statusBadge(s.status)}</div>
+        <div style="margin-top:14px"><div style="font-size:9px;letter-spacing:1.5px;color:var(--bronze);margin-bottom:5px">${sessionTypeLabel(s.sessionType)}</div><div style="font-size:19px;font-weight:800;line-height:1.1;min-height:42px">${esc(theme)}</div></div>
+        ${sessionCardScoreHtml(s)}
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap"><div style="font-size:9px;color:var(--gray3);letter-spacing:1px">${ps.length} JOUEUR${ps.length>1?'S':''}</div><div style="display:flex;gap:7px;flex-wrap:wrap">${sessionCardActions(s)}</div></div>
+      </div>`}).join(''):`<div class="card" style="color:var(--gray);font-family:var(--font-body)">Aucune séance dans ce filtre.</div>`}
+    </div>
   </div>`;
 }
-
 function sessionSynthesisHtml(s){
   if(!(s.status==='closed_coach'||s.status==='completed')) return '';
   const data=sessionSynthesisData(s);
@@ -3602,22 +3650,69 @@ function sessionSynthesisHtml(s){
   </div>`;
 }
 
+function defaultSessionTab(s){
+  if(s.status==='open') return 'terrain';
+  if(s.status==='closed_coach') return 'retours';
+  if(s.status==='completed') return 'resume';
+  return 'briefing';
+}
+function sessionDetailTabButton(key,label,active){
+  return `<button class="tab ${active===key?'active':''}" onclick="setUI({sessionTab:'${key}'})">${label}</button>`;
+}
+function sessionDetailContent(s,tab,group,main,pr){
+  if(tab==='briefing') return `${STATE.role==='coach'?`<div class="card" style="border-color:var(--bronze-dim2)"><div class="card-title">DOSSIER DE SÉANCE PDF</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.65">Le PDF reprend le briefing, la structure et les fiches exercice. Complète la préparation avant de l’exporter.</div><div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn btn-primary btn-sm" onclick="printSessionPdf(${s.id})">CRÉER DOSSIER PDF</button></div></div>`:''}${sessionBriefing(s,main||{},pr)}${s.sessionType==='aft'?'':sessionStructureCard(s)}`;
+  if(tab==='preparation') return `${s.playerWishes?`<div class="card"><div class="card-title">DEMANDES JOUEURS À L'ENTRÉE</div><div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.7;white-space:pre-wrap">${esc(s.playerWishes)}</div></div>`:''}${group.length>1?`<div class="card"><div class="card-title">GROUPE DE SÉANCE</div><div class="session-group-line">${group.map(p=>`<span class="session-group-chip">${esc(p.name)}</span>`).join('')}</div></div>`:''}${sessionWorkBlocksHtml(s)}`;
+  if(tab==='terrain') return `<div class="card" style="border-color:var(--bronze-dim2)"><div class="card-title">MODE TERRAIN</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.65;margin-bottom:14px">Version terrain épurée: tu ouvres la séance, puis tu avances exercice par exercice jusqu’à l’évaluation finale.</div><button class="btn btn-primary" onclick="enterFieldMode(${s.id})">OUVRIR LE MODE TERRAIN</button></div>`;
+  if(tab==='evaluation') return `<div class="card"><div class="card-title">${s.status==='completed'?'RÉSUMÉ DE CLÔTURE':'ÉVALUATION & CLÔTURE'}</div>${sessionClosure(s)}</div>`;
+  if(tab==='retours') return sessionSynthesisHtml(s)||`<div class="card"><div class="card-title">RETOURS JOUEURS</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.65">Les retours apparaîtront ici après la clôture coach.</div></div>`;
+  if(tab==='resume') return `${sessionSynthesisHtml(s)||''}<div class="card"><div class="card-title">RÉSUMÉ SIMPLE</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.65">Thème: ${esc(sessionThemeLabel(s))}<br>Joueurs: ${group.map(p=>esc(p.name)).join(', ')}<br>Date: ${esc(sessionDateLine(s))}</div></div>`;
+  return sessionBriefing(s,main||{},pr);
+}
 function pageSessionDetail(sessionId){
   const s=STATE.sessions.find(x=>x.id===sessionId);
   if(!s) return '<div class="content"><div class="card">Séance introuvable.</div></div>';
   if(STATE.role==='player'&&STATE.activePlayerId&&!playerInSession(s,STATE.activePlayerId)) return pagePlayerPortal();
+  if(STATE.role==='player') return pagePlayerSessionSummary(s);
   if(STATE.role==='coach'&&UI.sessionMode==='field') return pageFieldMode(s);
   const group=sessionPlayers(s); const main=group[0]; const pr=main?PROFILES.find(p=>p.id===main.profileId):null;
+  const tab=UI.sessionTab||defaultSessionTab(s);
+  const tabs=[['briefing','Briefing'],['preparation','Préparation'],['terrain','Terrain'],['evaluation','Évaluation'],['retours','Retours'],['resume','Résumé']];
   return `<div class="content">${quoteBand()}
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:null,sessionMode:null})">← RETOUR</button><div style="flex:1"><div style="font-size:18px;font-weight:700;letter-spacing:1px">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2)">${s.date} · ${sessionTypeLabel(s.sessionType)} · ${statusBadge(s.status)}</div></div>${STATE.role==='coach'?`<button class="btn btn-primary" onclick="printSessionPdf(${s.id})">CRÉER DOSSIER PDF</button>`:''}${STATE.role==='coach'&&(s.status==='planned'||s.status==='open')?`<button class="btn btn-primary" onclick="enterFieldMode(${s.id})">MODE TERRAIN</button>`:''}${STATE.role==='coach'&&(s.status==='closed_coach'||s.status==='completed')?`<button class="btn btn-ghost" onclick="toggleSessionEdit(${s.id})">${s.editMode?'TERMINER MODIF':'MODIFIER'}</button>`:''}${STATE.role==='coach'?`<button class="btn btn-danger" onclick="deleteSession(${s.id})">SUPPRIMER</button>`:''}</div>
-    ${STATE.role==='coach'?`<div class="card" style="border-color:var(--bronze-dim2)"><div class="card-title">DOSSIER DE SÉANCE PDF</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.65">Complète les exercices et les schémas, puis clique <b style="color:var(--offwhite)">Créer dossier PDF</b>. Une page imprimable s’ouvre: choisis ensuite <b style="color:var(--offwhite)">Enregistrer en PDF</b> dans la fenêtre d’impression.</div></div>`:''}
-    ${sessionBriefing(s,main||{},pr)}
-    ${s.sessionType==='aft'?'':sessionStructureCard(s)}
-    ${sessionSynthesisHtml(s)}
-    ${s.playerWishes?`<div class="card"><div class="card-title">DEMANDES JOUEURS À L'ENTRÉE</div><div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.7;white-space:pre-wrap">${esc(s.playerWishes)}</div></div>`:''}
-    ${group.length>1?`<div class="card"><div class="card-title">GROUPE DE SÉANCE</div><div class="session-group-line">${group.map(p=>`<span class="session-group-chip">${esc(p.name)}</span>`).join('')}</div></div>`:''}
-    ${sessionWorkBlocksHtml(s)}
-    <div class="card"><div class="card-title">${s.status==='completed'?'RÉSUMÉ DE CLÔTURE':'CLÔTURER LA SÉANCE'}</div>${sessionClosure(s)}</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:null,sessionMode:null,sessionTab:null})">← RETOUR</button><div style="flex:1"><div style="font-size:22px;font-weight:800;letter-spacing:1px;line-height:1.05">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2);margin-top:4px">${esc(sessionDateLine(s))} · ${sessionTypeLabel(s.sessionType)} · ${statusBadge(s.status)}</div></div>${s.status==='planned'||s.status==='open'?`<button class="btn btn-primary" onclick="enterFieldMode(${s.id})">MODE TERRAIN</button>`:''}${s.status==='closed_coach'||s.status==='completed'?`<button class="btn btn-ghost" onclick="toggleSessionEdit(${s.id})">${s.editMode?'TERMINER MODIF':'MODIFIER'}</button>`:''}<button class="btn btn-danger" onclick="deleteSession(${s.id})">SUPPRIMER</button></div>
+    <div class="tabs" style="margin-bottom:18px;overflow:auto">${tabs.map(t=>sessionDetailTabButton(t[0],t[1],tab)).join('')}</div>
+    ${sessionDetailContent(s,tab,group,main,pr)}
+  </div>`;
+}
+function pagePlayerSessionSummary(s){
+  const aspects=sessionPublicAspects(s);
+  const theme=sessionThemeLabel(s);
+  return `<div class="content">${quoteBand()}
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:null,sessionMode:null})">← RETOUR</button>
+      <div style="flex:1">
+        <div style="font-size:18px;font-weight:700;letter-spacing:1px">${esc(sessionTitle(s))}</div>
+        <div style="font-size:10px;color:var(--gray2)">${esc(sessionDateLine(s))} · ${sessionTypeLabel(s.sessionType)} · ${statusBadge(s.status)}</div>
+      </div>
+    </div>
+    <div class="card" style="border-color:var(--bronze-dim2)">
+      <div class="card-title">MA SÉANCE</div>
+      <div style="font-size:28px;font-weight:800;line-height:1.05;margin-bottom:8px">${esc(theme)}</div>
+      <div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.65">Voici le résumé joueur: le thème travaillé et les grands aspects de progression. Les détails de préparation restent dans l’espace coach.</div>
+      <div class="g2" style="margin-top:16px">
+        ${s.location?`<div class="briefing-item"><div class="briefing-pill" style="color:var(--bronze)">LIEU</div><div style="font-size:13px;font-weight:700">${esc(s.location)}</div></div>`:''}
+        ${s.time?`<div class="briefing-item"><div class="briefing-pill" style="color:var(--bronze)">HEURE</div><div style="font-size:13px;font-weight:700">${esc(s.time)}</div></div>`:''}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">ASPECTS TRAVAILLÉS</div>
+      <div class="g4">
+        ${aspects.length?aspects.map(b=>{const pl=PILLARS.find(p=>p.id===b.pillar);return `<div style="background:var(--bg4);border:1px solid ${(pl?.color||'#a67c52')}55;border-radius:8px;padding:14px">
+          <div style="font-size:9px;letter-spacing:1.5px;color:${pl?.color||'var(--bronze)'};margin-bottom:7px">${esc(pl?.name||b.pillar||'ASPECT')}</div>
+          <div style="font-size:14px;font-weight:800">${esc(b.aspect)}</div>
+        </div>`}).join(''):`<div style="font-size:12px;color:var(--gray);font-family:var(--font-body)">Les aspects seront visibles quand le coach aura terminé la préparation.</div>`}
+      </div>
+    </div>
+    <div class="card"><div class="card-title">${s.status==='closed_coach'?'MON RESSENTI':'RETOUR JOUEUR'}</div>${s.status==='closed_coach'||s.status==='completed'?renderPlayerClosure(s):`<div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.65">Tu pourras donner ton ressenti quand le coach aura fermé la séance.</div>`}</div>
   </div>`;
 }
 
@@ -3651,7 +3746,7 @@ function pageFieldMode(s){
       <div style="flex:1;min-width:220px">
         <div style="font-size:10px;color:var(--bronze);letter-spacing:2px">MODE TERRAIN</div>
         <div style="font-size:26px;font-weight:700;letter-spacing:1px;line-height:1.1">${esc(sessionTitle(s))}</div>
-        <div style="font-size:10px;color:var(--gray2);margin-top:3px">${esc(s.date)} · ${statusBadge(s.status)}</div>
+        <div style="font-size:10px;color:var(--gray2);margin-top:3px">${esc(sessionDateLine(s))} · ${statusBadge(s.status)}</div>
       </div>
       ${s.status==='planned'?`<button class="btn btn-primary" onclick="startSession(${s.id})">DÉMARRER</button>`:''}
       <button class="btn btn-danger" onclick="setUI({fieldBlock:${maxStep}})">ÉVALUATION FINALE</button>
@@ -4483,62 +4578,51 @@ function readPlayerForm(existing=null){
   };
 }
 
+function aspectSelectHtml(pillarId,label){
+  const pl=PILLARS.find(p=>p.id===pillarId);
+  return `<div class="form-group"><label class="form-label">${label}</label><select class="form-select" id="m_aspect_${pillarId}"><option value="">— Choisir —</option>${(pl?.aspects||[]).map(a=>`<option value="${esc(a.name)}">${esc(a.name)} · ${esc(a.desc)}</option>`).join('')}</select></div>`;
+}
 function newSessionModalHtml(extra){
   const selected=Array.isArray(extra)?extra.filter(Boolean):(extra?[extra]:[]);
-  const aftSteps=sessionStructure({sessionType:'aft'});
   const typeCards=[
-    {value:'aft',title:'SÉANCE AFT · 1H',text:"Échauffement, jeu de départ, jeu d’apprentissage, jeu d’application, cooling down. FAR, induction et sandwich."},
-    {value:'hwbt',title:'SÉANCE HWBT',text:'Structure academy: préparation, entraînement ciblé, transfert et évaluation rapide.'}
+    {value:'aft',title:'SÉANCE AFT · 1H',text:"Thème officiel, questions AFT, puis préparation avec échauffement, jeu de départ, apprentissage, application et cooling down."},
+    {value:'hwbt',title:'SÉANCE HWBT',text:'Une priorité par pilier, entraînement ciblé, transfert terrain et évaluation rapide.'}
   ];
-  return `<div class="modal-title">CRÉER UNE SÉANCE PAS À PAS</div><button class="modal-close" onclick="closeModal()">×</button>
-  <div class="form-group">
-    <label class="form-label">TYPE D'ENTRAÎNEMENT</label>
-    <div class="g2">
-      ${typeCards.map((t,i)=>`<label style="background:var(--bg4);border:1px solid ${i===0?'var(--bronze-dim2)':'var(--border)'};border-radius:8px;padding:12px;display:block;cursor:pointer">
-        <div style="display:flex;gap:9px;align-items:flex-start">
-          <input type="radio" name="m_session_type" value="${t.value}" ${i===0?'checked':''} style="margin-top:3px">
-          <span><span style="display:block;font-size:13px;font-weight:800;color:var(--offwhite);letter-spacing:.8px">${t.title}</span><span style="display:block;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:5px">${t.text}</span></span>
-        </div>
-      </label>`).join('')}
-    </div>
+  return `<div class="modal-title">CRÉER UNE SÉANCE</div><button class="modal-close" onclick="closeModal()">×</button>
+  <div style="background:var(--bg4);border-left:3px solid var(--bronze);padding:10px 12px;border-radius:0 6px 6px 0;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:14px">Étape 1: tu poses le cadre de la séance. Après création, tu arrives dans la fiche de préparation pour compléter les exercices, les schémas et le déroulement détaillé.</div>
+  <div class="g3">
+    <div class="form-group"><label class="form-label">DATE</label><input class="form-input" id="m_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+    <div class="form-group"><label class="form-label">HEURE</label><input class="form-input" id="m_time" type="time" value=""></div>
+    <div class="form-group"><label class="form-label">LIEU</label><input class="form-input" id="m_location" placeholder="Ex: Padel club, terrain 3"></div>
   </div>
-  <div class="form-group"><label class="form-label">JOUEURS (1 À 4)</label><div class="session-player-grid">${STATE.players.map(p=>`<label class="session-player-choice"><input type="checkbox" class="m_session_player" value="${p.id}" ${selected.includes(p.id)?'checked':''} onchange="limitSessionPlayers(this)"><span><span class="session-player-name">${esc(p.name)}</span><span class="session-player-meta">${esc(p.code||'')}</span></span></label>`).join('')}</div></div>
-  <div class="form-group"><label class="form-label">DATE</label><input class="form-input" id="m_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+  <div class="form-group"><label class="form-label">JOUEURS (1 À 4)</label><div class="session-player-grid">${STATE.players.map(p=>`<label class="session-player-choice"><input type="checkbox" class="m_session_player" value="${p.id}" ${selected.includes(p.id)?'checked':''} onchange="limitSessionPlayers(this);updateSessionPlanningSuggestions()"><span><span class="session-player-name">${esc(p.name)}</span><span class="session-player-meta">${esc(p.code||'')}</span></span></label>`).join('')}</div></div>
+  <div class="form-group"><label class="form-label">TYPE D'ENTRAÎNEMENT</label><div class="g2">
+    ${typeCards.map((t,i)=>`<label style="background:var(--bg4);border:1px solid ${i===0?'var(--bronze-dim2)':'var(--border)'};border-radius:8px;padding:12px;display:block;cursor:pointer"><div style="display:flex;gap:9px;align-items:flex-start"><input type="radio" name="m_session_type" value="${t.value}" ${i===0?'checked':''} style="margin-top:3px"><span><span style="display:block;font-size:13px;font-weight:800;color:var(--offwhite);letter-spacing:.8px">${t.title}</span><span style="display:block;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:5px">${t.text}</span></span></div></label>`).join('')}
+  </div></div>
   <div class="g2">
     <div class="form-group"><label class="form-label">THÈME AFT OFFICIEL</label><select class="form-select" id="m_aft_theme_key" onchange="applyAftThemeToModal(this.value)"><option value="">— Choisir un thème —</option>${AFT_THEMES.map(t=>`<option value="${t.key}">${esc(t.title)}</option>`).join('')}</select></div>
-    <div class="form-group"><label class="form-label">ASPECT TECHNIQUE CIBLÉ</label><select class="form-select" id="m_aft_technical"><option value="">— Choisir —</option>${(PILLARS.find(p=>p.id==='T')?.aspects||[]).map(a=>`<option value="${esc(a.name)}">${esc(a.name)} · ${esc(a.desc)}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">THÈME / FIL ROUGE</label><input class="form-input" id="m_aft_theme" placeholder="Ex: Les positions en attaque"></div>
   </div>
-  <div class="form-group"><label class="form-label">THÈME / FIL ROUGE MODIFIABLE</label><input class="form-input" id="m_aft_theme" placeholder="Le thème choisi se mettra ici, tu peux l'adapter."></div>
   <div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
-    <div style="font-size:10px;letter-spacing:1.5px;color:var(--bronze);margin-bottom:10px">QUESTIONS ASSISTANT AFT</div>
+    <div style="font-size:10px;letter-spacing:1.5px;color:var(--bronze);margin-bottom:10px">QUESTIONS AFT POUR CADRER LA SÉANCE</div>
     <div class="g2">
       <div class="form-group"><label class="form-label">NIVEAU DU GROUPE</label><select class="form-select" id="m_aft_level"><option>Débutant</option><option>Débutant +</option><option>Intermédiaire</option></select></div>
-      <div class="form-group"><label class="form-label">ASPECT MENTAL À STIMULER</label><select class="form-select" id="m_aft_mental"><option value="">— Choisir —</option>${(PILLARS.find(p=>p.id==='M')?.aspects||[]).map(a=>`<option value="${esc(a.name)}">${esc(a.name)} · ${esc(a.desc)}</option>`).join('')}</select></div>
-      <div class="form-group"><label class="form-label">CE QUE LE PROF VEUT VOIR</label><input class="form-input" id="m_aft_teacher_goal" placeholder="Ex: plus de balles basses, moins de fautes, meilleure communication..."></div>
-      <div class="form-group"><label class="form-label">CONTRAINTE / MATÉRIEL</label><input class="form-input" id="m_aft_constraint" placeholder="Ex: 4 joueurs, balles rouges, câbles, rubalises, peu de paniers..."></div>
+      <div class="form-group"><label class="form-label">CE QUE LE PROF VEUT VOIR</label><input class="form-input" id="m_aft_teacher_goal" placeholder="Ex: rester en zone d’attaque, mieux choisir le lob..."></div>
+      <div class="form-group"><label class="form-label">CONTRAINTE / MATÉRIEL</label><input class="form-input" id="m_aft_constraint" placeholder="Ex: 4 joueurs, cônes, câbles, balles rouges..."></div>
+      <div class="form-group"><label class="form-label">DEMANDES JOUEURS</label><input class="form-input" id="m_player_wishes" placeholder="Ex: confiance au filet, retour de vitre..."></div>
+    </div>
+    <div class="g2">
+      <div class="form-group"><label class="form-label">TACTIQUE À TRANSMETTRE</label><textarea class="form-input" id="m_aft_tactic" rows="2" placeholder="Ce que le joueur doit comprendre par le jeu."></textarea></div>
+      <div class="form-group"><label class="form-label">TECHNIQUE À TRANSMETTRE</label><textarea class="form-input" id="m_aft_technique" rows="2" placeholder="Repères simples du geste, sans surcorriger."></textarea></div>
     </div>
   </div>
-  <div class="g2">
-    <div class="form-group"><label class="form-label">TACTIQUE À TRANSMETTRE</label><textarea class="form-input" id="m_aft_tactic" rows="2" placeholder="Ce que le joueur doit comprendre par le jeu."></textarea></div>
-    <div class="form-group"><label class="form-label">TECHNIQUE À TRANSMETTRE</label><textarea class="form-input" id="m_aft_technique" rows="2" placeholder="Repères simples du geste, sans surcorriger."></textarea></div>
-  </div>
-  <div style="background:var(--bg4);border-left:3px solid var(--bronze);padding:10px 12px;border-radius:0 6px 6px 0;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:14px">Pour une séance AFT, choisis un thème officiel puis lance l’assistant. Il prépare le fil conducteur, les consignes tactiques/techniques et les exercices. Les 4 aspects HWBT restent utiles pour mesurer la progression après la séance.</div>
-  <div style="display:flex;justify-content:flex-end;margin-bottom:14px;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-ghost btn-sm" onclick="fillAftSessionAssistant()">ASSISTANT AFT · GÉNÉRER LE PLAN</button><button type="button" class="btn btn-primary btn-sm" onclick="enhanceAllModalAftSteps()">MODE EXPRESS · FICHE PRO COMPLÈTE</button></div>
-  <div class="form-group"><label class="form-label">RETOUR / DEMANDES JOUEURS</label><textarea class="form-input" id="m_player_wishes" rows="3" placeholder="Ex: Julie veut travailler la confiance au filet. Marc veut mieux gérer les points importants."></textarea></div>
-  <div id="sessionPlanningSuggestions" style="margin-bottom:16px">${sessionPlanningSuggestionsHtml(selected)}</div>
   <div style="background:var(--bg4);border:1px solid var(--bronze-dim2);border-radius:8px;padding:12px;margin-bottom:14px">
-    <div style="font-size:10px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:10px">CRÉATION DE LA SÉANCE — 5 PARTIES</div>
-    <div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:12px">Prépare ici le vrai déroulement du cours: ce que les joueurs font, la règle du jeu, la contrainte, le placement et ce que le coach doit observer. Les aspects/statistiques se gèrent ensuite dans l’évaluation, pas dans cette étape de création.</div>
-    ${aftSteps.map((st,idx)=>`<div class="aspect-input-block">
-      <div class="aib-header"><span class="aib-pillar" style="background:var(--bronze-dim);color:var(--bronze)">${st.num}</span><span class="aib-name">${esc(st.name)}</span></div>
-      <div style="font-size:9px;color:var(--bronze);letter-spacing:1.2px;margin-bottom:7px">${esc(st.time)}${st.focus?` · ${esc(st.focus)}`:''}</div>
-      <div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.5;margin-bottom:8px">${esc(st.desc)}</div>
-      <textarea class="form-input" rows="4" id="m_aft_step_${idx}" placeholder="Déroulement, règle, consigne ou situation de jeu..."></textarea>
-      <div style="display:flex;justify-content:flex-end;margin-top:8px"><button type="button" class="btn btn-primary btn-sm" onclick="enhanceModalAftStep(${idx})">CORRIGER + COMPLÉTER AFT</button></div>
-    </div>`).join('')}
+    <div style="font-size:10px;letter-spacing:1.5px;color:var(--bronze);margin-bottom:10px">ASPECTS À TRAVAILLER — 1 PAR PILIER</div>
+    <div class="g4">${aspectSelectHtml('T','TECHNIQUE')}${aspectSelectHtml('TA','TACTIQUE')}${aspectSelectHtml('P','PHYSIQUE')}${aspectSelectHtml('M','MENTAL')}</div>
+    <div id="sessionPlanningSuggestions" style="margin-top:10px">${sessionPlanningSuggestionsHtml(selected)}</div>
   </div>
-  <textarea class="form-input" id="m_session_goal" rows="2" placeholder="Objectif général"></textarea>
-  <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">ANNULER</button><button class="btn btn-primary" onclick="createSession()">CRÉER</button></div>`;
+  <textarea class="form-input" id="m_session_goal" rows="2" placeholder="Objectif général visible coach"></textarea>
+  <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">ANNULER</button><button class="btn btn-primary" onclick="createSession()">CRÉER ET PRÉPARER</button></div>`;
 }
 function renderModal(type,extra){
   if(type==='addPlayer') return playerFormHtml();
@@ -4594,8 +4678,10 @@ function applyAftThemeToModal(key){
   if(type) type.checked=true;
   const set=(id,val)=>{const el=document.getElementById(id);if(!el)return;if(el.tagName==='SELECT'&&val&&![...el.options].some(o=>o.value===val))el.add(new Option(val,val));el.value=val||'';};
   set('m_aft_theme',theme.title);
-  set('m_aft_technical',theme.technical);
-  set('m_aft_mental',theme.mental);
+  set('m_aspect_T',theme.technical);
+  set('m_aspect_TA',theme.tacticAspect);
+  set('m_aspect_P',theme.physical);
+  set('m_aspect_M',theme.mental);
   set('m_aft_tactic',theme.tactics.join('\n'));
   set('m_aft_technique',theme.techniques.join('\n'));
   set('m_session_goal',`Séance AFT: ${theme.title}. Faire découvrir le thème par le jeu, puis transférer en situation réelle.`);
@@ -4833,25 +4919,38 @@ function openNextSessionFromSession(sessionId){
 function createSession(){
   const playerIds=selectedSessionPlayerIds();
   const date=document.getElementById('m_date').value;
+  const time=document.getElementById('m_time')?.value||'';
+  const location=document.getElementById('m_location')?.value.trim()||'';
   const playerWishes=document.getElementById('m_player_wishes')?.value.trim()||'';
   const sessionType=document.querySelector('input[name="m_session_type"]:checked')?.value||'hwbt';
   const themeKey=document.getElementById('m_aft_theme_key')?.value||'';
   const theme=aftThemeByKey(themeKey);
-  const aftMeta={themeKey,theme:document.getElementById('m_aft_theme')?.value.trim()||'',technical:document.getElementById('m_aft_technical')?.value.trim()||'',mental:document.getElementById('m_aft_mental')?.value||'',tactic:document.getElementById('m_aft_tactic')?.value.trim()||'',technique:document.getElementById('m_aft_technique')?.value.trim()||'',level:document.getElementById('m_aft_level')?.value||'',teacherGoal:document.getElementById('m_aft_teacher_goal')?.value.trim()||'',constraint:document.getElementById('m_aft_constraint')?.value.trim()||'',coachInfo:theme?.coachInfo||''};
+  const selectedAspects={
+    T:document.getElementById('m_aspect_T')?.value||theme?.technical||'',
+    TA:document.getElementById('m_aspect_TA')?.value||theme?.tacticAspect||'',
+    P:document.getElementById('m_aspect_P')?.value||theme?.physical||'',
+    M:document.getElementById('m_aspect_M')?.value||theme?.mental||''
+  };
+  const aftMeta={themeKey,theme:document.getElementById('m_aft_theme')?.value.trim()||theme?.title||'',technical:selectedAspects.T||'',mental:selectedAspects.M||'',tactic:document.getElementById('m_aft_tactic')?.value.trim()||'',technique:document.getElementById('m_aft_technique')?.value.trim()||'',level:document.getElementById('m_aft_level')?.value||'',teacherGoal:document.getElementById('m_aft_teacher_goal')?.value.trim()||'',constraint:document.getElementById('m_aft_constraint')?.value.trim()||'',coachInfo:theme?.coachInfo||''};
   if(playerIds.length<1||playerIds.length>4||!date){showNotif('Choisis 1 à 4 joueurs et une date');return;}
-  const pillarFlow=['T','TA','P','M','M'];
   const steps=sessionStructure({sessionType});
-  const blocks=steps.map((st,idx)=>({
-    pillar:pillarFlow[idx]||'M',
-    aspect:st.name,
-    exercise:document.getElementById('m_aft_step_'+idx)?.value.trim()||'',
+  const aftPillarFlow=['P','TA','T','M','M'];
+  const hwbtPillarFlow=['T','TA','P','M','M'];
+  const pillarFlow=sessionType==='aft'?aftPillarFlow:hwbtPillarFlow;
+  const blocks=steps.map((st,idx)=>{
+    const pillar=pillarFlow[idx]||'M';
+    const aspect=selectedAspects[pillar]||st.name;
+    return {
+    pillar,
+    aspect,
+    exercise:'',
     subAspects:{},
     scores:{},
     coachState:'',
     sessionPart:st.name
-  }));
+  }}).map((b,idx)=>({...b,sessionPart:steps[idx]?.name||b.sessionPart}));
   const id=Math.max(0,...STATE.sessions.map(s=>s.id))+1;
-  STATE.sessions.push({id,playerId:playerIds[0],playerIds,date,status:'planned',sessionType,aftMeta,goal:document.getElementById('m_session_goal').value.trim(),playerWishes,blocks,futureAspects:[],coachFeedback:{},playerFeedback:{}});
+  STATE.sessions.push({id,playerId:playerIds[0],playerIds,date,time,location,status:'planned',sessionType,aftMeta,goal:document.getElementById('m_session_goal').value.trim(),playerWishes,blocks,futureAspects:[],coachFeedback:{},playerFeedback:{}});
   closeModal();
   showNotif(`Séance ${sessionTypeLabel(sessionType)} créée`);
   setUI({page:'sessions',selectedSessionId:id});
