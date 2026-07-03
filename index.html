@@ -2412,13 +2412,13 @@ function prepTextArea(sessionId,idx,key,label,value,rows=3){
 function sessionPrepEditorHtml(s,idx,b,isCooling){
   const prep=ensureBlockPrep(b,isCooling);
   return `<div>
-    <div class="g3">
-      ${prepTextArea(s.id,idx,'setup','MISE EN PLACE',prep.setup,3)}
-      ${prepTextArea(s.id,idx,'flow','DÉROULEMENT',prep.flow,3)}
+    ${prepTextArea(s.id,idx,'setup','MISE EN PLACE',prep.setup,5)}
+    ${prepTextArea(s.id,idx,'flow','DÉROULEMENT',prep.flow,6)}
+    <div class="g2">
       ${prepTextArea(s.id,idx,'rule','RÈGLE / SCORE',prep.rule,3)}
-    </div>
-    <div class="g3">
       ${prepTextArea(s.id,idx,'coach','POINTS COACH',prep.coach,3)}
+    </div>
+    <div class="g2">
       ${prepTextArea(s.id,idx,'questions','QUESTIONS',prep.questions,3)}
       ${prepTextArea(s.id,idx,'benefits','BIENFAITS + ADAPTATION',prep.benefits,3)}
     </div>
@@ -2448,13 +2448,17 @@ function sessionWorkBlocksHtml(s){
     const score=measuredBlockScore(b);
     const actionButtons=isCooling
       ? `<button class="btn btn-primary btn-sm" onclick="enhanceSessionBlockAft(${s.id},${idx})">CORRIGER + COMPLÉTER LE BILAN</button>`
-      : `${aft?`<button class="btn btn-primary btn-sm" onclick="enhanceSessionBlockAft(${s.id},${idx})">CORRIGER + COMPLÉTER AFT</button>`:''}<button class="btn btn-ghost btn-sm" onclick="diagramToText(${s.id},${idx})">SCHÉMA → TEXTE</button><button class="btn btn-ghost btn-sm" onclick="diagramFromText(${s.id},${idx})">TEXTE → SCHÉMA</button><button class="btn btn-ghost btn-sm" onclick="saveBlockExerciseToLibrary(${s.id},${idx})">ENREGISTRER EN BIBLIOTHÈQUE</button>`;
+      : `${aft?`<button class="btn btn-primary btn-sm" onclick="enhanceSessionBlockAft(${s.id},${idx})">CORRIGER + COMPLÉTER AFT</button>${idx===3?`<button class="btn btn-ghost btn-sm" onclick="copyDiagramFromBlock(${s.id},1,3)">COPIER SCHÉMA JEU DE DÉPART</button>`:''}`:''}<button class="btn btn-ghost btn-sm" onclick="diagramToText(${s.id},${idx})">SCHÉMA → TEXTE</button><button class="btn btn-ghost btn-sm" onclick="diagramFromText(${s.id},${idx})">TEXTE → SCHÉMA</button><button class="btn btn-ghost btn-sm" onclick="saveBlockExerciseToLibrary(${s.id},${idx})">ENREGISTRER EN BIBLIOTHÈQUE</button>`;
+    const prepBlock=canEdit?(aft?`${sessionPrepEditorHtml(s,idx,b,isCooling)}<div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${actionButtons}</div>`:`<div class="form-group"><label class="form-label">EXERCICE / CONSIGNE</label><textarea class="form-input" rows="2" oninput="updateSessionBlock(${s.id},${idx},'exercise',this.value)">${esc(b.exercise||'')}</textarea><div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${actionButtons}</div></div>`):(aft?sessionPrepReadOnlyHtml(b,isCooling):`${b.exercise?`<div class="exercise-card"><div style="font-size:8px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:5px">${isCooling?'BILAN DONNÉ':'EXERCICE DONNÉ'}</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.5;white-space:pre-wrap">${esc(b.exercise)}</div></div>`:''}`);
+    const diagramBlock=isCooling?`<div style="background:var(--bg4);border-left:3px solid var(--bronze);border-radius:0 8px 8px 0;padding:12px;font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.65"><b style="color:var(--offwhite)">Pas de schéma terrain pour cette étape.</b><br>Le cooling down sert à revenir au calme, vérifier ce que les joueurs retiennent et fermer la séance avec un feedback sandwich.</div>`:diagramHtml(s,idx,canEdit);
+    const body=aft&&!isCooling
+      ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px;align-items:start"><div style="min-width:0">${prepBlock}</div><div style="min-width:0">${diagramBlock}</div></div>`
+      : `${prepBlock}${diagramBlock}`;
     return `<div class="aspect-input-block">
       <div class="aib-header"><span class="aib-pillar" style="background:var(--bronze-dim);color:var(--bronze)">${String(idx+1).padStart(2,'0')}</span><span class="aib-name">${esc(label)}</span>${!aft&&closed&&b.coachState?`<span style="margin-left:auto;font-size:10px;color:${pl.color};font-weight:700">${ASPECT_STATE_LABEL[b.coachState]} · ${score}/20</span>`:''}</div>
       <div style="font-size:10px;color:var(--bronze);letter-spacing:1.4px;margin-bottom:8px">${esc(sub)}</div>
       <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:10px">${esc(desc)}</div>
-      ${canEdit?(aft?`${sessionPrepEditorHtml(s,idx,b,isCooling)}<div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${actionButtons}</div>`:`<div class="form-group"><label class="form-label">EXERCICE / CONSIGNE</label><textarea class="form-input" rows="2" oninput="updateSessionBlock(${s.id},${idx},'exercise',this.value)">${esc(b.exercise||'')}</textarea><div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${actionButtons}</div></div>`):(aft?sessionPrepReadOnlyHtml(b,isCooling):`${b.exercise?`<div class="exercise-card"><div style="font-size:8px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:5px">${isCooling?'BILAN DONNÉ':'EXERCICE DONNÉ'}</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.5;white-space:pre-wrap">${esc(b.exercise)}</div></div>`:''}`)}
-      ${isCooling?`<div style="background:var(--bg4);border-left:3px solid var(--bronze);border-radius:0 8px 8px 0;padding:12px;font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.65"><b style="color:var(--offwhite)">Pas de schéma terrain pour cette étape.</b><br>Le cooling down sert à revenir au calme, vérifier ce que les joueurs retiennent et fermer la séance avec un feedback sandwich.</div>`:diagramHtml(s,idx,canEdit)}
+      ${body}
     </div>`;
   }).join('');
   return `<div class="card"><div class="card-title">${title}</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-bottom:12px">${note}</div>${cards}</div>`;
@@ -5308,6 +5312,17 @@ function diagramFromText(sessionId,blockIdx){
   if(/cone|cône|plot/.test(text))items.push({type:'cone',label:'△',color:'#ff7f50',x:35,y:126},{type:'cone',label:'△',color:'#ff7f50',x:65,y:126});
   b.diagramItems=items;
   saveState(); render(); showNotif('Schéma généré depuis le texte');
+}
+function copyDiagramFromBlock(sessionId,fromIdx,toIdx){
+  const s=STATE.sessions.find(s=>s.id===sessionId);
+  if(!s) return;
+  const from=ensureSessionBlock(s,fromIdx);
+  const to=ensureSessionBlock(s,toIdx);
+  if(!from||!to) return;
+  const source=Array.isArray(from.diagramItems)?from.diagramItems:[];
+  if(!source.length){showNotif('Le jeu de départ n’a pas encore de schéma');return;}
+  to.diagramItems=JSON.parse(JSON.stringify(source));
+  saveState();render();showNotif('Schéma du jeu de départ copié vers le jeu d’application');
 }
 function addDiagramTemplate(sessionId,blockIdx){
   const s=STATE.sessions.find(s=>s.id===sessionId); const b=ensureSessionBlock(s,blockIdx); if(!b)return;
