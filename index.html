@@ -4876,6 +4876,14 @@ function cleanCoachText(text){
 function bulletLines(list,limit=4){
   return (list||[]).slice(0,limit).map(x=>`- ${x}`).join('\n');
 }
+function textToAftBullets(text,fallback=[],limit=5){
+  const cleaned=cleanCoachText(text);
+  const parts=cleaned
+    ? cleaned.split(/(?:\.|;|\n| puis | ensuite | après | et après |, puis )/i).map(x=>x.trim()).filter(x=>x.length>2)
+    : [];
+  const items=(parts.length?parts:fallback).map(x=>x.replace(/^[-•]\s*/,'').trim()).filter(Boolean);
+  return bulletLines(items.length?items:fallback,limit);
+}
 function inferAftMaterials(text,theme,step){
   const source=`${text} ${theme?.coachInfo||''} ${step?.name||''}`.toLowerCase();
   const materials=['Raquettes','Balles'];
@@ -4894,11 +4902,11 @@ function aftStepFormat(step,idx){
 }
 function aftStepLearning(step,theme,technicalAspect,mentalAspect){
   const name=String(step?.name||'').toLowerCase();
-  if(name.includes('échauffement')) return 'Les joueurs entrent dans le thème sans explication longue. Ils découvrent le repère du jour par le mouvement, beaucoup de touches et une consigne simple.';
-  if(name.includes('départ')) return `Le jeu révèle le problème tactique: les joueurs sentent pourquoi le thème "${theme?.title||'AFT'}" est utile dans le point. Le coach observe avant de corriger.`;
-  if(name.includes('apprentissage')) return `Les joueurs répètent la solution avec un cadre clair. Le geste "${technicalAspect||theme?.technical||'technique'}" est lié à une intention tactique, pas travaillé isolément.`;
-  if(name.includes('application')) return `Les joueurs transfèrent en condition de match. On vérifie si le bon choix revient avec score, opposition et pression. L’aspect mental stimulé est "${mentalAspect||theme?.mental||'concentration'}".`;
-  return 'Les joueurs verbalisent ce qu’ils retiennent. Le coach fixe une réussite, un point d’attention et une mission simple pour la prochaine séance.';
+  if(name.includes('échauffement')) return bulletLines(['Entrer dans le thème sans longue explication.','Multiplier les touches de balle et les déplacements simples.','Installer le repère technique du jour par le mouvement.'],3);
+  if(name.includes('départ')) return bulletLines([`Faire apparaître le problème tactique: ${theme?.title||'thème AFT'}.`,'Observer les choix des joueurs avant de corriger.','Créer le besoin d’apprendre avec une règle simple.'],3);
+  if(name.includes('apprentissage')) return bulletLines(['Répéter la solution dans un cadre clair.',`Relier le geste "${technicalAspect||theme?.technical||'technique'}" à une intention tactique.`,'Corriger un repère à la fois, sans couper le rythme.'],3);
+  if(name.includes('application')) return bulletLines(['Transférer la solution dans un jeu proche du match.','Vérifier si le bon choix revient avec score et opposition.',`Stimuler l’aspect mental: ${mentalAspect||theme?.mental||'concentration'}.`],3);
+  return bulletLines(['Faire verbaliser ce que les joueurs retiennent.','Fixer une réussite et un point d’attention.','Donner une mission simple pour la prochaine séance.'],3);
 }
 function enhanceAftText(raw,ctx){
   const step=ctx.step||{};
@@ -4922,7 +4930,13 @@ CE QUE J’APPRENDS
 ${aftStepLearning(step,theme,technicalAspect,mentalAspect)}
 
 DÉROULEMENT DU JEU
-${idea}
+${textToAftBullets(idea,[
+  'Lancer le jeu avec une consigne courte.',
+  'Laisser les joueurs chercher la solution pendant quelques points.',
+  'Observer le placement, le choix et la communication.',
+  'Faire un court arrêt pour poser une question.',
+  'Relancer avec une règle ou un bonus lié au thème.'
+],5)}
 
 MISE EN PLACE
 - Organiser rapidement les joueurs pour limiter l’attente.
@@ -4959,14 +4973,14 @@ QUESTIONS À POSER
 ${bulletLines(questions,4)}
 
 PROGRESSION / RÉGRESSION
-R-1: agrandir la zone, ralentir la balle, enlever l’opposition ou autoriser plus de temps.
-R0: garder la règle actuelle et demander de répéter le bon choix.
-R+1: réduire la zone, ajouter le score, activer l’adversaire ou demander une décision plus rapide.
+- R-1: agrandir la zone, ralentir la balle, enlever l’opposition ou autoriser plus de temps.
+- R0: garder la règle actuelle et demander de répéter le bon choix.
+- R+1: réduire la zone, ajouter le score, activer l’adversaire ou demander une décision plus rapide.
 
 FEEDBACK SANDWICH
-1. Valoriser une action réussie et précise.
-2. Poser une question qui amène le joueur à comprendre.
-3. Donner un repère simple à refaire au point suivant.
+- Valoriser une action réussie et précise.
+- Poser une question qui amène le joueur à comprendre.
+- Donner un repère simple à refaire au point suivant.
 
 BIENFAITS POUR LE JOUEUR
 - Il comprend le jeu avant de chercher le geste parfait.
@@ -5010,18 +5024,42 @@ function enhanceSessionBlockAft(sessionId,idx){
 function detailedAftExerciseText(stepTitle,theme,level,technicalAspect,mentalAspect,teacherGoal,constraint,baseText,focus){
   return `${stepTitle}
 
-Intention pédagogique:
-Le but est de faire comprendre "${theme.title}" par l'action, sans donner trop de théorie au départ. Le coach observe si les joueurs trouvent naturellement la bonne solution: placement, choix de trajectoire, communication et qualité du geste. L'aspect technique prioritaire est "${technicalAspect}" et l'aspect mental à stimuler est "${mentalAspect}".
+INTENTION PÉDAGOGIQUE
+- Faire découvrir "${theme.title}" par le jeu.
+- Garder peu de théorie au départ.
+- Observer si les joueurs trouvent la bonne solution.
+- Relier l’aspect technique "${technicalAspect}" à l’aspect mental "${mentalAspect}".
 
-Organisation:
-${baseText}
-Contexte prévu: ${level}. Contrainte/matériel: ${constraint}. Objectif particulier du prof: ${teacherGoal}.
+DÉROULEMENT DU JEU
+${textToAftBullets(baseText,[
+  'Lancer le jeu avec une consigne simple.',
+  'Laisser les joueurs jouer quelques points.',
+  'Observer le placement et la décision.',
+  'Faire un court arrêt avec une question.',
+  'Relancer avec un bonus ou une contrainte.'
+],5)}
 
-Consignes coach:
-Commencer avec une règle très simple et un critère visible. Si les joueurs réussissent trop facilement, ajouter une contrainte R+1: zone plus précise, score, adversaire plus actif ou décision plus rapide. Si les joueurs bloquent, passer en R-1: cible plus grande, vitesse plus lente, moins d'opposition ou consigne unique.
+MISE EN PLACE
+- Niveau prévu: ${level}.
+- Contrainte / matériel: ${constraint}.
+- Objectif prof: ${teacherGoal}.
+- Démarrer vite pour éviter l’attente.
 
-Ce qu'il faut observer:
-${focus}. Le coach doit surtout regarder si le joueur comprend pourquoi il fait l'action, pas seulement s'il réussit le geste une fois. Finir avec un feedback sandwich: valoriser une réussite, poser une question qui guide, puis donner un repère simple à répéter.`;
+POINTS COACH
+- ${focus}
+- Regarder si le joueur comprend pourquoi il fait l’action.
+- Corriger un seul repère à la fois.
+- Utiliser une question avant de donner la solution.
+
+PROGRESSION / RÉGRESSION
+- R-1: simplifier la cible, ralentir la balle ou enlever l’opposition.
+- R0: garder la règle actuelle et chercher la répétition.
+- R+1: ajouter score, zone plus précise ou décision plus rapide.
+
+FEEDBACK SANDWICH
+- Valoriser une réussite précise.
+- Poser une question qui guide.
+- Donner un repère simple à refaire.`;
 }
 function fillAftSessionAssistant(){
   const key=document.getElementById('m_aft_theme_key')?.value||'';
@@ -5059,15 +5097,21 @@ function fillAftSessionAssistant(){
   });
   const cooling=document.getElementById('m_aft_step_4');
   if(cooling) cooling.value=`COOLING DOWN
-Retour au calme rapide. Le coach reprend 2 réussites vues dans le jeu d’application, puis pose une question simple: "Qu’est-ce que tu dois retenir pour ton prochain match ?"
 
-Bilan sandwich:
-1. Valoriser une action réussie.
-2. Donner un repère simple à corriger.
-3. Terminer par une phrase positive et concrète.
+DÉROULEMENT
+- Retour au calme rapide.
+- Reprendre 2 réussites vues dans le jeu d’application.
+- Poser une question simple: "Qu’est-ce que tu dois retenir pour ton prochain match ?"
 
-Trace pour la suite:
-Noter le point qui doit revenir dans la prochaine séance et le ressenti des joueurs.`;
+BILAN SANDWICH
+- Valoriser une action réussie.
+- Donner un repère simple à corriger.
+- Terminer par une phrase positive et concrète.
+
+TRACE POUR LA SUITE
+- Noter le point qui doit revenir dans la prochaine séance.
+- Noter le ressenti des joueurs.
+- Choisir une priorité simple pour la suite.`;
   const goal=document.getElementById('m_session_goal');
   if(goal) goal.value=`Séance AFT ${level}: ${theme.title}. Objectif prof: ${teacherGoal}. Contrainte: ${constraint}.`;
   showNotif('Assistant AFT: séance pré-remplie');
