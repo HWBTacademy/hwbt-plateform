@@ -2459,6 +2459,7 @@ function sessionWorkBlocksHtml(s){
     const pl=aft?(PILLARS.find(p=>p.id===b.pillar)||PILLARS[idx]||PILLARS[0]):item;
     const step=aft?item:null;
     const label=aft?step.name:pl.name;
+    const exerciseName=b.exerciseName||defaultExerciseName(step,idx);
     const isApplication=aft&&/application/i.test(label||'');
     const sub=aft?`${step.time}${step.focus?` · ${step.focus}`:''}`:`${b.aspect||'Aspect à définir'}`;
     const desc=aft?step.desc:(b.aspect?`Aspect mesuré: ${b.aspect}`:'Choisis ou précise l’exercice.');
@@ -2472,7 +2473,7 @@ function sessionWorkBlocksHtml(s){
       ? `<div class="aft-prep-grid"><div style="min-width:0">${prepBlock}</div><div class="aft-prep-diagram" style="min-width:0">${diagramBlock}</div></div>`
       : `${prepBlock}${diagramBlock}`;
     return `<div class="aspect-input-block">
-      <div class="aib-header"><span class="aib-pillar" style="background:var(--bronze-dim);color:var(--bronze)">${String(idx+1).padStart(2,'0')}</span><span class="aib-name">${esc(label)}</span>${!aft&&closed&&b.coachState?`<span style="margin-left:auto;font-size:10px;color:${pl.color};font-weight:700">${ASPECT_STATE_LABEL[b.coachState]} · ${score}/20</span>`:''}</div>
+      <div class="aib-header" style="align-items:flex-end;flex-wrap:wrap"><span class="aib-pillar" style="background:var(--bronze-dim);color:var(--bronze)">${String(idx+1).padStart(2,'0')}</span><span class="aib-name">${esc(label)}</span>${aft&&canEdit?`<div style="flex:1;min-width:220px"><label class="form-label" style="margin-bottom:4px">NOM DE L’EXERCICE</label><input class="form-input" value="${esc(exerciseName)}" oninput="updateSessionBlock(${s.id},${idx},'exerciseName',this.value)"></div>`:aft?`<span style="font-size:12px;color:var(--offwhite);font-family:var(--font-body)">— ${esc(exerciseName)}</span>`:''}${!aft&&closed&&b.coachState?`<span style="margin-left:auto;font-size:10px;color:${pl.color};font-weight:700">${ASPECT_STATE_LABEL[b.coachState]} · ${score}/20</span>`:''}</div>
       <div style="font-size:10px;color:var(--bronze);letter-spacing:1.4px;margin-bottom:8px">${esc(sub)}</div>
       <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:10px">${esc(desc)}</div>
       ${body}
@@ -2631,8 +2632,9 @@ function professionalPrepHtml(s){
     const benefits=pdfTextLines(prep.benefits).length?pdfTextLines(prep.benefits):pdfBulletsFrom(exerciseText,['BIENFAITS POUR LE JOUEUR','CE QUE J’APPRENDS','BIENFAITS'],['DÉROULEMENT','MISE EN PLACE','RÈGLE','REPÈRES'],isCooling?['Ancrer l’apprentissage avant de quitter le terrain.','Donner au joueur une image claire de sa progression.','Préparer le prochain entraînement avec une priorité simple.']:['Comprendre le jeu avant le geste parfait.','Relier technique, tactique et décision.','Repartir avec un repère clair.'],4);
     const blockMaterials=pdfInferMaterials(`${prep.setup} ${prep.flow} ${prep.rule}`||exerciseText||materialSource);
     const diagramPanel=isCooling?`<div class="cooldown-panel"><b>Cooling down</b><span>Pas de schéma terrain</span><p>Retour au calme, bilan sandwich et question ouverte pour vérifier ce que les joueurs retiennent.</p></div>`:printDiagramSvg(b);
+    const exName=b.exerciseName||defaultExerciseName(st,i);
     return `<section class="exercise">
-    <div class="ex-title"><span>${String(i+1).padStart(2,'0')}</span><div><h3>${esc(st?.name||pl?.name||'Bloc')}</h3><p>${esc(st?.time||'')} · ${esc(st?.focus||pl?.name||b.pillar)} · ${esc(b.aspect||'Aspect à définir')}</p></div></div>
+    <div class="ex-title"><span>${String(i+1).padStart(2,'0')}</span><div><h3>${esc(st?.name||pl?.name||'Bloc')} · ${esc(exName)}</h3><p>${esc(st?.time||'')} · ${esc(st?.focus||pl?.name||b.pillar)} · ${esc(b.aspect||'Aspect à définir')}</p></div></div>
     <div class="exercise-grid">
       <div class="diagram-panel">${diagramPanel}</div>
       <div class="text-panel">
@@ -4836,6 +4838,15 @@ function aspectSelectHtml(pillarId,label){
 function modalPrepTextArea(idx,key,label,rows=3){
   return `<div class="form-group" style="margin-bottom:10px"><label class="form-label">${label}</label><textarea class="form-input" id="m_aft_prep_${idx}_${key}" rows="${rows}"></textarea></div>`;
 }
+function defaultExerciseName(step,idx){
+  const name=String(step?.name||'').toLowerCase();
+  if(name.includes('échauffement')) return 'Mise en route thème';
+  if(name.includes('départ')) return 'Jeu de départ';
+  if(name.includes('apprentissage')) return 'Atelier d’apprentissage';
+  if(name.includes('application')) return 'Jeu d’application';
+  if(name.includes('cooling')) return 'Bilan final';
+  return `Exercice ${idx+1}`;
+}
 function modalAftPrepHtml(){
   const steps=sessionStructure({sessionType:'aft'});
   return `<div style="background:var(--bg4);border:1px solid var(--bronze-dim2);border-radius:8px;padding:12px;margin-bottom:14px">
@@ -4847,7 +4858,7 @@ function modalAftPrepHtml(){
       const isCooling=idx===steps.length-1;
       const isApplication=/application/i.test(st.name||'');
       return `<div class="aspect-input-block">
-        <div class="aib-header"><span class="aib-pillar" style="background:var(--bronze-dim);color:var(--bronze)">${String(idx+1).padStart(2,'0')}</span><span class="aib-name">${esc(st.name)}</span>${isApplication?`<button type="button" class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="copyModalStartGameToApplication()">COPIER JEU DE DÉPART</button>`:''}</div>
+        <div class="aib-header" style="align-items:flex-end;flex-wrap:wrap"><span class="aib-pillar" style="background:var(--bronze-dim);color:var(--bronze)">${String(idx+1).padStart(2,'0')}</span><span class="aib-name">${esc(st.name)}</span><div style="flex:1;min-width:220px"><label class="form-label" style="margin-bottom:4px">NOM DE L’EXERCICE</label><input class="form-input" id="m_aft_ex_name_${idx}" value="${esc(defaultExerciseName(st,idx))}" placeholder="Ex: Lob avant vitre, jeu des zones..."></div>${isApplication?`<button type="button" class="btn btn-ghost btn-sm" onclick="copyModalStartGameToApplication()">COPIER JEU DE DÉPART</button>`:''}</div>
         <div style="font-size:10px;color:var(--bronze);letter-spacing:1.4px;margin-bottom:10px">${esc(st.time)}${st.focus?` · ${esc(st.focus)}`:''}</div>
         <div class="aft-prep-grid">
           <div style="min-width:0">
@@ -5138,6 +5149,9 @@ function readModalPrep(idx){
   const read=key=>document.getElementById(`m_aft_prep_${idx}_${key}`)?.value||'';
   return {objective:read('objective'),setup:read('setup'),flow:read('flow'),rule:read('rule'),coach:read('coach'),questions:read('questions'),benefits:read('benefits')};
 }
+function readModalExerciseName(idx,step=null){
+  return document.getElementById(`m_aft_ex_name_${idx}`)?.value.trim()||defaultExerciseName(step,idx);
+}
 function setModalPrep(idx,prep){
   ['objective','setup','flow','rule','coach','questions','benefits'].forEach(key=>{
     const el=document.getElementById(`m_aft_prep_${idx}_${key}`);
@@ -5315,6 +5329,7 @@ function createSession(){
     return {
     pillar,
     aspect,
+    exerciseName:sessionType==='aft'?readModalExerciseName(idx,st):'',
     exercise,
     prep:sessionType==='aft'?modalPrep:null,
     subAspects:{},
@@ -5336,7 +5351,7 @@ function ensureSessionBlock(s,blockIdx){
   if(!s.blocks[blockIdx]) s.blocks[blockIdx]={pillar:fallback.id,aspect:'',exercise:'',scores:{},coachState:''};
   return s.blocks[blockIdx];
 }
-function updateSessionBlock(sessionId,blockIdx,field,value){const s=STATE.sessions.find(s=>s.id===sessionId);const b=ensureSessionBlock(s,blockIdx);if(!b)return;if(field==='exercise'){b.exercise=value;b.prep=null;}else if(field==='aspect')b.aspect=value;else if(field.startsWith('prep.')){const key=field.split('.')[1];b.prep=b.prep&&typeof b.prep==='object'?b.prep:{};b.prep[key]=value;b.exercise=prepToExerciseText(b.prep);}saveState();}
+function updateSessionBlock(sessionId,blockIdx,field,value){const s=STATE.sessions.find(s=>s.id===sessionId);const b=ensureSessionBlock(s,blockIdx);if(!b)return;if(field==='exercise'){b.exercise=value;b.prep=null;}else if(field==='aspect')b.aspect=value;else if(field==='exerciseName')b.exerciseName=value;else if(field.startsWith('prep.')){const key=field.split('.')[1];b.prep=b.prep&&typeof b.prep==='object'?b.prep:{};b.prep[key]=value;b.exercise=prepToExerciseText(b.prep);}saveState();}
 function diagramCourtClick(evt,sessionId,blockIdx){
   const s=STATE.sessions.find(s=>s.id===sessionId); const b=ensureSessionBlock(s,blockIdx); if(!b) return;
   const svg=evt.currentTarget, r=svg.getBoundingClientRect();
