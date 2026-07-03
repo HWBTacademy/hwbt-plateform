@@ -2377,6 +2377,58 @@ function sessionStructureCard(s){
     </div>
   </div>`;
 }
+function prepToExerciseText(prep){
+  const p=prep||{};
+  const sections=[
+    ['MISE EN PLACE',p.setup],
+    ['DÉROULEMENT DU JEU',p.flow],
+    ['RÈGLE PRINCIPALE',p.rule],
+    ['POINTS D’ATTENTION',p.coach],
+    ['QUESTIONS À POSER',p.questions],
+    ['BIENFAITS POUR LE JOUEUR',p.benefits]
+  ];
+  return sections.map(([title,text])=>text?`${title}\n${text}`:'').filter(Boolean).join('\n\n');
+}
+function sessionPrepFromText(text,isCooling=false){
+  const fallbackSetup=isCooling?['Cercle coach rapide.','Retour au calme et attention des joueurs.']:['Organiser rapidement les joueurs.','Délimiter la zone et le format.'];
+  const fallbackFlow=isCooling?['Chaque joueur donne un ressenti court.','Le coach reprend une réussite et un point à améliorer.']:['Lancer le jeu avec une consigne courte.','Laisser jouer quelques points.','Faire un court arrêt avec une question.'];
+  const setup=pdfBulletsFrom(text,['MISE EN PLACE','ORGANISATION','FORMAT'],['DÉROULEMENT','DEROULEMENT','RÈGLE','REGLE','POINTS','QUESTIONS','BIENFAITS'],fallbackSetup,4);
+  const flow=pdfBulletsFrom(text,['DÉROULEMENT DU JEU','DEROULEMENT DU JEU','DÉROULEMENT','DEROULEMENT'],['MISE EN PLACE','RÈGLE PRINCIPALE','REGLE PRINCIPALE','POINTS','QUESTIONS','BIENFAITS'],fallbackFlow,5);
+  const rule=pdfBulletsFrom(text,['RÈGLE PRINCIPALE','REGLE PRINCIPALE','RÈGLE','REGLE','RÈGLE / SCORE','REGLE / SCORE'],['POINTS','QUESTIONS','PROGRESSION','BIENFAITS','FEEDBACK'],isCooling?['Feedback sandwich en fin de séance.']:['Le score récompense le bon choix.','Ajouter un bonus lié au thème.'],4);
+  const coach=pdfBulletsFrom(text,['POINTS D’ATTENTION',"POINTS D'ATTENTION",'POINTS COACH','OBSERVATION COACH','CRITÈRES DE RÉUSSITE'],['QUESTIONS','PROGRESSION','FEEDBACK','BIENFAITS'],isCooling?['Vérifier ce que les joueurs retiennent.','Terminer sur une note positive.']:['Observer avant de corriger.','Corriger un seul repère à la fois.'],4);
+  const questions=pdfBulletsFrom(text,['QUESTIONS À POSER',"QUESTIONS A POSER",'QUESTIONS'],['PROGRESSION','RÉGRESSION','REGRESSION','BIENFAITS','MESSAGE'],isCooling?['Qu’est-ce que tu retiens pour ton prochain match ?']:['Qu’est-ce qui vous a aidés à gagner le point ?','Quel choix était le plus simple ?'],4);
+  const benefits=pdfBulletsFrom(text,['BIENFAITS POUR LE JOUEUR','CE QUE J’APPRENDS','BIENFAITS','BIENFAITS + ADAPTATION'],['DÉROULEMENT','MISE EN PLACE','RÈGLE','REPÈRES'],isCooling?['Ancrer l’apprentissage.','Préparer la prochaine séance.']:['Comprendre le jeu avant le geste parfait.','Relier technique, tactique et décision.'],4);
+  const join=a=>a.map(x=>x.startsWith('-')?x:`- ${x}`).join('\n');
+  return {setup:join(setup),flow:join(flow),rule:join(rule),coach:join(coach),questions:join(questions),benefits:join(benefits)};
+}
+function ensureBlockPrep(block,isCooling=false){
+  if(!block.prep||typeof block.prep!=='object') block.prep=sessionPrepFromText(block.exercise||'',isCooling);
+  ['setup','flow','rule','coach','questions','benefits'].forEach(k=>{if(typeof block.prep[k]!=='string')block.prep[k]='';});
+  return block.prep;
+}
+function prepTextArea(sessionId,idx,key,label,value,rows=3){
+  return `<div class="form-group" style="margin-bottom:10px"><label class="form-label">${label}</label><textarea class="form-input" rows="${rows}" oninput="updateSessionBlock(${sessionId},${idx},'prep.${key}',this.value)">${esc(value||'')}</textarea></div>`;
+}
+function sessionPrepEditorHtml(s,idx,b,isCooling){
+  const prep=ensureBlockPrep(b,isCooling);
+  return `<div>
+    <div class="g3">
+      ${prepTextArea(s.id,idx,'setup','MISE EN PLACE',prep.setup,3)}
+      ${prepTextArea(s.id,idx,'flow','DÉROULEMENT',prep.flow,3)}
+      ${prepTextArea(s.id,idx,'rule','RÈGLE / SCORE',prep.rule,3)}
+    </div>
+    <div class="g3">
+      ${prepTextArea(s.id,idx,'coach','POINTS COACH',prep.coach,3)}
+      ${prepTextArea(s.id,idx,'questions','QUESTIONS',prep.questions,3)}
+      ${prepTextArea(s.id,idx,'benefits','BIENFAITS + ADAPTATION',prep.benefits,3)}
+    </div>
+  </div>`;
+}
+function sessionPrepReadOnlyHtml(b,isCooling){
+  const prep=ensureBlockPrep(b,isCooling);
+  const item=(label,text)=>`<div class="exercise-card"><div style="font-size:8px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:5px">${label}</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.5;white-space:pre-wrap">${esc(text||'—')}</div></div>`;
+  return `<div class="g3">${item('MISE EN PLACE',prep.setup)}${item('DÉROULEMENT',prep.flow)}${item('RÈGLE / SCORE',prep.rule)}${item('POINTS COACH',prep.coach)}${item('QUESTIONS',prep.questions)}${item('BIENFAITS + ADAPTATION',prep.benefits)}</div>`;
+}
 function sessionWorkBlocksHtml(s){
   const aft=s.sessionType==='aft';
   const steps=sessionStructure(s);
@@ -2401,7 +2453,7 @@ function sessionWorkBlocksHtml(s){
       <div class="aib-header"><span class="aib-pillar" style="background:var(--bronze-dim);color:var(--bronze)">${String(idx+1).padStart(2,'0')}</span><span class="aib-name">${esc(label)}</span>${!aft&&closed&&b.coachState?`<span style="margin-left:auto;font-size:10px;color:${pl.color};font-weight:700">${ASPECT_STATE_LABEL[b.coachState]} · ${score}/20</span>`:''}</div>
       <div style="font-size:10px;color:var(--bronze);letter-spacing:1.4px;margin-bottom:8px">${esc(sub)}</div>
       <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:10px">${esc(desc)}</div>
-      ${canEdit?`<div class="form-group"><label class="form-label">${isCooling?'BILAN / RETOUR AU CALME':(aft?'EXERCICE / DÉROULEMENT':'EXERCICE / CONSIGNE')}</label><textarea class="form-input" rows="${aft?7:2}" oninput="updateSessionBlock(${s.id},${idx},'exercise',this.value)" placeholder="${isCooling?'Question ouverte, feedback sandwich, point retenu par les joueurs...':''}">${esc(b.exercise||'')}</textarea><div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${actionButtons}</div></div>`:`${b.exercise?`<div class="exercise-card"><div style="font-size:8px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:5px">${isCooling?'BILAN DONNÉ':'EXERCICE DONNÉ'}</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.5;white-space:pre-wrap">${esc(b.exercise)}</div></div>`:''}`}
+      ${canEdit?(aft?`${sessionPrepEditorHtml(s,idx,b,isCooling)}<div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${actionButtons}</div>`:`<div class="form-group"><label class="form-label">EXERCICE / CONSIGNE</label><textarea class="form-input" rows="2" oninput="updateSessionBlock(${s.id},${idx},'exercise',this.value)">${esc(b.exercise||'')}</textarea><div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${actionButtons}</div></div>`):(aft?sessionPrepReadOnlyHtml(b,isCooling):`${b.exercise?`<div class="exercise-card"><div style="font-size:8px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:5px">${isCooling?'BILAN DONNÉ':'EXERCICE DONNÉ'}</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.5;white-space:pre-wrap">${esc(b.exercise)}</div></div>`:''}`)}
       ${isCooling?`<div style="background:var(--bg4);border-left:3px solid var(--bronze);border-radius:0 8px 8px 0;padding:12px;font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.65"><b style="color:var(--offwhite)">Pas de schéma terrain pour cette étape.</b><br>Le cooling down sert à revenir au calme, vérifier ce que les joueurs retiennent et fermer la séance avec un feedback sandwich.</div>`:diagramHtml(s,idx,canEdit)}
     </div>`;
   }).join('');
@@ -2548,14 +2600,14 @@ function professionalPrepHtml(s){
     const st=aft?steps[Math.min(i,steps.length-1)]:steps[i];
     const isCooling=aft&&i===steps.length-1;
     const exerciseText=b.exercise||'';
-    const setup=pdfBulletsFrom(exerciseText,['MISE EN PLACE','ORGANISATION','FORMAT'],['DÉROULEMENT','DEROULEMENT','RÈGLE','REGLE','POINTS'],['Format terrain à préciser.','Délimiter la zone et annoncer la règle simple.'],3);
-    const flow=pdfBulletsFrom(exerciseText,['DÉROULEMENT DU JEU','DEROULEMENT DU JEU','DÉROULEMENT','DEROULEMENT'],['MISE EN PLACE','RÈGLE PRINCIPALE','REGLE PRINCIPALE','REPÈRES','POINTS'],[exerciseText||'Exercice à préciser.'],4);
-    const rule=pdfBulletsFrom(exerciseText,['RÈGLE PRINCIPALE','REGLE PRINCIPALE','RÈGLE','REGLE'],['RÔLE','ROLE','POINTS','QUESTIONS','PROGRESSION','BIENFAITS'],isCooling?['Chaque joueur formule un repère retenu.','Le coach ferme avec un feedback sandwich.']:['Une règle simple donne du sens au jeu.','Le score récompense le bon choix, pas seulement le point gagné.'],3);
-    const attention=pdfBulletsFrom(exerciseText,['POINTS D’ATTENTION',"POINTS D'ATTENTION",'OBSERVATION COACH','CRITÈRES DE RÉUSSITE'],['QUESTIONS À POSER','PROGRESSION','FEEDBACK','BIENFAITS'],isCooling?['Question ouverte: qu’avez-vous retenu ?','Feedback sandwich: réussite, correction, encouragement.','Retour au calme et fermeture positive.']:['Observer le choix tactique avant de corriger.','Garder une consigne courte.','Adapter en R-1/R+1 selon réussite.'],4);
-    const questions=pdfBulletsFrom(exerciseText,['QUESTIONS À POSER',"QUESTIONS A POSER"],['PROGRESSION','RÉGRESSION','REGRESSION','BIENFAITS','MESSAGE'],isCooling?['Qu’est-ce que tu retiens pour le prochain match ?','Quel repère t’a aidé aujourd’hui ?']:['Qu’est-ce qui te permet de gagner du temps ?','Où dois-tu te placer avant la frappe ?'],3);
-    const benefits=pdfBulletsFrom(exerciseText,['BIENFAITS POUR LE JOUEUR','CE QUE J’APPRENDS','BIENFAITS'],['DÉROULEMENT','MISE EN PLACE','RÈGLE','REPÈRES'],isCooling?['Ancrer l’apprentissage avant de quitter le terrain.','Donner au joueur une image claire de sa progression.','Préparer le prochain entraînement avec une priorité simple.']:['Comprendre le jeu avant le geste parfait.','Relier technique, tactique et décision.','Repartir avec un repère clair.'],4);
-    const progression=pdfBulletsFrom(exerciseText,['PROGRESSION','RÉGRESSION','REGRESSION'],['MESSAGE','BIENFAITS','FEEDBACK'],['R-1: simplifier la contrainte.','R0: garder la règle de base.','R+1: ajouter pression, cible ou score.'],3);
-    const blockMaterials=pdfInferMaterials(exerciseText||materialSource);
+    const prep=ensureBlockPrep(b,isCooling);
+    const setup=pdfTextLines(prep.setup).length?pdfTextLines(prep.setup):pdfBulletsFrom(exerciseText,['MISE EN PLACE','ORGANISATION','FORMAT'],['DÉROULEMENT','DEROULEMENT','RÈGLE','REGLE','POINTS'],['Format terrain à préciser.','Délimiter la zone et annoncer la règle simple.'],3);
+    const flow=pdfTextLines(prep.flow).length?pdfTextLines(prep.flow):pdfBulletsFrom(exerciseText,['DÉROULEMENT DU JEU','DEROULEMENT DU JEU','DÉROULEMENT','DEROULEMENT'],['MISE EN PLACE','RÈGLE PRINCIPALE','REGLE PRINCIPALE','REPÈRES','POINTS'],[exerciseText||'Exercice à préciser.'],4);
+    const rule=pdfTextLines(prep.rule).length?pdfTextLines(prep.rule):pdfBulletsFrom(exerciseText,['RÈGLE PRINCIPALE','REGLE PRINCIPALE','RÈGLE','REGLE'],['RÔLE','ROLE','POINTS','QUESTIONS','PROGRESSION','BIENFAITS'],isCooling?['Chaque joueur formule un repère retenu.','Le coach ferme avec un feedback sandwich.']:['Une règle simple donne du sens au jeu.','Le score récompense le bon choix, pas seulement le point gagné.'],3);
+    const attention=pdfTextLines(prep.coach).length?pdfTextLines(prep.coach):pdfBulletsFrom(exerciseText,['POINTS D’ATTENTION',"POINTS D'ATTENTION",'OBSERVATION COACH','CRITÈRES DE RÉUSSITE'],['QUESTIONS À POSER','PROGRESSION','FEEDBACK','BIENFAITS'],isCooling?['Question ouverte: qu’avez-vous retenu ?','Feedback sandwich: réussite, correction, encouragement.','Retour au calme et fermeture positive.']:['Observer le choix tactique avant de corriger.','Garder une consigne courte.','Adapter en R-1/R+1 selon réussite.'],4);
+    const questions=pdfTextLines(prep.questions).length?pdfTextLines(prep.questions):pdfBulletsFrom(exerciseText,['QUESTIONS À POSER',"QUESTIONS A POSER"],['PROGRESSION','RÉGRESSION','REGRESSION','BIENFAITS','MESSAGE'],isCooling?['Qu’est-ce que tu retiens pour le prochain match ?','Quel repère t’a aidé aujourd’hui ?']:['Qu’est-ce qui te permet de gagner du temps ?','Où dois-tu te placer avant la frappe ?'],3);
+    const benefits=pdfTextLines(prep.benefits).length?pdfTextLines(prep.benefits):pdfBulletsFrom(exerciseText,['BIENFAITS POUR LE JOUEUR','CE QUE J’APPRENDS','BIENFAITS'],['DÉROULEMENT','MISE EN PLACE','RÈGLE','REPÈRES'],isCooling?['Ancrer l’apprentissage avant de quitter le terrain.','Donner au joueur une image claire de sa progression.','Préparer le prochain entraînement avec une priorité simple.']:['Comprendre le jeu avant le geste parfait.','Relier technique, tactique et décision.','Repartir avec un repère clair.'],4);
+    const blockMaterials=pdfInferMaterials(`${prep.setup} ${prep.flow} ${prep.rule}`||exerciseText||materialSource);
     const diagramPanel=isCooling?`<div class="cooldown-panel"><b>Cooling down</b><span>Pas de schéma terrain</span><p>Retour au calme, bilan sandwich et question ouverte pour vérifier ce que les joueurs retiennent.</p></div>`:printDiagramSvg(b);
     return `<section class="exercise">
     <div class="ex-title"><span>${String(i+1).padStart(2,'0')}</span><div><h3>${esc(st?.name||pl?.name||'Bloc')}</h3><p>${esc(st?.time||'')} · ${esc(st?.focus||pl?.name||b.pillar)} · ${esc(b.aspect||'Aspect à définir')}</p></div></div>
@@ -2564,7 +2616,7 @@ function professionalPrepHtml(s){
       <div class="text-panel">
         <div class="mini-strip"><b>Matériel</b>${pdfSmallTags(blockMaterials)}</div>
         <div class="exercise-cols"><div><h4>Mise en place</h4>${pdfBulletList(setup)}</div><div><h4>Déroulement</h4>${pdfBulletList(flow)}</div><div><h4>Règle / score</h4>${pdfBulletList(rule)}</div></div>
-        <div class="exercise-cols second"><div><h4>Points coach</h4>${pdfBulletList(attention)}</div><div><h4>Questions</h4>${pdfBulletList(questions)}</div><div><h4>Bienfaits + adaptation</h4>${pdfBulletList([...benefits.slice(0,2),...progression.slice(0,2)])}</div></div>
+        <div class="exercise-cols second"><div><h4>Points coach</h4>${pdfBulletList(attention)}</div><div><h4>Questions</h4>${pdfBulletList(questions)}</div><div><h4>Bienfaits + adaptation</h4>${pdfBulletList(benefits)}</div></div>
       </div>
     </div>
   </section>`}).join('');
@@ -5019,6 +5071,7 @@ function enhanceSessionBlockAft(sessionId,idx){
   const theme=aftThemeByKey(s.aftMeta?.themeKey)||AFT_THEMES[0];
   const steps=sessionStructure(s);
   b.exercise=enhanceAftText(b.exercise,{idx,step:steps[idx],theme,level:s.aftMeta?.level||'Débutant',technicalAspect:s.aftMeta?.technical||theme.technical,mentalAspect:s.aftMeta?.mental||theme.mental,teacherGoal:s.aftMeta?.teacherGoal||s.goal||'',constraint:s.aftMeta?.constraint||''});
+  b.prep=sessionPrepFromText(b.exercise,idx===steps.length-1);
   saveState();render();showNotif('Bloc séance corrigé et complété');
 }
 function detailedAftExerciseText(stepTitle,theme,level,technicalAspect,mentalAspect,teacherGoal,constraint,baseText,focus){
@@ -5183,7 +5236,7 @@ function ensureSessionBlock(s,blockIdx){
   if(!s.blocks[blockIdx]) s.blocks[blockIdx]={pillar:fallback.id,aspect:'',exercise:'',scores:{},coachState:''};
   return s.blocks[blockIdx];
 }
-function updateSessionBlock(sessionId,blockIdx,field,value){const s=STATE.sessions.find(s=>s.id===sessionId);const b=ensureSessionBlock(s,blockIdx);if(!b)return;if(field==='exercise')b.exercise=value;else if(field==='aspect')b.aspect=value;saveState();}
+function updateSessionBlock(sessionId,blockIdx,field,value){const s=STATE.sessions.find(s=>s.id===sessionId);const b=ensureSessionBlock(s,blockIdx);if(!b)return;if(field==='exercise'){b.exercise=value;b.prep=null;}else if(field==='aspect')b.aspect=value;else if(field.startsWith('prep.')){const key=field.split('.')[1];b.prep=b.prep&&typeof b.prep==='object'?b.prep:{};b.prep[key]=value;b.exercise=prepToExerciseText(b.prep);}saveState();}
 function diagramCourtClick(evt,sessionId,blockIdx){
   const s=STATE.sessions.find(s=>s.id===sessionId); const b=ensureSessionBlock(s,blockIdx); if(!b) return;
   const svg=evt.currentTarget, r=svg.getBoundingClientRect();
