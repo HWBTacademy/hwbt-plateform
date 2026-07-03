@@ -2600,10 +2600,11 @@ function professionalPrepHtml(s){
       <div>
         ${aft?`<section class="box"><h2>Repères AFT courts</h2><div class="repere-grid"><div><h4>Tactique</h4>${pdfBulletList(tacticBullets)}</div><div><h4>Technique</h4>${pdfBulletList(techniqueBullets)}</div></div><p class="small" style="margin-top:8px">${esc(meta.coachInfo||theme?.coachInfo||'Faire découvrir par le jeu et corriger par induction.')}</p></section>`:''}
         <section class="box"><h2>Légende schéma</h2><div class="key-points legend"><span>J1-J4: joueurs</span><span>CO / L / PAN: coach, lanceur, panier</span><span>Jaune: balle</span><span>Orange: lancer</span><span>Blanc pointillé: course</span></div></section>
+        <section class="box"><h2>Bilan sandwich & évaluation</h2><div class="key-points legend"><span><b>1. Encourager</b><br>comportement réussi</span><span><b>2. Guider</b><br>question ou règle</span><span><b>3. Valoriser</b><br>repère à répéter</span><span><b>Évaluer</b><br>non acquis / évolution / acquis</span><span><b>Suite</b><br>point à reprendre</span></div></section>
       </div>
     </div>
     <div class="exercise-page"><div class="section-banner"><h2>Exercices</h2><span>FICHES TERRAIN</span></div>${blockRows}</div>
-    <section class="box"><h2>Bilan sandwich & évaluation</h2><div class="key-points legend"><span><b>1. Encourager</b><br>comportement réussi</span><span><b>2. Guider</b><br>question ou règle</span><span><b>3. Valoriser</b><br>repère à répéter</span><span><b>Évaluer</b><br>pas acquis / évolution / acquis</span><span><b>Suite</b><br>point à reprendre</span></div></section></div>
+    </div>
   </div><script>setTimeout(()=>window.print(),300)<\/script></body></html>`;
 }
 function printSessionPdf(sessionId){
