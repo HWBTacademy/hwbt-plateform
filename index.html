@@ -2700,6 +2700,7 @@ function scoreBar(label,val,color='var(--bronze)'){
 function statusBadge(s){
   if(s==='completed') return `<span class="badge" style="background:#27ae6022;color:#27ae60;border:1px solid #27ae6044">CLÔTURÉE</span>`;
   if(s==='closed_coach') return `<span class="badge" style="background:#d4a01722;color:#d4a017;border:1px solid #d4a01744">ATTENTE RETOUR JOUEUR</span>`;
+  if(s==='ready') return `<span class="badge" style="background:#27ae6022;color:#27ae60;border:1px solid #27ae6044">PRÊTE À DONNER</span>`;
   if(s==='planned') return `<span class="badge" style="background:var(--bronze-dim);color:var(--bronze);border:1px solid var(--bronze-dim2)">PLANIFIÉE</span>`;
   if(s==='open') return `<span class="badge" style="background:#2980b922;color:#2980b9;border:1px solid #2980b944">EN COURS</span>`;
   return `<span class="badge" style="background:var(--border);color:var(--gray)">—</span>`;
@@ -3016,7 +3017,7 @@ function pagePlayerPortal(){
 function nextSessionForPlayer(player){
   const today=todayIso();
   const upcoming=STATE.sessions
-    .filter(s=>playerInSession(s,player.id)&&['planned','open'].includes(s.status))
+    .filter(s=>playerInSession(s,player.id)&&['planned','ready','open'].includes(s.status))
     .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   return upcoming.find(s=>String(s.date)>=today)||upcoming[0]||null;
 }
@@ -3078,7 +3079,7 @@ function coachDailyFocusRows(){
   const rows=[];
   const today=todayIso();
   STATE.sessions.filter(s=>s.status==='open').slice(0,3).forEach(s=>rows.push({title:`Évaluer ${sessionTitle(s)}`,text:'Séance ouverte: va au point 5 et clôture les aspects travaillés.',button:'ÉVALUER',action:`setUI({page:'sessions',selectedSessionId:${s.id},sessionMode:'field',fieldBlock:${(s.blocks||[]).length}})`,color:'var(--rouge)'}));
-  STATE.sessions.filter(s=>s.status==='planned'&&s.date===today).slice(0,3).forEach(s=>rows.push({title:`Ouvrir ${sessionTitle(s)}`,text:'Séance prévue aujourd’hui: lance le mode terrain.',button:'OUVRIR',action:`setUI({page:'sessions',selectedSessionId:${s.id}})`,color:'var(--bronze)'}));
+  STATE.sessions.filter(s=>(s.status==='planned'||s.status==='ready')&&s.date===today).slice(0,3).forEach(s=>rows.push({title:`Ouvrir ${sessionTitle(s)}`,text:s.status==='ready'?'Cours prêt: lance le mode terrain au bon moment.':'Séance prévue aujourd’hui: finalise ou lance le mode terrain.',button:'OUVRIR',action:`setUI({page:'sessions',selectedSessionId:${s.id}})`,color:s.status==='ready'?'var(--vert)':'var(--bronze)'}));
   STATE.sessions.filter(s=>s.status==='closed_coach').slice(0,3).forEach(s=>rows.push({title:`Retour joueur · ${sessionTitle(s)}`,text:`Manquant: ${missingFeedbackPlayers(s).map(p=>p.name).join(', ')||'joueur'}.`,button:'VOIR',action:`setUI({page:'sessions',selectedSessionId:${s.id}})`,color:'var(--jaune)'}));
   STATE.players.filter(p=>!p.profileId).slice(0,3).forEach(p=>rows.push({title:`Test mental · ${p.name}`,text:'Profil mental à faire pour mieux adapter la communication.',button:'FICHE',action:`setUI({page:'players',selectedPlayerId:${p.id},subpage:'profil'})`,color:'var(--bleu)'}));
   return rows.slice(0,5);
@@ -3134,8 +3135,8 @@ function pageDashboard(){
   const today=todayIso();
   const recent=sessions.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,4);
   const noProfile=players.filter(p=>!p.profileId);
-  const planned=sessions.filter(s=>s.status==='planned').sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-  const todaySessions=sessions.filter(s=>s.date===today&&['planned','open'].includes(s.status)).sort((a,b)=>String(a.status).localeCompare(String(b.status)));
+  const planned=sessions.filter(s=>s.status==='planned'||s.status==='ready').sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const todaySessions=sessions.filter(s=>s.date===today&&['planned','ready','open'].includes(s.status)).sort((a,b)=>String(a.status).localeCompare(String(b.status)));
   const open=sessions.filter(s=>s.status==='open').sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   const waitingPlayer=sessions.filter(s=>s.status==='closed_coach').sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   const incompletePlayers=players.map(p=>({player:p,missing:playerMissingData(p)})).filter(x=>x.missing.length).sort((a,b)=>b.missing.length-a.missing.length);
@@ -3650,37 +3651,100 @@ function sessionFilterKey(s){
   if(s.status==='closed_coach') return 'feedback';
   if(s.status==='completed') return 'done';
   if(s.status==='open') return 'open';
+  if(s.status==='ready') return 'ready';
   if(s.status==='planned'&&s.date===today) return 'today';
   if(s.status==='planned') return 'prep';
   return 'all';
 }
 function sessionFilterLabel(key){
-  return ({all:'TOUTES',prep:'À PRÉPARER',today:"AUJOURD'HUI",open:'OUVERTES',feedback:'RETOUR JOUEUR',done:'CLÔTURÉES'})[key]||key.toUpperCase();
+  return ({all:'TOUTES',prep:'À PRÉPARER',ready:'PRÊTES',today:"AUJOURD'HUI",open:'OUVERTES',feedback:'RETOUR JOUEUR',done:'CLÔTURÉES'})[key]||key.toUpperCase();
 }
 function sessionCardScoreHtml(s){
   return `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:12px">${PILLARS.map(pl=>{const b=(s.blocks||[]).find(x=>x.pillar===pl.id);const score=b?measuredBlockScore(b):null;const label=b?.aspect||pl.name;const pct=score!==null?Math.max(6,Math.min(100,(score/20)*100)):0;return `<div style="background:var(--bg4);border:1px solid ${pl.color}44;border-radius:7px;padding:8px;min-width:0"><div style="font-size:8px;letter-spacing:1.1px;color:${pl.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pl.name}</div><div style="font-size:16px;font-weight:800;margin-top:4px">${score!==null?formatScore(score):'—'}</div><div style="font-size:8px;color:var(--gray3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">${esc(label)}</div><div style="height:2px;background:var(--border2);border-radius:2px;margin-top:6px"><div style="height:2px;width:${pct}%;background:${pl.color};border-radius:2px"></div></div></div>`}).join('')}</div>`;
 }
 function sessionCardActions(s){
   if(STATE.role==='player') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'briefing'})">OUVRIR</button>`;
-  if(s.status==='planned') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'preparation'})">PRÉPARER</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();printSessionPdf(${s.id})">PDF</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();enterFieldMode(${s.id})">TERRAIN</button>`;
+  if(s.status==='planned') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'preparation'})">PRÉPARER</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();markSessionReady(${s.id})">PRÊT</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();printSessionPdf(${s.id})">PDF</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();enterFieldMode(${s.id})">TERRAIN</button>`;
+  if(s.status==='ready') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();enterFieldMode(${s.id})">TERRAIN</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'preparation'})">MODIFIER</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();printSessionPdf(${s.id})">PDF</button>`;
   if(s.status==='open') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'evaluation'})">ÉVALUER</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();printSessionPdf(${s.id})">PDF</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();enterFieldMode(${s.id})">TERRAIN</button>`;
   if(s.status==='closed_coach') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'retours'})">RETOURS</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();printSessionPdf(${s.id})">PDF</button>`;
   return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'resume'})">RÉSUMÉ</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();printSessionPdf(${s.id})">PDF</button>`;
 }
+function monthKeyFromDate(dateStr){
+  return String(dateStr||new Date().toISOString().slice(0,10)).slice(0,7);
+}
+function shiftMonthKey(key,delta){
+  const [y,m]=String(key||monthKeyFromDate()).split('-').map(Number);
+  const d=new Date(y||new Date().getFullYear(),(m||1)-1+delta,1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function monthLabel(key){
+  const [y,m]=String(key||monthKeyFromDate()).split('-').map(Number);
+  return new Date(y,(m||1)-1,1).toLocaleDateString('fr-BE',{month:'long',year:'numeric'});
+}
+function agendaSessionDot(s){
+  const colors={planned:'var(--bronze)',ready:'var(--vert)',open:'var(--bleu)',closed_coach:'var(--jaune)',completed:'var(--gray3)'};
+  return colors[s.status]||'var(--border3)';
+}
+function sessionsAgendaMonthHtml(visible){
+  const key=UI.agendaMonth||monthKeyFromDate(new Date().toISOString().slice(0,10));
+  const [year,month]=key.split('-').map(Number);
+  const first=new Date(year,month-1,1);
+  const daysInMonth=new Date(year,month,0).getDate();
+  const start=(first.getDay()+6)%7;
+  const cells=[];
+  for(let i=0;i<start;i++) cells.push(null);
+  for(let d=1;d<=daysInMonth;d++) cells.push(d);
+  while(cells.length%7) cells.push(null);
+  const sessionsByDate={};
+  visible.filter(s=>monthKeyFromDate(s.date)===key).forEach(s=>{(sessionsByDate[s.date]=sessionsByDate[s.date]||[]).push(s);});
+  const weekDays=['LUN','MAR','MER','JEU','VEN','SAM','DIM'];
+  return `<div class="card" style="border-color:var(--bronze-dim2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+      <div><div class="card-title">AGENDA HWBT</div><div style="font-size:28px;font-weight:900;text-transform:uppercase;line-height:1">${esc(monthLabel(key))}</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({agendaMonth:'${shiftMonthKey(key,-1)}'})">← MOIS</button><button class="btn btn-primary btn-sm" onclick="setUI({agendaMonth:'${monthKeyFromDate()}'})">AUJOURD'HUI</button><button class="btn btn-ghost btn-sm" onclick="setUI({agendaMonth:'${shiftMonthKey(key,1)}'})">MOIS →</button></div>
+    </div>
+    <div style="overflow-x:auto;padding-bottom:4px">
+    <div style="min-width:760px">
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px">${weekDays.map(d=>`<div style="font-size:9px;letter-spacing:1.5px;color:var(--bronze);text-align:center">${d}</div>`).join('')}</div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
+      ${cells.map(day=>{
+        if(!day) return `<div style="min-height:118px;border:1px solid transparent"></div>`;
+        const date=`${key}-${String(day).padStart(2,'0')}`;
+        const list=(sessionsByDate[date]||[]).sort((a,b)=>String(a.time||'').localeCompare(String(b.time||'')));
+        const today=date===new Date().toISOString().slice(0,10);
+        return `<div style="min-height:118px;background:${today?'linear-gradient(180deg,var(--bronze-dim),var(--bg4))':'var(--bg4)'};border:1px solid ${today?'var(--bronze-dim2)':'var(--border)'};border-radius:8px;padding:8px;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px"><span style="font-size:17px;font-weight:900;color:${today?'var(--bronze)':'var(--white)'}">${day}</span>${list.length?`<span style="font-size:8px;color:var(--gray);letter-spacing:1px">${list.length} COURS</span>`:''}</div>
+          <div style="display:grid;gap:5px">${list.slice(0,4).map(s=>{const ps=sessionPlayers(s);return `<button onclick="setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'briefing'})" style="width:100%;text-align:left;background:#050507;border:1px solid ${agendaSessionDot(s)}55;border-left:3px solid ${agendaSessionDot(s)};border-radius:5px;padding:6px;color:var(--offwhite);cursor:pointer;min-width:0">
+            <div style="font-size:9px;color:${agendaSessionDot(s)};letter-spacing:1px">${esc(s.time||'HEURE ?')} · ${sessionTypeLabel(s.sessionType)}</div>
+            <div style="font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(sessionTitle(s))}</div>
+            <div style="font-size:8px;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ps.map(p=>p.firstName||p.name).join(' · ')||sessionThemeLabel(s))}</div>
+          </button>`}).join('')}${list.length>4?`<div style="font-size:8px;color:var(--bronze);letter-spacing:1px">+${list.length-4} autres</div>`:''}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:9px;color:var(--gray);font-family:var(--font-body)">${[['planned','Planifié'],['ready','Prêt'],['open','En cours'],['closed_coach','Retour joueur'],['completed','Clôturé']].map(([k,l])=>`<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${agendaSessionDot({status:k})};margin-right:5px"></span>${l}</span>`).join('')}</div>
+  </div>`;
+}
 function pageSessionsList(){
   const visible=STATE.role==='player'&&STATE.activePlayerId?STATE.sessions.filter(s=>playerInSession(s,STATE.activePlayerId)):STATE.sessions;
   const active=UI.sessionFilter||'all';
-  const counts={all:visible.length,prep:0,today:0,open:0,feedback:0,done:0};
+  const counts={all:visible.length,prep:0,ready:0,today:0,open:0,feedback:0,done:0};
   visible.forEach(s=>{const k=sessionFilterKey(s); if(counts[k]!==undefined) counts[k]++;});
   const filtered=active==='all'?visible:visible.filter(s=>sessionFilterKey(s)===active);
   const sorted=filtered.slice().sort((a,b)=>`${b.date||''} ${b.time||''}`.localeCompare(`${a.date||''} ${a.time||''}`));
-  const filters=['all','prep','today','open','feedback','done'];
+  const filters=['all','prep','ready','today','open','feedback','done'];
+  const view=UI.sessionView||'list';
   return `<div class="content">
     ${quoteBand()}
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:18px">
       <div><div style="font-size:30px;font-weight:800;letter-spacing:1px;line-height:1">Sessions</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-top:6px">Scan rapide: thème, joueurs, statut, piliers et actions utiles.</div></div>
       ${STATE.role==='coach'?`<button class="btn btn-primary" onclick="openModal('newSession')">+ NOUVELLE SÉANCE</button>`:''}
     </div>
+    <div class="tabs"><button class="tab ${view==='list'?'active':''}" onclick="setUI({sessionView:'list'})">LISTE</button><button class="tab ${view==='agenda'?'active':''}" onclick="setUI({sessionView:'agenda'})">AGENDA</button></div>
+    ${view==='agenda'?sessionsAgendaMonthHtml(visible):`
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">${filters.map(f=>`<button class="tab ${active===f?'active':''}" onclick="setUI({sessionFilter:'${f}'})">${sessionFilterLabel(f)} <span style="opacity:.65">${counts[f]||0}</span></button>`).join('')}</div>
     <div class="g2">
       ${sorted.length?sorted.map(s=>{const ps=sessionPlayers(s);const p=ps[0];if(!p)return '';const pr=PROFILES.find(pr=>pr.id===p.profileId);const c1=pr?ENERGY_COLORS[pr.c1]:'var(--bronze)';const theme=sessionThemeLabel(s);const players=ps.map(x=>x.firstName||x.name.split(' ')[0]||x.name).join(' · ');return `<div onclick="setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'briefing'})" style="position:relative;overflow:hidden;background:linear-gradient(135deg,var(--bg2),#08090d);border:1px solid ${c1}55;border-radius:10px;padding:16px;cursor:pointer;min-height:230px">
@@ -3690,7 +3754,7 @@ function pageSessionsList(){
         ${sessionCardScoreHtml(s)}
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap"><div style="font-size:9px;color:var(--gray3);letter-spacing:1px">${ps.length} JOUEUR${ps.length>1?'S':''}</div><div style="display:flex;gap:7px;flex-wrap:wrap">${sessionCardActions(s)}</div></div>
       </div>`}).join(''):`<div class="card" style="color:var(--gray);font-family:var(--font-body)">Aucune séance dans ce filtre.</div>`}
-    </div>
+    </div>`}
   </div>`;
 }
 function sessionSynthesisHtml(s){
@@ -3787,7 +3851,7 @@ function pageSessionDetail(sessionId){
   const tab=UI.sessionTab||defaultSessionTab(s);
   const tabs=[['briefing','Briefing'],['preparation','Préparation'],['terrain','Terrain'],['evaluation','Évaluation'],['retours','Retours'],['resume','Résumé']];
   return `<div class="content">${quoteBand()}
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:null,sessionMode:null,sessionTab:null})">← RETOUR</button><div style="flex:1"><div style="font-size:22px;font-weight:800;letter-spacing:1px;line-height:1.05">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2);margin-top:4px">${esc(sessionDateLine(s))} · ${sessionTypeLabel(s.sessionType)} · ${statusBadge(s.status)}</div></div><button class="btn btn-primary" onclick="printSessionPdf(${s.id})">PDF SÉANCE</button>${s.status==='planned'||s.status==='open'?`<button class="btn btn-ghost" onclick="enterFieldMode(${s.id})">MODE TERRAIN</button>`:''}${s.status==='closed_coach'||s.status==='completed'?`<button class="btn btn-ghost" onclick="toggleSessionEdit(${s.id})">${s.editMode?'TERMINER MODIF':'MODIFIER'}</button>`:''}<button class="btn btn-danger" onclick="deleteSession(${s.id})">SUPPRIMER</button></div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:null,sessionMode:null,sessionTab:null})">← RETOUR</button><div style="flex:1"><div style="font-size:22px;font-weight:800;letter-spacing:1px;line-height:1.05">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2);margin-top:4px">${esc(sessionDateLine(s))} · ${sessionTypeLabel(s.sessionType)} · ${statusBadge(s.status)}</div></div>${s.status==='planned'?`<button class="btn btn-primary" onclick="markSessionReady(${s.id})">COURS PRÊT</button>`:''}<button class="btn btn-primary" onclick="printSessionPdf(${s.id})">PDF SÉANCE</button>${s.status==='planned'||s.status==='ready'||s.status==='open'?`<button class="btn btn-ghost" onclick="enterFieldMode(${s.id})">MODE TERRAIN</button>`:''}${s.status==='closed_coach'||s.status==='completed'?`<button class="btn btn-ghost" onclick="toggleSessionEdit(${s.id})">${s.editMode?'TERMINER MODIF':'MODIFIER'}</button>`:''}<button class="btn btn-danger" onclick="deleteSession(${s.id})">SUPPRIMER</button></div>
     <div class="tabs" style="margin-bottom:18px;overflow:auto">${tabs.map(t=>sessionDetailTabButton(t[0],t[1],tab)).join('')}</div>
     ${sessionDetailContent(s,tab,group,main,pr)}
   </div>`;
@@ -3826,7 +3890,8 @@ function pagePlayerSessionSummary(s){
 }
 
 function sessionClosure(s){
-  if(s.status==='planned') return STATE.role==='coach'?`<div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.7;margin-bottom:16px">La séance est prête. Ouvre-la au moment du terrain.</div><button class="btn btn-primary" onclick="startSession(${s.id})">OUVRIR LA SÉANCE</button>`:`<div style="font-size:12px;color:var(--gray);font-family:var(--font-body)">Séance planifiée par le coach.</div>`;
+  if(s.status==='planned') return STATE.role==='coach'?`<div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.7;margin-bottom:16px">La séance est encore en préparation. Quand ton dossier est complet, marque-la prête pour la retrouver clairement dans l'agenda.</div><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" onclick="markSessionReady(${s.id})">COURS PRÊT À DONNER</button><button class="btn btn-ghost" onclick="startSession(${s.id})">OUVRIR QUAND MÊME</button></div>`:`<div style="font-size:12px;color:var(--gray);font-family:var(--font-body)">Séance planifiée par le coach.</div>`;
+  if(s.status==='ready') return STATE.role==='coach'?`<div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.7;margin-bottom:16px">Cours prêt à donner. Tu peux ouvrir le mode terrain au moment de commencer.</div><button class="btn btn-primary" onclick="startSession(${s.id})">DÉMARRER LA SÉANCE</button>`:`<div style="font-size:12px;color:var(--gray);font-family:var(--font-body)">Séance prête à donner.</div>`;
   if(s.status==='completed') return `<div style="font-size:12px;color:var(--gray);font-family:var(--font-body)">Séance clôturée et retour joueur enregistré.</div>`;
   if(STATE.role==='player') return renderPlayerClosure(s);
   return renderCoachClosure(s);
@@ -4234,7 +4299,7 @@ function generateAIBrief(context={}){
   const sessions=STATE.sessions||[];
   const noProfile=players.filter(p=>!p.profileId).slice(0,3).map(p=>p.name);
   const feedback=sessions.filter(s=>s.status==='closed_coach').slice(0,2).map(s=>sessionTitle(s));
-  const next=sessions.filter(s=>s.status==='planned'||s.status==='open').sort((a,b)=>String(a.date).localeCompare(String(b.date)))[0];
+  const next=sessions.filter(s=>s.status==='planned'||s.status==='ready'||s.status==='open').sort((a,b)=>String(a.date).localeCompare(String(b.date)))[0];
   const playerFocus=[...new Set([...noProfile,...feedback])].filter(Boolean).slice(0,4);
   return {
     id:commandId('brief'),date:todayISO(),createdAt:new Date().toISOString(),done:false,
@@ -4314,7 +4379,7 @@ function saveCommandDecision(){
 function markCommandItemDone(collection,id){const cc=commandState();const arr=cc[collection]||[];const item=arr.find(x=>x.id===id);if(item){item.done=!item.done;saveState();render();}}
 function commandTabs(){const tabs=[['brief','Morning Brief'],['brain','CEO Brain'],['players','Players Intelligence'],['content','Content Lab'],['strategy','Strategy Room']];const active=UI.commandTab||'brief';return `<div class="tabs" style="margin-bottom:18px;overflow:auto">${tabs.map(t=>`<button class="tab ${active===t[0]?'active':''}" onclick="setUI({commandTab:'${t[0]}'})">${t[1]}</button>`).join('')}</div>`;}
 function commandCard(title,body,color='var(--bronze)'){return `<div class="card" style="border-color:${color}55;margin-bottom:14px"><div class="card-title" style="color:${color}">${title}</div>${body}</div>`;}
-function commandStatusText(status){return ({planned:'planifiée',open:'ouverte',closed_coach:'retour joueur attendu',completed:'clôturée'})[status]||status||'—';}
+function commandStatusText(status){return ({planned:'planifiée',ready:'prête à donner',open:'ouverte',closed_coach:'retour joueur attendu',completed:'clôturée'})[status]||status||'—';}
 function pageCommandCenter(){
   if(STATE.role!=='coach') return pageDashboard();
   const cc=commandState();
@@ -5469,9 +5534,17 @@ function addDiagramTemplate(sessionId,blockIdx){
 function undoDiagramItem(sessionId,blockIdx){const s=STATE.sessions.find(s=>s.id===sessionId);const b=ensureSessionBlock(s,blockIdx);if(!b)return;b.diagramItems=Array.isArray(b.diagramItems)?b.diagramItems:[];b.diagramItems.pop();saveState();render();}
 function clearDiagram(sessionId,blockIdx){const s=STATE.sessions.find(s=>s.id===sessionId);const b=ensureSessionBlock(s,blockIdx);if(!b)return;if(!confirm('Vider le schéma de cet exercice ?'))return;b.diagramItems=[];saveState();render();}
 function toggleSessionEdit(id){const s=STATE.sessions.find(s=>s.id===id);if(!s)return;s.editMode=!s.editMode;showNotif(s.editMode?'Modification activée':'Modification terminée');render();}
-function enterFieldMode(id){const s=STATE.sessions.find(s=>s.id===id);if(!s)return;if(s.status==='planned')s.status='open';showNotif('Mode terrain ouvert');setUI({page:'sessions',selectedSessionId:id,sessionMode:'field',fieldBlock:0});}
+function markSessionReady(id){
+  const s=STATE.sessions.find(s=>s.id===id);
+  if(!s) return;
+  s.status='ready';
+  saveState();
+  showNotif('Cours marqué prêt à donner');
+  render();
+}
+function enterFieldMode(id){const s=STATE.sessions.find(s=>s.id===id);if(!s)return;if(s.status==='planned'||s.status==='ready'){s.status='open';saveState();}showNotif('Mode terrain ouvert');setUI({page:'sessions',selectedSessionId:id,sessionMode:'field',fieldBlock:0});}
 function saveFieldNotes(id,value){const s=STATE.sessions.find(s=>s.id===id);if(s){s.fieldNotes=value;saveState();}}
-function startSession(id){const s=STATE.sessions.find(s=>s.id===id);if(!s)return;s.status='open';showNotif('Séance ouverte');setUI({page:'sessions',selectedSessionId:id,sessionMode:'field',fieldBlock:0});}
+function startSession(id){const s=STATE.sessions.find(s=>s.id===id);if(!s)return;s.status='open';saveState();showNotif('Séance ouverte');setUI({page:'sessions',selectedSessionId:id,sessionMode:'field',fieldBlock:0});}
 function setCoachState(id,pillar,state){const s=STATE.sessions.find(s=>s.id===id);if(!s)return;const b=(s.blocks||[]).find(b=>b.pillar===pillar);if(b)applyQuickStateToBlock(b,state);render();}
 function setBlockEval(id,pillar,field,value,playerId=null){const s=STATE.sessions.find(s=>s.id===id);if(!s)return;const b=(s.blocks||[]).find(b=>b.pillar===pillar);if(!b)return;const target=playerId?ensurePlayerBlockEval(b,playerId):b;if(['exec','comp','press'].includes(field)){target.scores=target.scores||{};target.scores[field]=Math.max(0,Math.min(10,parseInt(value)||0));const score=measuredBlockScore({...b,...target});if(score!==null)target.coachState=stateFromScore(score);}else if(field==='quickState'){applyQuickStateToBlock(target,value);}else if(field==='secondaryAspect'){target.secondaryAspect=value;target.secondaryStatus=value?(target.secondaryStatus&&target.secondaryStatus!=='not_expressed'?target.secondaryStatus:'seen'):'not_expressed';}else if(field==='secondaryStatus'){target.secondaryStatus=value;}render();}
 function saveCoachDraft(id){const s=STATE.sessions.find(s=>s.id===id);const el=document.getElementById('coachNotes_'+id);if(s&&el){s.coachFeedback.notes=el.value;showNotif('Sauvegardé');}}
