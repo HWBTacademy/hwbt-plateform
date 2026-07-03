@@ -339,6 +339,7 @@ body{min-width:0}
       <div class="nav-item" data-page="dashboard" onclick="setUI({page:'dashboard'})" style="display: flex;"><span class="nav-icon">◈</span>DASHBOARD</div>
       <div class="nav-item active" data-page="players" onclick="setUI({page:'players',selectedPlayerId:null,subpage:'profil'})" style="display: flex;"><span class="nav-icon">◉</span>PLAYERS</div>
       <div class="nav-item" data-page="sessions" onclick="setUI({page:'sessions'})" style="display: flex;"><span class="nav-icon">▦</span>SESSIONS</div>
+      <div class="nav-item" data-page="commandCenter" onclick="setUI({page:'commandCenter',commandTab:'brief'})" style="display: flex;"><span class="nav-icon">◆</span>COMMAND CENTER</div>
       <div class="nav-item" data-page="shop" onclick="setUI({page:'shop'})" style="display: flex;"><span class="nav-icon">◫</span>SHOP</div>
     </div>
     <div class="nav-section">
@@ -478,7 +479,8 @@ let STATE = {
   ],
   matches: [],
   customExercises: [],
-  testResults: {}
+  testResults: {},
+  commandCenter: {briefs:[],chats:[],debriefs:[],contentIdeas:[],decisions:[],tasks:[]}
 };
 
 let UI = {page:'dashboard', subpage:'profil', pillarFilter:'T', selectedPlayerId:null, selectedSessionId:null, testState:null};
@@ -486,13 +488,15 @@ const STORAGE_KEY='hwbt_academy_v3_state';
 let REMOTE_SAVE_TIMER=null;
 let REMOTE_READY=false;
 function statePayload(){
-  return {players:STATE.players,sessions:STATE.sessions,matches:STATE.matches,customExercises:STATE.customExercises||[],testResults:STATE.testResults,updatedAt:new Date().toISOString()};
+  return {players:STATE.players,sessions:STATE.sessions,matches:STATE.matches,customExercises:STATE.customExercises||[],testResults:STATE.testResults,commandCenter:STATE.commandCenter||{},updatedAt:new Date().toISOString()};
 }
 function applySavedState(saved){
   if(!saved||typeof saved!=='object') return false;
   ['players','sessions','matches','customExercises'].forEach(k=>{if(Array.isArray(saved[k]))STATE[k]=saved[k];});
   if(saved.testResults&&typeof saved.testResults==='object')STATE.testResults=saved.testResults;
+  if(saved.commandCenter&&typeof saved.commandCenter==='object')STATE.commandCenter={briefs:[],chats:[],debriefs:[],contentIdeas:[],decisions:[],tasks:[],...saved.commandCenter};
   if(!Array.isArray(STATE.customExercises)) STATE.customExercises=[];
+  if(!STATE.commandCenter) STATE.commandCenter={briefs:[],chats:[],debriefs:[],contentIdeas:[],decisions:[],tasks:[]};
   return true;
 }
 function saveState(){
@@ -2511,6 +2515,20 @@ function pdfBulletsFrom(text,startLabels,endLabels,fallback=[],limit=4){
 function pdfBulletList(items){
   return `<ul>${(items||[]).filter(Boolean).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
 }
+function pdfInferMaterials(text){
+  const source=String(text||'').toLowerCase();
+  const items=['Raquettes','Balles'];
+  if(/c[oô]ne|plot/.test(source)) items.push('Cônes / plots');
+  if(/cible|zone|carr[eé]|marque/.test(source)) items.push('Cibles / zones');
+  if(/panier|basket/.test(source)) items.push('Panier');
+  if(/lichette|ligne/.test(source)) items.push('Lichettes / lignes');
+  if(/c[aâ]ble|corde|rubalise/.test(source)) items.push('Câbles / rubalises');
+  if(/chrono|temps|timer/.test(source)) items.push('Chrono');
+  return [...new Set(items)].slice(0,6);
+}
+function pdfSmallTags(items){
+  return `<div class="tag-row">${(items||[]).filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join('')}</div>`;
+}
 function professionalPrepHtml(s){
   const players=sessionPlayers(s);
   const blocks=s.blocks||[];
@@ -2518,23 +2536,36 @@ function professionalPrepHtml(s){
   const meta=s.aftMeta||{};
   const steps=sessionStructure(s);
   const theme=aftThemeByKey(meta.themeKey);
-  const materialSource=[meta.constraint||'',...blocks.map(b=>b.exercise||'')].join(' ').toLowerCase();
-  const materials=['Balles','Cônes','Cibles/zones'];
-  if(/panier|basket/.test(materialSource)) materials.push('Panier');
-  if(/câble|cable/.test(materialSource)) materials.push('Câbles');
-  if(/rubalise|marque|fl[eé]chage/.test(materialSource)) materials.push('Rubalises / marques au sol');
-  if(/lichette/.test(materialSource)) materials.push('Lichettes');
-  if(/balle rouge|balles rouges/.test(materialSource)) materials.push('Balles rouges');
+  const materialSource=[meta.constraint||'',s.goal||'',...blocks.map(b=>b.exercise||'')].join(' ');
+  const materials=pdfInferMaterials(materialSource);
   const coachPoints=(theme?[...(theme.tactics||[]).slice(0,3),...(theme.techniques||[]).slice(0,2)]:['Règle simple et visible','Beaucoup de touches','Questionner avant de corriger','Feedback sandwich','Progression R-1 / R0 / R+1']).slice(0,5);
   const tacticBullets=pdfTextLines(meta.tactic||'').slice(0,3).length?pdfTextLines(meta.tactic).slice(0,3):(theme?.tactics||[]).slice(0,3);
   const techniqueBullets=pdfTextLines(meta.technique||'').slice(0,3).length?pdfTextLines(meta.technique).slice(0,3):(theme?.techniques||[]).slice(0,3);
   const tacticalTheme=meta.theme||theme?.title||s.goal||'Thème tactique à préciser';
   const heroSummary=`${players.length} joueur${players.length>1?'s':''} · ${esc(meta.level||'niveau à définir')} · ${materials.slice(0,3).map(esc).join(' / ')}`;
-  const blockRows=blocks.map((b,i)=>{const pl=PILLARS.find(p=>p.id===b.pillar);const st=aft?steps[Math.min(i,steps.length-1)]:steps[i];const isCooling=aft&&i===steps.length-1;const flow=pdfBulletsFrom(b.exercise,['DÉROULEMENT DU JEU','DEROULEMENT DU JEU','ORGANISATION'],['MISE EN PLACE','RÈGLE PRINCIPALE','REGLE PRINCIPALE','REPÈRES'],[b.exercise||'Exercice à préciser.'],4);const attention=pdfBulletsFrom(b.exercise,['POINTS D’ATTENTION',"POINTS D'ATTENTION",'OBSERVATION COACH','CRITÈRES DE RÉUSSITE'],['QUESTIONS À POSER','PROGRESSION','FEEDBACK','BIENFAITS'],isCooling?['Question ouverte: qu’avez-vous retenu ?','Feedback sandwich: réussite, correction, encouragement.','Retour au calme et fermeture positive.']:['Observer le choix tactique avant de corriger.','Garder une consigne courte.','Adapter en R-1/R+1 selon réussite.'],4);const benefits=pdfBulletsFrom(b.exercise,['BIENFAITS POUR LE JOUEUR','CE QUE J’APPRENDS'],['DÉROULEMENT','MISE EN PLACE','RÈGLE','REPÈRES'],isCooling?['Ancrer l’apprentissage avant de quitter le terrain.','Donner au joueur une image claire de sa progression.','Préparer le prochain entraînement avec une priorité simple.']:['Comprendre le jeu avant le geste parfait.','Relier technique, tactique et décision.','Repartir avec un repère clair.'],4);const diagramPanel=isCooling?`<div class="cooldown-panel"><b>Cooling down</b><span>Pas de schéma terrain</span><p>Retour au calme, bilan sandwich et question ouverte pour vérifier ce que les joueurs retiennent.</p></div>`:printDiagramSvg(b);return `<section class="exercise">
+  const blockRows=blocks.map((b,i)=>{
+    const pl=PILLARS.find(p=>p.id===b.pillar);
+    const st=aft?steps[Math.min(i,steps.length-1)]:steps[i];
+    const isCooling=aft&&i===steps.length-1;
+    const exerciseText=b.exercise||'';
+    const setup=pdfBulletsFrom(exerciseText,['MISE EN PLACE','ORGANISATION','FORMAT'],['DÉROULEMENT','DEROULEMENT','RÈGLE','REGLE','POINTS'],['Format terrain à préciser.','Délimiter la zone et annoncer la règle simple.'],3);
+    const flow=pdfBulletsFrom(exerciseText,['DÉROULEMENT DU JEU','DEROULEMENT DU JEU','DÉROULEMENT','DEROULEMENT'],['MISE EN PLACE','RÈGLE PRINCIPALE','REGLE PRINCIPALE','REPÈRES','POINTS'],[exerciseText||'Exercice à préciser.'],4);
+    const rule=pdfBulletsFrom(exerciseText,['RÈGLE PRINCIPALE','REGLE PRINCIPALE','RÈGLE','REGLE'],['RÔLE','ROLE','POINTS','QUESTIONS','PROGRESSION','BIENFAITS'],isCooling?['Chaque joueur formule un repère retenu.','Le coach ferme avec un feedback sandwich.']:['Une règle simple donne du sens au jeu.','Le score récompense le bon choix, pas seulement le point gagné.'],3);
+    const attention=pdfBulletsFrom(exerciseText,['POINTS D’ATTENTION',"POINTS D'ATTENTION",'OBSERVATION COACH','CRITÈRES DE RÉUSSITE'],['QUESTIONS À POSER','PROGRESSION','FEEDBACK','BIENFAITS'],isCooling?['Question ouverte: qu’avez-vous retenu ?','Feedback sandwich: réussite, correction, encouragement.','Retour au calme et fermeture positive.']:['Observer le choix tactique avant de corriger.','Garder une consigne courte.','Adapter en R-1/R+1 selon réussite.'],4);
+    const questions=pdfBulletsFrom(exerciseText,['QUESTIONS À POSER',"QUESTIONS A POSER"],['PROGRESSION','RÉGRESSION','REGRESSION','BIENFAITS','MESSAGE'],isCooling?['Qu’est-ce que tu retiens pour le prochain match ?','Quel repère t’a aidé aujourd’hui ?']:['Qu’est-ce qui te permet de gagner du temps ?','Où dois-tu te placer avant la frappe ?'],3);
+    const benefits=pdfBulletsFrom(exerciseText,['BIENFAITS POUR LE JOUEUR','CE QUE J’APPRENDS','BIENFAITS'],['DÉROULEMENT','MISE EN PLACE','RÈGLE','REPÈRES'],isCooling?['Ancrer l’apprentissage avant de quitter le terrain.','Donner au joueur une image claire de sa progression.','Préparer le prochain entraînement avec une priorité simple.']:['Comprendre le jeu avant le geste parfait.','Relier technique, tactique et décision.','Repartir avec un repère clair.'],4);
+    const progression=pdfBulletsFrom(exerciseText,['PROGRESSION','RÉGRESSION','REGRESSION'],['MESSAGE','BIENFAITS','FEEDBACK'],['R-1: simplifier la contrainte.','R0: garder la règle de base.','R+1: ajouter pression, cible ou score.'],3);
+    const blockMaterials=pdfInferMaterials(exerciseText||materialSource);
+    const diagramPanel=isCooling?`<div class="cooldown-panel"><b>Cooling down</b><span>Pas de schéma terrain</span><p>Retour au calme, bilan sandwich et question ouverte pour vérifier ce que les joueurs retiennent.</p></div>`:printDiagramSvg(b);
+    return `<section class="exercise">
     <div class="ex-title"><span>${String(i+1).padStart(2,'0')}</span><div><h3>${esc(st?.name||pl?.name||'Bloc')}</h3><p>${esc(st?.time||'')} · ${esc(st?.focus||pl?.name||b.pillar)} · ${esc(b.aspect||'Aspect à définir')}</p></div></div>
     <div class="exercise-grid">
       <div class="diagram-panel">${diagramPanel}</div>
-      <div class="text-panel"><div class="exercise-cols"><div><h4>Déroulement</h4>${pdfBulletList(flow)}</div><div><h4>Points d'attention</h4>${pdfBulletList(attention)}</div><div><h4>Bienfaits</h4>${pdfBulletList(benefits)}</div></div></div>
+      <div class="text-panel">
+        <div class="mini-strip"><b>Matériel</b>${pdfSmallTags(blockMaterials)}</div>
+        <div class="exercise-cols"><div><h4>Mise en place</h4>${pdfBulletList(setup)}</div><div><h4>Déroulement</h4>${pdfBulletList(flow)}</div><div><h4>Règle / score</h4>${pdfBulletList(rule)}</div></div>
+        <div class="exercise-cols second"><div><h4>Points coach</h4>${pdfBulletList(attention)}</div><div><h4>Questions</h4>${pdfBulletList(questions)}</div><div><h4>Bienfaits + adaptation</h4>${pdfBulletList([...benefits.slice(0,2),...progression.slice(0,2)])}</div></div>
+      </div>
     </div>
   </section>`}).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Dossier séance HWBT</title><style>
@@ -2550,13 +2581,13 @@ function professionalPrepHtml(s){
     .sheet{padding:14px 22px 0} h2{font-size:11px;margin:0 0 8px;text-transform:uppercase;letter-spacing:1.8px;color:#8b5d20} h3{font-size:16px;margin:0;text-transform:uppercase;letter-spacing:.6px} h4{font-size:8.5px;margin:0 0 5px;text-transform:uppercase;color:#8b5d20;letter-spacing:1.3px}
     .dashboard-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:10px}.meta-grid{display:grid;grid-template-columns:1.1fr .75fr 1.4fr;gap:8px;margin-bottom:10px}.meta-cell{background:#fff;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:6px;padding:9px}.meta-label{font-size:8px;color:#8b5d20;letter-spacing:1.5px;text-transform:uppercase;font-weight:800;margin-bottom:4px}.meta-value{font-size:10.5px}
     .box{background:white;border:1px solid var(--line);border-radius:8px;padding:11px;break-inside:avoid;margin-top:10px}.box:first-child{margin-top:0}.timeline{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.step{background:linear-gradient(180deg,#fff,#f4eddf);border:1px solid #dfcfb5;border-radius:7px;padding:8px;min-height:66px;position:relative;overflow:hidden}.step:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--gold)}.step b{font-size:9px;text-transform:uppercase}.step span{display:block;color:var(--muted);font-size:8.5px;margin-top:4px}.step em{display:block;color:#8b5d20;font-style:normal;font-size:8px;margin-top:3px}
-    .key-points{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.key-points span{background:#111;color:#eee;border:1px solid #2a2a2a;border-radius:6px;padding:7px;font-size:8.7px;min-height:48px}.repere-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.repere-grid p{margin:0;white-space:pre-line}.repere-grid ul{margin:0;padding-left:15px}.repere-grid li{margin-bottom:4px}.small{font-size:8.5px;color:var(--muted)}
+    .key-points{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.key-points span{background:#111;color:#eee;border:1px solid #2a2a2a;border-radius:6px;padding:7px;font-size:8.7px;min-height:48px}.repere-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.repere-grid p{margin:0;white-space:pre-line}.repere-grid ul{margin:0;padding-left:15px}.repere-grid li{margin-bottom:4px}.small{font-size:8.5px;color:var(--muted)}.tag-row{display:flex;gap:5px;flex-wrap:wrap}.tag-row span{display:inline-flex;background:#f4eddf;border:1px solid #dfcfb5;border-radius:4px;padding:3px 6px;font-size:7.8px;color:#22180a;font-weight:700}
     .legend span{background:#f4eddf;color:#171717;border-color:#dfcfb5}.exercise-page{break-before:page;page-break-before:always;margin-top:18px;page:exercisePage}.section-banner{background:linear-gradient(135deg,#070708,#1c1308);color:white;border-radius:8px;border:1px solid #b8893566;padding:18px 22px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}.section-banner h2{color:white;font-size:30px;margin:0;letter-spacing:2px}.section-banner span{color:var(--gold2);font-weight:900;letter-spacing:2px}
     .exercise{background:white;border:1px solid var(--line);border-radius:9px;margin-top:12px;padding:0;break-inside:avoid;overflow:hidden}.ex-title{display:grid;grid-template-columns:74px 1fr;background:#111;color:white;border-bottom:3px solid var(--gold)}.ex-title>span{background:var(--gold);color:#000;font-size:22px;font-weight:900;display:flex;align-items:center;justify-content:center}.ex-title div{padding:10px 14px}.ex-title p{margin:3px 0 0;color:#c9c9c9;font-size:9.5px}
-    .exercise-grid{display:grid;grid-template-columns:315px 1fr;gap:0}.diagram-panel{background:#0b0b0f;padding:12px;border-right:1px solid var(--line);display:flex;align-items:center;justify-content:center}.cooldown-panel{border:1px solid #b8893566;background:linear-gradient(180deg,#151515,#080808);color:white;border-radius:8px;padding:22px;text-align:center;min-height:210px;display:flex;flex-direction:column;justify-content:center}.cooldown-panel b{font-size:24px;text-transform:uppercase}.cooldown-panel span{color:#c99a3b;font-size:10px;letter-spacing:1.4px;margin:8px 0}.cooldown-panel p{color:#d8d8d8;font-size:11px;line-height:1.55;margin:0}.text-panel{padding:13px 15px}.exercise-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.exercise-cols ul{margin:0;padding-left:15px}.exercise-cols li{margin:0 0 6px;font-size:9.2px;line-height:1.32}.text-panel p{margin:0;white-space:normal}.text-panel p b,.text-panel p strong{color:#111}
+    .exercise-grid{display:grid;grid-template-columns:315px 1fr;gap:0}.diagram-panel{background:#0b0b0f;padding:12px;border-right:1px solid var(--line);display:flex;align-items:center;justify-content:center}.cooldown-panel{border:1px solid #b8893566;background:linear-gradient(180deg,#151515,#080808);color:white;border-radius:8px;padding:22px;text-align:center;min-height:210px;display:flex;flex-direction:column;justify-content:center}.cooldown-panel b{font-size:24px;text-transform:uppercase}.cooldown-panel span{color:#c99a3b;font-size:10px;letter-spacing:1.4px;margin:8px 0}.cooldown-panel p{color:#d8d8d8;font-size:11px;line-height:1.55;margin:0}.text-panel{padding:12px 14px}.mini-strip{display:flex;align-items:center;gap:8px;border:1px solid #eadcc6;background:#fbf7ef;border-radius:6px;padding:6px 8px;margin-bottom:9px}.mini-strip b{font-size:8px;text-transform:uppercase;color:#8b5d20;letter-spacing:1.2px}.exercise-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.exercise-cols.second{margin-top:8px;border-top:1px solid #eee1cd;padding-top:8px}.exercise-cols ul{margin:0;padding-left:14px}.exercise-cols li{margin:0 0 4px;font-size:8.4px;line-height:1.25}.text-panel p{margin:0;white-space:normal}.text-panel p b,.text-panel p strong{color:#111}
     svg{--border2:#ddd;--border:#ddd;--bronze:#b88935;max-height:305px}.print-tip{position:fixed;right:18px;top:18px;padding:10px 14px;background:#111;color:white;border:0;border-radius:8px;box-shadow:0 8px 20px #0004}
     @page{size:A4 landscape;margin:8mm}
-    @media print{body{background:white}.page{padding:0;max-width:none;box-shadow:none}.no-print{display:none}.box,.exercise{page-break-inside:avoid}.exercise-page{page-break-before:always}.exercise-grid{grid-template-columns:300px 1fr}.exercise-cols li{font-size:8.8px}.cover{min-height:160px}.cover h1{font-size:32px}}
+    @media print{body{background:white}.page{padding:0;max-width:none;box-shadow:none}.no-print{display:none}.box,.exercise{page-break-inside:avoid}.exercise-page{page-break-before:always}.exercise-grid{grid-template-columns:300px 1fr}.exercise-cols li{font-size:8.2px}.cover{min-height:160px}.cover h1{font-size:32px}}
   </style></head><body><div class="page">
     <button class="no-print print-tip" onclick="window.print()">Enregistrer en PDF</button>
     <section class="cover"><div class="cover-inner"><div><div class="brand">HWBT Academy · préparation terrain</div><h1>Dossier<br>de séance</h1><div class="theme">${esc(tacticalTheme)}</div><p>${heroSummary}</p></div><div class="cover-card"><b>${esc(sessionTypeLabel(s.sessionType))}</b><span>${esc(sessionTitle(s))}<br>${esc(sessionDateLine(s))}<br>${players.map(p=>esc(p.name)).join('<br>')}</span></div></div></section>
@@ -2742,7 +2773,7 @@ function setLang(lang){
   render();
 }
 function updateChromeText(){
-  const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
+  const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
   document.querySelectorAll('.nav-item').forEach(n=>{
     const icon=n.querySelector('.nav-icon')?.textContent||'';
     const label=navNames[n.dataset.page]||n.dataset.page;
@@ -2764,7 +2795,7 @@ function render(){
   if(STATE.role==='player'){
     if(!STATE.activePlayerId) STATE.activePlayerId=STATE.players[0]?.id||null;
     const linkedPlayerTest=UI.page==='test'&&UI.testState&&UI.testState.playerId===STATE.activePlayerId;
-    if(['exercises','aspectsLibrary'].includes(UI.page)||(UI.page==='test'&&!linkedPlayerTest)) UI.page='dashboard';
+    if(['exercises','aspectsLibrary','commandCenter'].includes(UI.page)||(UI.page==='test'&&!linkedPlayerTest)) UI.page='dashboard';
     if(UI.page==='players') UI.selectedPlayerId=STATE.activePlayerId;
   }
   document.getElementById('lb-fr').classList.toggle('active',STATE.lang==='fr');
@@ -2775,17 +2806,18 @@ function render(){
   document.getElementById('roleTag').textContent=tr(STATE.role==='coach'?'COACH':'JOUEUR');
   const nav=document.querySelectorAll('.nav-item');
   nav.forEach(n=>{
-    const coachOnly=['exercises','aspectsLibrary'].includes(n.dataset.page);
+    const coachOnly=['exercises','aspectsLibrary','commandCenter'].includes(n.dataset.page);
     const playerHidden=['test'].includes(n.dataset.page);
     n.style.display=STATE.role==='player'&&(coachOnly||playerHidden)?'none':'flex';
     n.classList.toggle('active',n.dataset.page===UI.page);
   });
-  const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
+  const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
   document.getElementById('pageTitle').textContent=tr(STATE.role==='player'&&UI.page==='dashboard'?'MON CARNET JOUEUR':(titles[UI.page]||UI.page.toUpperCase()));
   const mc=document.getElementById('mainContent');
   if(UI.page==='dashboard') mc.innerHTML=STATE.role==='player'?pagePlayerPortal():pageDashboard();
   else if(UI.page==='players') mc.innerHTML=UI.selectedPlayerId?pagePlayerDetail(UI.selectedPlayerId):pagePlayersList();
   else if(UI.page==='sessions') mc.innerHTML=UI.selectedSessionId?pageSessionDetail(UI.selectedSessionId):pageSessionsList();
+  else if(UI.page==='commandCenter') mc.innerHTML=pageCommandCenter();
   else if(UI.page==='shop') mc.innerHTML=pageShop();
   else if(UI.page==='exercises') mc.innerHTML=pageExercises();
   else if(UI.page==='profiles') mc.innerHTML=UI.selectedProfileId?pageProfileDetail(UI.selectedProfileId):pageProfilesList();
@@ -3553,8 +3585,8 @@ function sessionCardScoreHtml(s){
 }
 function sessionCardActions(s){
   if(STATE.role==='player') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'briefing'})">OUVRIR</button>`;
-  if(s.status==='planned') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'preparation'})">PRÉPARER</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();enterFieldMode(${s.id})">TERRAIN</button>`;
-  if(s.status==='open') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'evaluation'})">ÉVALUER</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();enterFieldMode(${s.id})">TERRAIN</button>`;
+  if(s.status==='planned') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'preparation'})">PRÉPARER</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();printSessionPdf(${s.id})">PDF</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();enterFieldMode(${s.id})">TERRAIN</button>`;
+  if(s.status==='open') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'evaluation'})">ÉVALUER</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();printSessionPdf(${s.id})">PDF</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();enterFieldMode(${s.id})">TERRAIN</button>`;
   if(s.status==='closed_coach') return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'retours'})">RETOURS</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();printSessionPdf(${s.id})">PDF</button>`;
   return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'resume'})">RÉSUMÉ</button><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();printSessionPdf(${s.id})">PDF</button>`;
 }
@@ -3661,7 +3693,7 @@ function sessionDetailTabButton(key,label,active){
 }
 function sessionDetailContent(s,tab,group,main,pr){
   if(tab==='briefing') return `${STATE.role==='coach'?`<div class="card" style="border-color:var(--bronze-dim2)"><div class="card-title">DOSSIER DE SÉANCE PDF</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.65">Le PDF reprend le briefing, la structure et les fiches exercice. Complète la préparation avant de l’exporter.</div><div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn btn-primary btn-sm" onclick="printSessionPdf(${s.id})">CRÉER DOSSIER PDF</button></div></div>`:''}${sessionBriefing(s,main||{},pr)}${s.sessionType==='aft'?'':sessionStructureCard(s)}`;
-  if(tab==='preparation') return `${s.playerWishes?`<div class="card"><div class="card-title">DEMANDES JOUEURS À L'ENTRÉE</div><div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.7;white-space:pre-wrap">${esc(s.playerWishes)}</div></div>`:''}${group.length>1?`<div class="card"><div class="card-title">GROUPE DE SÉANCE</div><div class="session-group-line">${group.map(p=>`<span class="session-group-chip">${esc(p.name)}</span>`).join('')}</div></div>`:''}${sessionWorkBlocksHtml(s)}`;
+  if(tab==='preparation') return `${STATE.role==='coach'?`<div class="card" style="border-color:var(--bronze-dim2)"><div style="display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap"><div><div class="card-title">PDF PROFESSIONNEL DE SÉANCE</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.65">Exporte toute la préparation: dashboard séance, structure, matériel, points coach, fiches exercices, schémas terrain et bilan sandwich.</div></div><button class="btn btn-primary" onclick="printSessionPdf(${s.id})">IMPRIMER / PDF</button></div></div>`:''}${s.playerWishes?`<div class="card"><div class="card-title">DEMANDES JOUEURS À L'ENTRÉE</div><div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.7;white-space:pre-wrap">${esc(s.playerWishes)}</div></div>`:''}${group.length>1?`<div class="card"><div class="card-title">GROUPE DE SÉANCE</div><div class="session-group-line">${group.map(p=>`<span class="session-group-chip">${esc(p.name)}</span>`).join('')}</div></div>`:''}${sessionWorkBlocksHtml(s)}`;
   if(tab==='terrain') return `<div class="card" style="border-color:var(--bronze-dim2)"><div class="card-title">MODE TERRAIN</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.65;margin-bottom:14px">Version terrain épurée: tu ouvres la séance, puis tu avances exercice par exercice jusqu’à l’évaluation finale.</div><button class="btn btn-primary" onclick="enterFieldMode(${s.id})">OUVRIR LE MODE TERRAIN</button></div>`;
   if(tab==='evaluation') return `<div class="card"><div class="card-title">${s.status==='completed'?'RÉSUMÉ DE CLÔTURE':'ÉVALUATION & CLÔTURE'}</div>${sessionClosure(s)}</div>`;
   if(tab==='retours') return sessionSynthesisHtml(s)||`<div class="card"><div class="card-title">RETOURS JOUEURS</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.65">Les retours apparaîtront ici après la clôture coach.</div></div>`;
@@ -3678,7 +3710,7 @@ function pageSessionDetail(sessionId){
   const tab=UI.sessionTab||defaultSessionTab(s);
   const tabs=[['briefing','Briefing'],['preparation','Préparation'],['terrain','Terrain'],['evaluation','Évaluation'],['retours','Retours'],['resume','Résumé']];
   return `<div class="content">${quoteBand()}
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:null,sessionMode:null,sessionTab:null})">← RETOUR</button><div style="flex:1"><div style="font-size:22px;font-weight:800;letter-spacing:1px;line-height:1.05">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2);margin-top:4px">${esc(sessionDateLine(s))} · ${sessionTypeLabel(s.sessionType)} · ${statusBadge(s.status)}</div></div>${s.status==='planned'||s.status==='open'?`<button class="btn btn-primary" onclick="enterFieldMode(${s.id})">MODE TERRAIN</button>`:''}${s.status==='closed_coach'||s.status==='completed'?`<button class="btn btn-ghost" onclick="toggleSessionEdit(${s.id})">${s.editMode?'TERMINER MODIF':'MODIFIER'}</button>`:''}<button class="btn btn-danger" onclick="deleteSession(${s.id})">SUPPRIMER</button></div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:null,sessionMode:null,sessionTab:null})">← RETOUR</button><div style="flex:1"><div style="font-size:22px;font-weight:800;letter-spacing:1px;line-height:1.05">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2);margin-top:4px">${esc(sessionDateLine(s))} · ${sessionTypeLabel(s.sessionType)} · ${statusBadge(s.status)}</div></div><button class="btn btn-primary" onclick="printSessionPdf(${s.id})">PDF SÉANCE</button>${s.status==='planned'||s.status==='open'?`<button class="btn btn-ghost" onclick="enterFieldMode(${s.id})">MODE TERRAIN</button>`:''}${s.status==='closed_coach'||s.status==='completed'?`<button class="btn btn-ghost" onclick="toggleSessionEdit(${s.id})">${s.editMode?'TERMINER MODIF':'MODIFIER'}</button>`:''}<button class="btn btn-danger" onclick="deleteSession(${s.id})">SUPPRIMER</button></div>
     <div class="tabs" style="margin-bottom:18px;overflow:auto">${tabs.map(t=>sessionDetailTabButton(t[0],t[1],tab)).join('')}</div>
     ${sessionDetailContent(s,tab,group,main,pr)}
   </div>`;
@@ -4105,6 +4137,149 @@ function pageCommunicationChapter(){
       }).join('')}
     </div>
   </div>`;
+}
+
+// ══════════════════════════════════════════════════
+// HWBT COMMAND CENTER - V1 localStorage, API-ready hooks
+// ══════════════════════════════════════════════════
+function commandState(){
+  STATE.commandCenter=STATE.commandCenter||{};
+  ['briefs','chats','debriefs','contentIdeas','decisions','tasks'].forEach(k=>{if(!Array.isArray(STATE.commandCenter[k]))STATE.commandCenter[k]=[];});
+  return STATE.commandCenter;
+}
+function todayISO(){return new Date().toISOString().slice(0,10);}
+function commandId(prefix){return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2,7)}`;}
+function commandDateLabel(date=new Date()){
+  try{return date.toLocaleDateString(STATE.lang==='en'?'en-US':'fr-BE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});}catch(e){return todayISO();}
+}
+function generateAIBrief(context={}){
+  const players=STATE.players||[];
+  const sessions=STATE.sessions||[];
+  const noProfile=players.filter(p=>!p.profileId).slice(0,3).map(p=>p.name);
+  const feedback=sessions.filter(s=>s.status==='closed_coach').slice(0,2).map(s=>sessionTitle(s));
+  const next=sessions.filter(s=>s.status==='planned'||s.status==='open').sort((a,b)=>String(a.date).localeCompare(String(b.date)))[0];
+  const playerFocus=[...new Set([...noProfile,...feedback])].filter(Boolean).slice(0,4);
+  return {
+    id:commandId('brief'),date:todayISO(),createdAt:new Date().toISOString(),done:false,
+    hello:'Bonjour Thomas',dateLabel:commandDateLabel(),
+    mission:next?`Faire avancer ${sessionTitle(next)} avec une préparation claire et une trace exploitable.`:'Transformer HWBT en système: joueurs suivis, séances propres, contenu régulier.',
+    priorities:['Préparer ou clôturer les séances ouvertes','Identifier 3 joueurs à suivre cette semaine','Créer un contenu court qui montre la méthode HWBT'],
+    content:'Filmer une séquence simple: consigne claire, exercice, feedback sandwich, résultat joueur.',
+    players:playerFocus.length?playerFocus:['Joueurs sans profil mental','Joueurs avec retour séance attendu','Joueurs dont les stats stagnent'],
+    opportunity:'Transformer les séances AFT en preuves de méthode: PDF, extrait terrain, avant/après joueur.',
+    risk:'Trop d’encodage après séance. Garder les retours prédéfinis et l’évaluation rapide.',
+    platformIdea:'Ajouter un tableau hebdomadaire: séances à préparer, retours manquants, contenus à publier.',
+    vision:'HWBT doit devenir le carnet de progression mental, technique et business de l’académie.'
+  };
+}
+function generateAIResponse(prompt, context={}){
+  const p=String(prompt||'').toLowerCase();
+  const base={id:commandId('chat'),prompt,createdAt:new Date().toISOString(),done:false};
+  let title='Réponse CEO';
+  let bullets=['Clarifier la priorité.', 'Transformer l’idée en action mesurable.', 'Garder une trace dans le Command Center.'];
+  let action='Choisir une action simple à faire aujourd’hui.';
+  if(p.includes('bonjour')){title='Bonjour CEO';bullets=['Regarde les séances à préparer avant toute nouvelle idée.','Choisis un contenu à publier ou filmer aujourd’hui.','Relance les joueurs dont le retour bloque la progression.'];action='Ouvrir Morning Brief et marquer une priorité comme terminée.';}
+  else if(p.includes('débrief')||p.includes('debrief')){title='Débrief CEO';bullets=['Note ce qui a réellement avancé.','Repère ce qui t’a pris trop d’énergie.','Transforme une difficulté en règle de système.'];action='Compléter le formulaire Débrief CEO.';}
+  else if(p.includes('contenu')){title='Idée contenu HWBT';bullets=['Reel: une erreur fréquente au filet et la correction HWBT.','Story: question du jour à un joueur après séance.','Carrousel: 3 repères pour mieux communiquer avec son partenaire.'];action='Générer une idée dans Content Lab.';}
+  else if(p.includes('joueur')){title='Analyse joueur';bullets=['Vérifier profil mental, dernière séance, priorité joueur.','Comparer ce que le joueur veut et ce que le coach observe.','Planifier une action: test, relance, séance ciblée ou feedback.'];action='Ouvrir Players Intelligence.';}
+  else if(p.includes('semaine')){title='Priorité semaine';bullets=['1 objectif coaching: séances propres et évaluées.','1 objectif contenu: 3 publications utiles.','1 objectif business: 2 contacts sponsor/partenaire.'];action='Sauvegarder ces priorités dans Strategy Room.';}
+  else if(p.includes('plateforme')){title='Amélioration plateforme';bullets=['Réduire les clics après séance.','Afficher les actions urgentes sur dashboard coach.','Rendre les stats plus visuelles avec delta avant/après.'];action='Créer une décision plateforme.';}
+  else if(p.includes('business')||p.includes('opportunité')){title='Opportunité business';bullets=['Pack stage HWBT avec PDF + profil joueur.','Shop academy: hoodie/t-shirt comme identité groupe.','Sponsor local lié au sport, santé ou performance.'];action='Ajouter un sponsor ou partenariat à contacter.';}
+  return {...base,title,bullets,action};
+}
+function ensureTodayBrief(){
+  const cc=commandState();
+  const today=todayISO();
+  let brief=cc.briefs.find(b=>b.date===today);
+  if(!brief){brief=generateAIBrief({players:STATE.players,sessions:STATE.sessions});cc.briefs.unshift(brief);saveState();}
+  return brief;
+}
+function newCommandBrief(){const cc=commandState();cc.briefs.unshift(generateAIBrief({players:STATE.players,sessions:STATE.sessions}));saveState();render();showNotif('Nouveau briefing généré');}
+function commandQuickPrompt(prompt){const input=document.getElementById('ceoPrompt');if(input)input.value=prompt;sendCEOBrain(prompt);}
+function sendCEOBrain(forced=null){const input=document.getElementById('ceoPrompt');const prompt=(forced||input?.value||'').trim();if(!prompt){showNotif('Écris un prompt CEO');return;}const cc=commandState();cc.chats.unshift(generateAIResponse(prompt,{players:STATE.players,sessions:STATE.sessions}));if(input)input.value='';saveState();render();}
+function generateContentIdea(){
+  const cc=commandState();
+  const ideas=[
+    {type:'Reel',title:'Avant/après: une consigne qui change le point',cta:'Demande ton profil HWBT',channel:'Instagram'},
+    {type:'Carrousel',title:'3 erreurs de communication en padel',cta:'Sauvegarde pour ton prochain match',channel:'Instagram'},
+    {type:'Story',title:'Question joueur: qu’as-tu retenu de la séance ?',cta:'Réponds en DM',channel:'Instagram'},
+    {type:'Post résultat',title:'Progression joueur: aspect travaillé + ressenti',cta:'Réserve ta séance',channel:'Facebook'},
+    {type:'LinkedIn',title:'Comment structurer une académie avec données joueur',cta:'Parlons partenariat',channel:'LinkedIn'}
+  ];
+  const pick=ideas[(cc.contentIdeas.length+new Date().getDay())%ideas.length];
+  cc.contentIdeas.unshift({id:commandId('content'),status:'idée',plannedDate:todayISO(),...pick,done:false});
+  saveState();render();showNotif('Idée de contenu générée');
+}
+function nextContentStatus(id){
+  const cc=commandState();
+  const item=cc.contentIdeas.find(x=>x.id===id);
+  if(!item) return;
+  const statuses=['idée','à créer','prêt','publié'];
+  item.status=statuses[(statuses.indexOf(item.status)+1+statuses.length)%statuses.length];
+  item.done=item.status==='publié';
+  saveState();render();
+}
+function saveCEODebrief(){
+  const cc=commandState();
+  const read=id=>document.getElementById(id)?.value.trim()||'';
+  const item={id:commandId('debrief'),date:todayISO(),createdAt:new Date().toISOString(),actions:read('dbActions'),learnings:read('dbLearnings'),problems:read('dbProblems'),ideas:read('dbIdeas'),tomorrow:read('dbTomorrow'),done:false};
+  if(!item.actions&&!item.learnings&&!item.problems&&!item.ideas&&!item.tomorrow){showNotif('Complète au moins un champ de débrief');return;}
+  cc.debriefs.unshift(item);saveState();render();showNotif('Débrief CEO sauvegardé');
+}
+function saveCommandDecision(){
+  const cc=commandState();
+  const text=document.getElementById('decisionText')?.value.trim()||'';
+  const area=document.getElementById('decisionArea')?.value||'Stratégie';
+  if(!text){showNotif('Écris une décision');return;}
+  cc.decisions.unshift({id:commandId('decision'),date:todayISO(),area,text,done:false});
+  saveState();render();showNotif('Décision sauvegardée');
+}
+function markCommandItemDone(collection,id){const cc=commandState();const arr=cc[collection]||[];const item=arr.find(x=>x.id===id);if(item){item.done=!item.done;saveState();render();}}
+function commandTabs(){const tabs=[['brief','Morning Brief'],['brain','CEO Brain'],['players','Players Intelligence'],['content','Content Lab'],['strategy','Strategy Room']];const active=UI.commandTab||'brief';return `<div class="tabs" style="margin-bottom:18px;overflow:auto">${tabs.map(t=>`<button class="tab ${active===t[0]?'active':''}" onclick="setUI({commandTab:'${t[0]}'})">${t[1]}</button>`).join('')}</div>`;}
+function commandCard(title,body,color='var(--bronze)'){return `<div class="card" style="border-color:${color}55;margin-bottom:14px"><div class="card-title" style="color:${color}">${title}</div>${body}</div>`;}
+function commandStatusText(status){return ({planned:'planifiée',open:'ouverte',closed_coach:'retour joueur attendu',completed:'clôturée'})[status]||status||'—';}
+function pageCommandCenter(){
+  if(STATE.role!=='coach') return pageDashboard();
+  const cc=commandState();
+  const tab=UI.commandTab||'brief';
+  const content={brief:commandMorningBriefHtml,brain:commandCEOBrainHtml,players:commandPlayersIntelHtml,content:commandContentLabHtml,strategy:commandStrategyRoomHtml}[tab]();
+  return `<div class="content">${quoteBand()}<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px"><div><div style="font-size:34px;font-weight:900;letter-spacing:1px;line-height:1">HWBT Command Center</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-top:6px">Direction interne: coaching, joueurs, contenu, stratégie, business, plateforme et IA.</div></div><div style="font-size:10px;letter-spacing:1.4px;color:var(--bronze)">CEO MODE · LOCAL V1</div></div>${commandTabs()}${content}</div>`;
+}
+function commandMorningBriefHtml(){
+  const brief=ensureTodayBrief();
+  return `<div class="g2"><div>${commandCard('MORNING BRIEF',`<div style="font-size:28px;font-weight:900;margin-bottom:4px">${esc(brief.hello)}</div><div style="font-size:12px;color:var(--bronze);margin-bottom:14px">${esc(brief.dateLabel)}</div><div style="font-size:16px;font-weight:800;margin-bottom:8px">Mission du jour</div><div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.7">${esc(brief.mission)}</div><div style="margin-top:14px"><button class="btn btn-primary btn-sm" onclick="newCommandBrief()">NOUVEAU BRIEFING</button></div>`)}${commandCard('3 PRIORITÉS DU JOUR',`<div style="display:grid;gap:8px">${brief.priorities.map((p,i)=>`<div style="background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:10px"><b style="color:var(--bronze)">${i+1}.</b> ${esc(p)}</div>`).join('')}</div>`)}${commandCard('JOUEURS À SUIVRE',`<div style="display:flex;gap:8px;flex-wrap:wrap">${brief.players.map(p=>`<span class="session-group-chip">${esc(p)}</span>`).join('')}</div>`,'var(--bleu)')}</div><div>${commandCard('CONTENU À CRÉER AUJOURD’HUI',`<div class="muted-help">${esc(brief.content)}</div>`,'var(--rouge)')}${commandCard('OPPORTUNITÉ HWBT',`<div class="muted-help">${esc(brief.opportunity)}</div>`,'var(--vert)')}${commandCard('RISQUE À SURVEILLER',`<div class="muted-help">${esc(brief.risk)}</div>`,'var(--jaune)')}${commandCard('IDÉE PLATEFORME',`<div class="muted-help">${esc(brief.platformIdea)}</div>`,'var(--bleu)')}${commandCard('VISION LONG TERME',`<div style="font-size:13px;color:var(--white);font-family:var(--font-body);line-height:1.7">${esc(brief.vision)}</div>`)}</div></div>`;
+}
+function commandCEOBrainHtml(){
+  const cc=commandState();const quick=['Bonjour CEO','Débrief CEO','Idée contenu','Analyse joueur','Priorité semaine','Amélioration plateforme','Opportunité business'];
+  return `<div class="card"><div class="card-title">CEO BRAIN</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${quick.map(q=>`<button class="btn btn-ghost btn-sm" onclick="commandQuickPrompt('${q}')">${q}</button>`).join('')}</div><div class="g2"><textarea class="form-input" id="ceoPrompt" rows="3" placeholder="Pose une question CEO à HWBT..."></textarea><div><button class="btn btn-primary" onclick="sendCEOBrain()">ENVOYER</button></div></div></div><div class="g2">${cc.chats.map(c=>`<div class="card" style="border-color:${c.done?'var(--vert)':'var(--bronze-dim2)'}"><div class="card-title">${esc(c.title)}</div><div style="font-size:10px;color:var(--gray3);margin-bottom:8px">${esc(c.prompt)} · ${esc(c.createdAt.slice(0,10))}</div><ul style="margin:0 0 12px 18px;color:var(--offwhite);font-family:var(--font-body);font-size:12px;line-height:1.7">${c.bullets.map(b=>`<li>${esc(b)}</li>`).join('')}</ul><div class="muted-help"><b>Action:</b> ${esc(c.action)}</div><button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="markCommandItemDone('chats','${c.id}')">${c.done?'RÉOUVRIR':'MARQUER COMME TERMINÉ'}</button></div>`).join('')||'<div class="card"><div class="muted-help">Choisis un prompt rapide ou écris une demande CEO.</div></div>'}</div>`;
+}
+function commandPlayersIntelHtml(){
+  const rows=(STATE.players||[]).map(p=>{const measured=playerMeasuredProfile(p);const sessions=(STATE.sessions||[]).filter(s=>playerInSession(s,p.id));const last=sessions.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];let status='À suivre';let action='Planifier une séance ciblée';if(!p.profileId){status='À réévaluer';action='Faire le test de personnalité';}else if(last?.status==='closed_coach'){status='À relancer';action='Demander le ressenti joueur';}else if(measured.level&&measured.level<9){status='Progression bloquée';action='Reprendre un aspect simple et mesurable';}return {p,status,action,last};});
+  return `<div class="g2">${rows.map(r=>{const pr=PROFILES.find(x=>x.id===r.p.profileId);const color=pr?ENERGY_COLORS[pr.c1]:'var(--bronze)';return `<div class="card" style="border-color:${color}55"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><div>${avatar(r.p.name,'av44')}</div><div style="flex:1"><div style="font-size:17px;font-weight:900">${esc(r.p.name)}</div><div style="font-size:10px;color:${color};letter-spacing:1px">${pr?esc(pr.name):'PROFIL À FAIRE'} · ${esc(r.status)}</div></div><button class="btn btn-primary btn-sm" onclick="setUI({page:'players',selectedPlayerId:${r.p.id},subpage:'profil'})">FICHE</button></div><div class="muted-help" style="margin-top:12px"><b>Prochaine action:</b> ${esc(r.action)}<br><b>Dernière séance:</b> ${r.last?esc(`${r.last.date} · ${commandStatusText(r.last.status)}`):'aucune trace'}</div></div>`}).join('')}</div>`;
+}
+function commandContentLabHtml(){
+  const cc=commandState();
+  return `<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-primary" onclick="generateContentIdea()">GÉNÉRER UNE IDÉE DE CONTENU</button></div><div class="g3">${cc.contentIdeas.map(it=>`<div class="card" style="border-color:${it.done?'var(--vert)':'var(--border)'}"><div class="card-title">${esc(it.type)} · ${esc(it.channel)}</div><div style="font-size:17px;font-weight:900;line-height:1.15;margin-bottom:8px">${esc(it.title)}</div><div class="muted-help"><b>Statut:</b> ${esc(it.status)}<br><b>CTA:</b> ${esc(it.cta)}<br><b>Date prévue:</b> ${esc(it.plannedDate)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="nextContentStatus('${it.id}')">CHANGER STATUT</button><button class="btn btn-ghost btn-sm" onclick="markCommandItemDone('contentIdeas','${it.id}')">${it.done?'RÉOUVRIR':'TERMINÉ'}</button></div></div>`).join('')||'<div class="card"><div class="muted-help">Aucune idée encore. Génère une première idée de contenu.</div></div>'}</div>`;
+}
+function commandStrategyTasksHtml(){
+  const cc=commandState();
+  if(!cc.tasks.length){
+    cc.tasks=[
+      {id:commandId('task'),label:'Préparer le prochain stage HWBT',group:'Stages',done:false},
+      {id:commandId('task'),label:'Lister 5 sponsors locaux à contacter',group:'Business',done:false},
+      {id:commandId('task'),label:'Choisir une amélioration plateforme prioritaire',group:'Plateforme',done:false},
+      {id:commandId('task'),label:'Transformer une séance en contenu Instagram',group:'Contenu',done:false}
+    ];
+    saveState();
+  }
+  return `<div class="card" style="border-color:var(--bronze-dim2);margin-bottom:16px"><div class="card-title">ACTIONS STRATÉGIQUES</div><div class="g2">${cc.tasks.map(t=>`<button class="btn ${t.done?'btn-primary':'btn-ghost'}" style="justify-content:flex-start;text-align:left;min-height:58px" onclick="markCommandItemDone('tasks','${t.id}')"><span style="color:var(--bronze);margin-right:8px">${esc(t.group)}</span>${esc(t.label)}</button>`).join('')}</div></div>`;
+}
+function commandStrategyRoomHtml(){
+  const cc=commandState();
+  const goals=['Structurer 100% des séances avec trace claire','Publier 3 contenus utiles par semaine','Créer une offre stage HWBT prête à vendre'];
+  const priorities=['Coaching mesurable','Portail joueur plus simple','PDF séance premium','Sponsor local','Shop academy'];
+  const sponsors=['Club local','Marque sport/santé','Commerce padel','Kinésithérapeute','Préparateur physique'];
+  return `${commandStrategyTasksHtml()}<div class="g2"><div>${commandCard('OBJECTIFS DU MOIS',`<ul>${goals.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`)}${commandCard('PRIORITÉS HWBT',`<div style="display:flex;gap:8px;flex-wrap:wrap">${priorities.map(x=>`<span class="session-group-chip">${esc(x)}</span>`).join('')}</div>`,'var(--rouge)')}${commandCard('SPONSORS / PARTENARIATS À CONTACTER',`<ul>${sponsors.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`,'var(--vert)')}</div><div><div class="card"><div class="card-title">SAUVEGARDER UNE DÉCISION</div><select class="form-select" id="decisionArea" style="margin-bottom:8px"><option>Stratégie</option><option>Business</option><option>Plateforme</option><option>Contenu</option><option>Coaching</option></select><textarea class="form-input" id="decisionText" rows="3" placeholder="Décision importante, idée long terme ou amélioration plateforme..."></textarea><button class="btn btn-primary" style="margin-top:10px" onclick="saveCommandDecision()">SAUVEGARDER DÉCISION</button></div><div class="card"><div class="card-title">DÉBRIEF CEO</div><textarea class="form-input" id="dbActions" rows="2" placeholder="Actions réalisées aujourd’hui"></textarea><textarea class="form-input" id="dbLearnings" rows="2" placeholder="Apprentissages"></textarea><textarea class="form-input" id="dbProblems" rows="2" placeholder="Problèmes rencontrés"></textarea><textarea class="form-input" id="dbIdeas" rows="2" placeholder="Idées nouvelles"></textarea><textarea class="form-input" id="dbTomorrow" rows="2" placeholder="Priorité pour demain"></textarea><button class="btn btn-primary" style="margin-top:10px" onclick="saveCEODebrief()">SAUVEGARDER DÉBRIEF</button></div></div></div><div class="g2"><div class="card"><div class="card-title">DÉCISIONS</div>${cc.decisions.map(d=>`<div style="border-top:1px solid var(--border);padding:10px 0"><div style="font-size:10px;color:var(--bronze);letter-spacing:1px">${esc(d.area)} · ${esc(d.date)}</div><div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.6">${esc(d.text)}</div><button class="btn btn-ghost btn-sm" onclick="markCommandItemDone('decisions','${d.id}')">${d.done?'RÉOUVRIR':'TERMINÉ'}</button></div>`).join('')||'<div class="muted-help">Aucune décision enregistrée.</div>'}</div><div class="card"><div class="card-title">HISTORIQUE DÉBRIEFS</div>${cc.debriefs.map(d=>`<div style="border-top:1px solid var(--border);padding:10px 0"><div style="font-size:10px;color:var(--bronze);letter-spacing:1px">${esc(d.date)}</div><div class="muted-help"><b>Actions:</b> ${esc(d.actions||'-')}<br><b>Apprentissages:</b> ${esc(d.learnings||'-')}<br><b>Problèmes:</b> ${esc(d.problems||'-')}<br><b>Idées:</b> ${esc(d.ideas||'-')}<br><b>Demain:</b> ${esc(d.tomorrow||'-')}</div></div>`).join('')||'<div class="muted-help">Aucun débrief enregistré.</div>'}</div></div>`;
 }
 
 function pageNutrition(){
