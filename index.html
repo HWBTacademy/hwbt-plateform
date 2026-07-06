@@ -4566,7 +4566,8 @@ function pageProfilesList(){
       ${PROFILES.map(pr=>{
         const c1=ENERGY_COLORS[pr.c1], c2=ENERGY_COLORS[pr.c2];
         const deep=profileDeepRead(pr);
-        return `<div class="card profile-card-full" onclick="setUI({page:'profiles',selectedProfileId:${pr.id}})" style="cursor:pointer;padding:0;border-color:${c1}44;overflow:hidden">
+        return `<div class="card profile-card-full" onclick="setUI({page:'profiles',selectedProfileId:${pr.id}})" style="cursor:pointer;padding:0;border-color:${c1}44;overflow:hidden;position:relative">
+          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();printProfilePdf(${pr.id})" style="position:absolute;right:12px;top:12px;z-index:2">IMPRIMER</button>
           <div class="pf-header" style="background:linear-gradient(135deg,${c1}33,${c2}22)">
             <div class="pf-header-num">${String(pr.id).padStart(2,'0')}</div>
             <div style="font-size:10px;color:${c1};letter-spacing:2px;margin-bottom:6px">PROFIL HWBT</div>
@@ -4601,7 +4602,10 @@ function pageProfileDetail(id){
   const pillarLabels={T:'TECHNIQUE',TA:'TACTIQUE',P:'PHYSIQUE',M:'MENTAL'};
   return `<div class="content">
     ${quoteBand()}
-    <button class="btn btn-ghost btn-sm" onclick="setUI({page:'profiles',selectedProfileId:null})" style="margin-bottom:20px">← TOUS LES PROFILS</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+      <button class="btn btn-ghost btn-sm" onclick="setUI({page:'profiles',selectedProfileId:null})">← TOUS LES PROFILS</button>
+      <button class="btn btn-primary btn-sm" onclick="printProfilePdf(${pr.id})">IMPRIMER CE PROFIL</button>
+    </div>
     <div class="profile-card-full" style="border:1px solid ${c1}55;background:var(--bg2);margin-bottom:18px">
       <div class="pf-header" style="background:linear-gradient(135deg,${c1}44,${c2}22)">
         <div class="pf-header-num">${String(pr.id).padStart(2,'0')}</div>
@@ -4680,6 +4684,69 @@ function pageProfileDetail(id){
       </div>
     </div>
   </div>`;
+}
+function profilePrintHtml(id){
+  const pr=PROFILES.find(p=>p.id===id);
+  if(!pr) return '';
+  const c1=ENERGY_COLORS[pr.c1]||'#b88935';
+  const c2=ENERGY_COLORS[pr.c2]||'#d4a017';
+  const deep=profileDeepRead(pr);
+  const pillarLabels={T:'TECHNIQUE',TA:'TACTIQUE',P:'PHYSIQUE',M:'MENTAL'};
+  const pillarRows=Object.entries(pr.pillarProfile||{}).map(([k,v])=>{
+    const pl=PILLARS.find(p=>p.id===k);
+    const color=pl?pl.color:'#b88935';
+    return `<div class="pillar"><div><b style="color:${color}">${esc(pillarLabels[k]||k)}</b><span>${v}/20</span></div><i><em style="width:${Math.max(4,Math.min(100,(v/20)*100))}%;background:${color}"></em></i></div>`;
+  }).join('');
+  const list=items=>`<ul>${(items||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
+  const comm=[
+    ['AVANT LE MATCH',pr.commBefore],
+    ['APRÈS UNE ERREUR',pr.commError],
+    ['SOUS PRESSION',pr.commPressure],
+    ['PHRASE QUI RELANCE',pr.commPositive],
+    ['À ÉVITER',pr.commAvoid],
+    ['AVEC SON PARTENAIRE',deep.partner]
+  ];
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(pr.name)} · Profil HWBT</title><style>
+    :root{--gold:#b88935;--paper:#f7f3ea;--ink:#171717;--muted:#606060;--line:#d8cfbf}
+    *{box-sizing:border-box}body{margin:0;background:#d9d1c3;color:var(--ink);font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1.38}
+    .page{max-width:1120px;margin:0 auto;background:var(--paper);min-height:100vh;box-shadow:0 22px 70px #0004}
+    .hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#050505 0%,#111 58%,#1f1306 100%);color:#fff;padding:28px 32px 24px;border-bottom:5px solid var(--gold)}
+    .hero:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,#fff1 0 1px,#0000 1px 8px);opacity:.32}
+    .hero:after{content:"${String(pr.id).padStart(2,'0')}";position:absolute;right:30px;top:-8px;font-size:128px;font-weight:900;color:#b8893518;letter-spacing:4px}
+    .hero-inner{position:relative;z-index:1;display:grid;grid-template-columns:1fr 260px;gap:22px;align-items:end}.brand{font-size:9px;color:#d4a017;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px}.hero h1{font-size:44px;line-height:.92;margin:0;text-transform:uppercase;letter-spacing:1px}.hero h2{font-size:20px;margin:8px 0 0;color:#e8e8e8;font-weight:500}.tagline{font-size:14px;color:#d4a017;margin-top:14px;max-width:740px}.profile-box{border:1px solid #b8893566;background:#0008;border-radius:7px;padding:14px}.profile-box b{display:block;font-size:13px;color:#fff;margin-bottom:8px}.energy{display:flex;gap:8px;margin-top:10px}.energy span{border:1px solid #ffffff30;border-radius:999px;padding:6px 10px;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;background:#111;color:#fff}
+    .sheet{padding:18px 22px 24px}.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:12px}.card{background:#fff;border:1px solid var(--line);border-radius:9px;padding:13px;margin-bottom:12px;break-inside:avoid}.title{font-size:9px;letter-spacing:1.8px;color:#8b5d20;text-transform:uppercase;font-weight:900;margin-bottom:8px}.story p{margin:0 0 8px;color:#202020}.quote{background:#111;color:#fff;border-left:5px solid var(--gold);border-radius:7px;padding:16px;font-size:18px;font-style:italic;line-height:1.25;margin-bottom:12px}
+    ul{margin:0;padding-left:16px}li{margin-bottom:5px}.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}.dark{background:#111;color:#fff;border-color:#252525}.dark .title{color:#d4a017}.dark li{color:#efefef}.muted{color:var(--muted)}.pillars{display:grid;gap:10px}.pillar div{display:flex;justify-content:space-between;gap:12px;margin-bottom:5px}.pillar b{font-size:9px;letter-spacing:1.4px}.pillar span{font-weight:900}.pillar i{display:block;height:5px;background:#e6dece;border-radius:99px;overflow:hidden}.pillar em{display:block;height:100%;border-radius:99px}
+    .comm-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.comm{border:1px solid var(--line);background:#fbf7ef;border-radius:7px;padding:10px}.comm b{display:block;font-size:8px;letter-spacing:1.2px;color:#8b5d20;margin-bottom:5px}.comm span{display:block;color:#222;line-height:1.45}.footer{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding-top:10px;margin-top:6px;color:#777;font-size:8px;letter-spacing:1.2px;text-transform:uppercase}
+    .print-tip{position:fixed;right:18px;top:18px;padding:10px 14px;background:#111;color:white;border:0;border-radius:8px;box-shadow:0 8px 20px #0004;z-index:10}
+    @page{size:A4 landscape;margin:8mm}
+    @media print{body{background:white}.page{box-shadow:none;max-width:none}.print-tip{display:none}.hero{padding:22px 28px 20px}.hero h1{font-size:39px}.sheet{padding:14px 18px 18px}.card{margin-bottom:9px;padding:11px}.quote{font-size:16px;padding:13px}.comm-grid{gap:7px}li{margin-bottom:4px}}
+  </style></head><body><button class="print-tip" onclick="window.print()">Enregistrer en PDF</button><main class="page">
+    <section class="hero"><div class="hero-inner"><div><div class="brand">HWBT Academy · profil compétiteur</div><h1>${esc(pr.name)}</h1><h2>${esc(pr.sub||'')}</h2><div class="tagline">${esc(pr.tagline||pr.quote||'')}</div></div><div class="profile-box"><b>PROFIL ${String(pr.id).padStart(2,'0')}</b><div>${esc(pr.role||'Rôle naturel')}</div><div class="energy"><span style="border-color:${c1};color:${c1}">${esc(pr.c1)}</span><span style="border-color:${c2};color:${c2}">${esc(pr.c2)}</span></div></div></div></section>
+    <section class="sheet">
+      <div class="grid"><div>
+        <div class="quote">“${esc(pr.quote||'Chaque profil est unique. Aucun profil n’est meilleur qu’un autre.')}”</div>
+        <div class="card"><div class="title">L'histoire du profil</div><div class="story"><p>${esc(deep.story)}</p><p>${esc(deep.match)}</p><p>${esc(deep.work)}</p></div></div>
+        <div class="card"><div class="title">Qui il est sur le terrain</div><p>${esc(pr.essence||'')}</p><p class="muted">${esc(pr.psycho||'')}</p></div>
+      </div><div>
+        <div class="card dark"><div class="title">Forces signature</div>${list(pr.strengths)}</div>
+        <div class="card"><div class="title">Points à travailler</div>${list(pr.workAxes)}</div>
+        <div class="card"><div class="title">Profil par pilier</div><div class="pillars">${pillarRows}</div></div>
+        <div class="card"><div class="title">Réflexe dominant</div><b>${esc(pr.reflex||'')}</b><p class="muted">${esc(deep.pressure)}</p></div>
+      </div></div>
+      <div class="card"><div class="title">Communication coach</div><div class="comm-grid">${comm.map(([label,text])=>`<div class="comm"><b>${esc(label)}</b><span>${esc(text||'—')}</span></div>`).join('')}</div></div>
+      <div class="footer"><span>HWBT Academy · Hard Work Beats Talent</span><span>Comprendre · S'entraîner · Valider · Évoluer</span></div>
+    </section>
+  </main><script>setTimeout(()=>window.print(),300)<\/script></body></html>`;
+}
+function printProfilePdf(id){
+  const html=profilePrintHtml(id);
+  if(!html){showNotif('Profil introuvable');return;}
+  const w=window.open('','_blank');
+  if(!w){showNotif('Autorise les popups pour imprimer le profil');return;}
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  showNotif('Profil ouvert: choisis Enregistrer en PDF');
 }
 function buildPersonalityTest(){
   const byPillar={};
