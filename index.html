@@ -2504,7 +2504,7 @@ function sessionWorkBlocksHtml(s){
     const score=measuredBlockScore(b);
     const actionButtons=isCooling
       ? `<button class="btn btn-primary btn-sm" onclick="enhanceSessionBlockAft(${s.id},${idx})">CORRIGER + COMPLÉTER LE BILAN</button>`
-      : `${aft?`<button class="btn btn-primary btn-sm" onclick="enhanceSessionBlockAft(${s.id},${idx})">CORRIGER + COMPLÉTER AFT</button>${isApplication?`<button class="btn btn-ghost btn-sm" onclick="copyStartGameToApplication(${s.id})">COPIER JEU DE DÉPART</button>`:''}`:''}<button class="btn btn-ghost btn-sm" onclick="diagramToText(${s.id},${idx})">SCHÉMA → TEXTE</button><button class="btn btn-ghost btn-sm" onclick="diagramFromText(${s.id},${idx})">TEXTE → SCHÉMA</button><button class="btn btn-ghost btn-sm" onclick="saveBlockExerciseToLibrary(${s.id},${idx})">ENREGISTRER EN BIBLIOTHÈQUE</button>`;
+      : `<button class="btn btn-primary btn-sm" onclick="openModal('sessionExercisePicker',{sessionId:${s.id},blockIdx:${idx}})">CHOISIR DANS LE CARNET</button>${aft?`<button class="btn btn-primary btn-sm" onclick="enhanceSessionBlockAft(${s.id},${idx})">CORRIGER + COMPLÉTER AFT</button>${isApplication?`<button class="btn btn-ghost btn-sm" onclick="copyStartGameToApplication(${s.id})">COPIER JEU DE DÉPART</button>`:''}`:''}<button class="btn btn-ghost btn-sm" onclick="diagramToText(${s.id},${idx})">SCHÉMA → TEXTE</button><button class="btn btn-ghost btn-sm" onclick="diagramFromText(${s.id},${idx})">TEXTE → SCHÉMA</button><button class="btn btn-ghost btn-sm" onclick="saveBlockExerciseToLibrary(${s.id},${idx})">ENREGISTRER EN BIBLIOTHÈQUE</button>`;
     const prepBlock=canEdit?(aft?`${sessionPrepEditorHtml(s,idx,b,isCooling)}<div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${actionButtons}</div>`:`<div class="form-group"><label class="form-label">EXERCICE / CONSIGNE</label><textarea class="form-input" rows="2" oninput="updateSessionBlock(${s.id},${idx},'exercise',this.value)">${esc(b.exercise||'')}</textarea><div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${actionButtons}</div></div>`):(aft?sessionPrepReadOnlyHtml(b,isCooling):`${b.exercise?`<div class="exercise-card"><div style="font-size:8px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:5px">${isCooling?'BILAN DONNÉ':'EXERCICE DONNÉ'}</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.5;white-space:pre-wrap">${esc(b.exercise)}</div></div>`:''}`);
     const diagramBlock=isCooling?`<div style="background:var(--bg4);border-left:3px solid var(--bronze);border-radius:0 8px 8px 0;padding:12px;font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.65"><b style="color:var(--offwhite)">Pas de schéma terrain pour cette étape.</b><br>Le cooling down sert à revenir au calme, vérifier ce que les joueurs retiennent et fermer la séance avec un feedback sandwich.</div>`:diagramHtml(s,idx,canEdit);
     const body=aft&&!isCooling
@@ -4245,6 +4245,63 @@ function saveBlockExerciseToLibrary(sessionId,blockIdx){
   if(ex){showNotif('Exercice enregistré dans la bibliothèque');render();}
   else showNotif('Choisis un aspect et écris une consigne');
 }
+function sessionExercisePickerHtml(extra={}){
+  const sessionId=Number(extra.sessionId);
+  const blockIdx=Number(extra.blockIdx);
+  const s=STATE.sessions.find(x=>x.id===sessionId);
+  const b=s?.blocks?.[blockIdx]||{};
+  const list=(STATE.customExercises||[]);
+  const types=[...new Set(list.map(e=>e.exerciseType||'Exercice').filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  return `<div class="modal-title">CHOISIR UN EXERCICE DU CARNET</div><button class="modal-close" onclick="closeModal()">×</button>
+    <div class="session-config-note">Choisis un exercice déjà validé. La plateforme remplit le nom, le déroulement, les aspects et le schéma dans cette séance.</div>
+    <div class="g2">
+      <div class="form-group"><label class="form-label">RECHERCHE / THÈME CLÉ</label><input class="form-input" id="exercisePickerSearch" placeholder="Ex: lob, jeu de départ, mental, vitre..." oninput="filterSessionExercisePicker()"></div>
+      <div class="form-group"><label class="form-label">TYPE D’EXERCICE</label><select class="form-select" id="exercisePickerType" onchange="filterSessionExercisePicker()"><option value="">Tous les types</option>${types.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}</select></div>
+    </div>
+    <div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:12px">Bloc actuel: <b style="color:var(--bronze)">${esc(b.exerciseName||b.sessionPart||'Exercice')}</b>${b.aspect?` · ${esc(b.aspect)}`:''}</div>
+    <div id="exercisePickerList" style="display:grid;gap:10px;max-height:58vh;overflow:auto;padding-right:4px">
+      ${list.length?list.map(ex=>{
+        const pl=exercisePillarMeta(ex);
+        const search=norm([ex.title,ex.exerciseType,ex.aspect,ex.secondary,ex.level,ex.players,ex.duration,ex.objective,ex.setup,ex.flow,ex.coach,ex.questions,ex.benefits].join(' '));
+        return `<div class="exercise-picker-item" data-type="${esc(ex.exerciseType||'Exercice')}" data-search="${esc(search)}" style="background:var(--bg4);border:1px solid ${pl.color}44;border-radius:8px;padding:12px">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+            <div><div style="font-size:9px;letter-spacing:1.5px;color:${pl.color};margin-bottom:4px">${esc(ex.exerciseType||'Exercice')} · ${esc(pl.name)}</div><div style="font-size:18px;font-weight:800;color:var(--white);line-height:1.08">${esc(ex.title)}</div></div>
+            <button class="btn btn-primary btn-sm" onclick="applyLibraryExerciseToSession(${sessionId},${blockIdx},'${ex.id}')">UTILISER</button>
+          </div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin:10px 0">${exerciseKeyThemes(ex).map(t=>`<span class="badge" style="background:var(--bg2);border:1px solid var(--border2);color:var(--offwhite)">${esc(t)}</span>`).join('')}</div>
+          <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55">${esc(exerciseFieldPreview(ex.objective||ex.flow,180))}</div>
+        </div>`;
+      }).join(''):`<div style="text-align:center;color:var(--gray);font-family:var(--font-body);line-height:1.7;padding:22px">Aucun exercice enregistré pour l’instant. Va dans une séance, prépare un exercice, puis clique ENREGISTRER EN BIBLIOTHÈQUE.</div>`}
+    </div>`;
+}
+function filterSessionExercisePicker(){
+  const q=norm(document.getElementById('exercisePickerSearch')?.value||'');
+  const type=document.getElementById('exercisePickerType')?.value||'';
+  document.querySelectorAll('.exercise-picker-item').forEach(item=>{
+    const okType=!type||item.dataset.type===type;
+    const okSearch=!q||String(item.dataset.search||'').includes(q);
+    item.style.display=okType&&okSearch?'block':'none';
+  });
+}
+function applyLibraryExerciseToSession(sessionId,blockIdx,exerciseId){
+  const s=STATE.sessions.find(x=>x.id===sessionId);
+  const ex=exerciseById(exerciseId);
+  const b=ensureSessionBlock(s,blockIdx);
+  if(!s||!ex||!b){showNotif('Exercice introuvable');return;}
+  b.exerciseName=ex.title||ex.exerciseName||'Exercice';
+  b.exerciseType=ex.exerciseType||b.sessionPart||'Exercice';
+  b.pillar=ex.pillar||b.pillar;
+  b.aspect=ex.aspect||b.aspect;
+  b.secondaryAspect=ex.secondary||b.secondaryAspect||'';
+  b.exercise=prepToExerciseText({objective:ex.objective,setup:ex.setup,flow:ex.flow,rule:ex.scoring,coach:ex.coach,questions:ex.questions,benefits:ex.benefits});
+  b.prep={objective:ex.objective||'',setup:ex.setup||'',flow:ex.flow||'',rule:ex.scoring||'',coach:ex.coach||'',questions:ex.questions||'',benefits:ex.benefits||''};
+  b.diagramItems=JSON.parse(JSON.stringify(ex.diagramItems||[]));
+  b.sourceExerciseId=ex.id;
+  saveState();
+  closeModal();
+  showNotif('Exercice du carnet appliqué à la séance');
+  render();
+}
 function deleteCustomExercise(id){
   const ex=(STATE.customExercises||[]).find(e=>e.id===id);
   if(!ex) return;
@@ -4757,6 +4814,16 @@ function exerciseMatchesFilter(ex){
 function exerciseFieldPreview(text,max=120){
   const raw=String(text||'').replace(/\s+/g,' ').trim();
   return raw.length>max?raw.slice(0,max-1).trim()+'…':raw||'À préciser';
+}
+function exerciseKeyThemes(ex){
+  return [
+    ex.exerciseType,
+    ex.aspect,
+    ex.secondary,
+    ex.level&&exerciseLevelLabel(ex.level),
+    ex.players?`${ex.players} joueurs`:'',
+    ex.duration
+  ].filter(Boolean).slice(0,6);
 }
 function exerciseNotebookCourtSvg(ex){
   return printDiagramSvg(ex);
@@ -5979,6 +6046,7 @@ function renderModal(type,extra){
   if(type==='editPlayer'){const p=STATE.players.find(p=>p.id===extra);return p?playerFormHtml(p):`<div class="modal-title">JOUEUR INTROUVABLE</div><button class="modal-close" onclick="closeModal()">×</button>`}
   if(type==='newSession') return newSessionModalHtml(extra);
   if(type==='editExercise') return exerciseEditFormHtml(extra);
+  if(type==='sessionExercisePicker') return sessionExercisePickerHtml(extra);
   return `<div class="modal-title">—</div><button class="modal-close" onclick="closeModal()">×</button>`;
 }
 function addPlayer(){const data=readPlayerForm();if(!data.firstName||!data.lastName){showNotif('Prénom et nom requis');return;}const id=Math.max(0,...STATE.players.map(p=>p.id))+1;if(!data.code)data.code=(data.firstName[0]+data.lastName[0]+String(id).padStart(3,'0')).toUpperCase();if(!data.playerPassword)data.playerPassword=String(data.code).toLowerCase();STATE.players.push({...data,id,profileId:null,level:null,levelManual:false,scores:{T:0,TA:0,P:0,M:0},aspects:{},futureAspects:[],sessions:[]});closeModal();showNotif('Fiche joueur créée');setUI({page:'players',selectedPlayerId:id,subpage:'profil'});}
