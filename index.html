@@ -2542,8 +2542,9 @@ function diagramTool(){
 function diagramToolData(){
   return DIAGRAM_TOOLS.find(t=>t.id===diagramTool())||DIAGRAM_TOOLS[0];
 }
-function courtBaseSvg(inner='',editable=false,sessionId=null,blockIdx=null){
-  return `<svg viewBox="0 0 100 200" style="width:100%;max-width:330px;aspect-ratio:1/2;background:#0d1117;border:1px solid var(--border2);border-radius:8px;touch-action:manipulation;display:block;margin:auto" ${editable?`onclick="diagramCourtClick(event,${sessionId},${blockIdx})"`:''}>
+function courtBaseSvg(inner='',editable=false,sessionId=null,blockIdx=null,clickHandler=null){
+  const clickAttr=editable?(clickHandler||`diagramCourtClick(event,${sessionId},${blockIdx})`):'';
+  return `<svg viewBox="0 0 100 200" style="width:100%;max-width:330px;aspect-ratio:1/2;background:#0d1117;border:1px solid var(--border2);border-radius:8px;touch-action:manipulation;display:block;margin:auto" ${clickAttr?`onclick="${clickAttr}"`:''}>
     <defs>
       <marker id="arrowHead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#d4a017"></path></marker>
       <marker id="runHead" markerWidth="4" markerHeight="4" refX="3.4" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 Z" fill="#ffffff"></path></marker>
@@ -2604,6 +2605,124 @@ function nl2br(v){
 function printDiagramSvg(block){
   const body=(block.diagramItems||[]).map(diagramItemSvg).join('');
   return courtBaseSvg(body,false);
+}
+function exerciseDiagramCanvasHtml(id,editable=false){
+  const ex=exerciseById(id);
+  if(!ex) return '';
+  const body=(ex.diagramItems||[]).map(diagramItemSvg).join('');
+  const pending=UI.exerciseDiagramPending&&UI.exerciseDiagramPending.exerciseId===id?UI.exerciseDiagramPending:null;
+  return `<div id="exercise_diagram_canvas_${id}">
+    ${courtBaseSvg(body,editable,null,null,`exerciseDiagramCourtClick(event,'${id}')`)}
+    ${editable?`<div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:8px">${pending?`<b style="color:var(--bronze)">Clique maintenant l’arrivée / la taille.</b>`:'Joueur/coach/panier = 1 clic. Course/balle/lancer/zone = 2 clics.'}</div>`:''}
+  </div>`;
+}
+function exerciseDiagramToolsHtml(id){
+  const tools=DIAGRAM_TOOLS.map(t=>`<button type="button" title="${esc(t.name)}" class="status-choice ${diagramTool()===t.id?'sel':''}" onclick="selectExerciseDiagramTool('${t.id}',this)">${esc(t.label)}</button>`).join('');
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${tools}<button type="button" class="status-choice" onclick="exerciseDiagramFromText('${id}')">TEXTE → SCHÉMA</button><button type="button" class="status-choice" onclick="exerciseDiagramToText('${id}')">SCHÉMA → TEXTE</button><button type="button" class="status-choice" onclick="addExerciseDiagramTemplate('${id}')">MODÈLE</button><button type="button" class="status-choice" onclick="undoExerciseDiagramItem('${id}')">UNDO</button><button type="button" class="status-choice" onclick="clearExerciseDiagram('${id}')">VIDER</button></div>`;
+}
+function selectExerciseDiagramTool(toolId,btn){
+  UI.diagramTool=toolId;
+  const wrap=btn?.parentElement;
+  if(wrap) wrap.querySelectorAll('.status-choice').forEach(b=>b.classList.toggle('sel',b===btn));
+}
+function refreshExerciseDiagram(id){
+  const box=document.getElementById('exercise_diagram_canvas_'+id);
+  if(box) box.outerHTML=exerciseDiagramCanvasHtml(id,true);
+}
+function exerciseDiagramCourtClick(evt,id){
+  const ex=(STATE.customExercises||[]).find(e=>e.id===id);
+  if(!ex) return;
+  const svg=evt.currentTarget, r=svg.getBoundingClientRect();
+  const x=Math.max(8,Math.min(92,((evt.clientX-r.left)/r.width)*100));
+  const y=Math.max(8,Math.min(192,((evt.clientY-r.top)/r.height)*200));
+  const tool=diagramToolData();
+  const twoClick=['run','shot','lob','feed','zone'].includes(tool.type);
+  const pending=UI.exerciseDiagramPending;
+  if(twoClick&&(!pending||pending.exerciseId!==id||pending.tool!==tool.type)){
+    UI.exerciseDiagramPending={exerciseId:id,tool:tool.type,label:tool.label,color:tool.color,x:+x.toFixed(1),y:+y.toFixed(1)};
+    showNotif(tool.type==='zone'?'Premier coin placé · clique le coin opposé':'Départ placé · clique l’arrivée');
+    refreshExerciseDiagram(id);
+    return;
+  }
+  const item={type:tool.type,label:tool.label,color:tool.color,x:+x.toFixed(1),y:+y.toFixed(1)};
+  if(twoClick&&pending){
+    item.x=pending.x; item.y=pending.y; item.label=pending.label; item.color=pending.color;
+    if(tool.type==='zone'){
+      item.x=+Math.min(pending.x,x).toFixed(1); item.y=+Math.min(pending.y,y).toFixed(1);
+      item.w=+Math.max(4,Math.abs(x-pending.x)).toFixed(1); item.h=+Math.max(4,Math.abs(y-pending.y)).toFixed(1);
+    }else{
+      item.x2=+x.toFixed(1); item.y2=+y.toFixed(1);
+    }
+    UI.exerciseDiagramPending=null;
+  }
+  ex.diagramItems=Array.isArray(ex.diagramItems)?ex.diagramItems:[];
+  ex.diagramItems.push(item);
+  saveState();
+  refreshExerciseDiagram(id);
+}
+function exerciseDiagramToText(id){
+  const ex=(STATE.customExercises||[]).find(e=>e.id===id);
+  if(!ex)return;
+  const summary=diagramSummaryText(ex);
+  if(!summary){showNotif('Ajoute d’abord des éléments sur le schéma');return;}
+  const flow=document.getElementById('ex_flow');
+  if(flow) flow.value=`${flow.value||ex.flow||''}\n\nLecture du schéma:\n${summary}`.trim();
+  showNotif('Schéma traduit dans le déroulement');
+}
+function exerciseDiagramFromText(id){
+  const ex=(STATE.customExercises||[]).find(e=>e.id===id);
+  if(!ex)return;
+  const text=[document.getElementById('ex_flow')?.value,document.getElementById('ex_setup')?.value,ex.flow,ex.setup].join(' ').toLowerCase();
+  const items=[
+    {type:'coach',label:'CO',color:'#ffffff',x:50,y:103},
+    {type:'basket',label:'PAN',color:'#a67c52',x:58,y:106},
+    {type:'feeder',label:'L',color:'#f39c12',x:42,y:106},
+    {type:'player',label:'J1',color:'#c0392b',x:28,y:156},
+    {type:'player',label:'J2',color:'#2980b9',x:72,y:156}
+  ];
+  if(/cible|zone|viser|objectif|pied|vitre|long/.test(text))items.push({type:'target',label:'C',color:'#ffffff',x:72,y:44},{type:'zone',label:'ZONE',color:'#27ae60',x:62,y:34,w:22,h:18});
+  if(/lancer|panier|coach|envoi|envoy/.test(text))items.push({type:'feed',label:'Lancer',color:'#f39c12',x:42,y:106,x2:28,y2:156});
+  if(/lob/.test(text))items.push({type:'lob',label:'Lob courbe',color:'#f4d35e',x:28,y:156,x2:72,y2:44});
+  else if(/balle|trajectoire|volée|service|retour|frappe/.test(text))items.push({type:'shot',label:'Balle droite',color:'#f4d35e',x:28,y:156,x2:72,y2:44});
+  if(/monte|replacement|déplacement|course|suivre|avancer|revenir/.test(text))items.push({type:'run',label:'Course',color:'#ffffff',x:28,y:156,x2:45,y2:128});
+  ex.diagramItems=items;
+  saveState();
+  refreshExerciseDiagram(id);
+  showNotif('Schéma généré depuis le texte');
+}
+function addExerciseDiagramTemplate(id){
+  const ex=(STATE.customExercises||[]).find(e=>e.id===id);
+  if(!ex)return;
+  ex.diagramItems=[
+    {type:'coach',label:'CO',color:'#ffffff',x:50,y:103},
+    {type:'basket',label:'PAN',color:'#a67c52',x:58,y:106},
+    {type:'feeder',label:'L',color:'#f39c12',x:42,y:106},
+    {type:'player',label:'J1',color:'#c0392b',x:28,y:156},
+    {type:'player',label:'J2',color:'#2980b9',x:72,y:156},
+    {type:'target',label:'C',color:'#ffffff',x:28,y:44},
+    {type:'target',label:'C',color:'#ffffff',x:72,y:44},
+    {type:'feed',label:'Lancer',color:'#f39c12',x:42,y:106,x2:28,y2:156},
+    {type:'shot',label:'Balle droite',color:'#f4d35e',x:28,y:156,x2:72,y2:44},
+    {type:'run',label:'Course',color:'#ffffff',x:28,y:156,x2:45,y2:128}
+  ];
+  saveState();
+  refreshExerciseDiagram(id);
+}
+function undoExerciseDiagramItem(id){
+  const ex=(STATE.customExercises||[]).find(e=>e.id===id);
+  if(!ex)return;
+  ex.diagramItems=Array.isArray(ex.diagramItems)?ex.diagramItems:[];
+  ex.diagramItems.pop();
+  saveState();
+  refreshExerciseDiagram(id);
+}
+function clearExerciseDiagram(id){
+  const ex=(STATE.customExercises||[]).find(e=>e.id===id);
+  if(!ex||!confirm('Vider le schéma de cet exercice ?'))return;
+  ex.diagramItems=[];
+  UI.exerciseDiagramPending=null;
+  saveState();
+  refreshExerciseDiagram(id);
 }
 function pdfTextLines(text){
   return String(text||'').split(/\n+/).map(x=>x.replace(/^[-•]\s*/,'').trim()).filter(Boolean);
@@ -4093,6 +4212,7 @@ function saveCustomExerciseFromBlock(block,source='session'){
     id:'cx'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
     title:candidate.title,
     exerciseName:block?.exerciseName||candidate.title,
+    exerciseType:block?.exerciseType||block?.sessionPart||'Exercice',
     pillar,
     aspect,
     secondary:block.secondaryAspect||'À définir',
@@ -4120,7 +4240,7 @@ function saveBlockExerciseToLibrary(sessionId,blockIdx){
   const s=STATE.sessions.find(s=>s.id===sessionId);
   const b=s?.blocks?.[blockIdx];
   const step=s?.sessionType==='aft'?sessionStructure(s)[blockIdx]:null;
-  const fallback={...(b||{}),pillar:b?.pillar||'M',aspect:b?.aspect||step?.name||'',exercise:b?.exercise||''};
+  const fallback={...(b||{}),pillar:b?.pillar||'M',aspect:b?.aspect||step?.name||'',exercise:b?.exercise||'',sessionPart:step?.name||b?.sessionPart||''};
   const ex=saveCustomExerciseFromBlock(fallback,'manual');
   if(ex){showNotif('Exercice enregistré dans la bibliothèque');render();}
   else showNotif('Choisis un aspect et écris une consigne');
@@ -4639,35 +4759,7 @@ function exerciseFieldPreview(text,max=120){
   return raw.length>max?raw.slice(0,max-1).trim()+'…':raw||'À préciser';
 }
 function exerciseNotebookCourtSvg(ex){
-  const items=Array.isArray(ex.diagramItems)?ex.diagramItems.slice(0,10):[];
-  const markers=items.filter(i=>['player','coach','feeder','basket','target'].includes(i.type)).map(i=>{
-    const color=i.color||'#fff';
-    const label=esc(i.label||'');
-    const r=i.type==='target'?3.2:4.3;
-    return i.type==='target'
-      ? `<rect x="${(i.x||50)-4}" y="${(i.y||100)-4}" width="8" height="8" fill="none" stroke="${color}" stroke-width="1.4"/>`
-      : `<circle cx="${i.x||50}" cy="${i.y||100}" r="${r}" fill="${color}" stroke="#fff" stroke-width="1"/><text x="${i.x||50}" y="${(i.y||100)+1.6}" text-anchor="middle" font-size="4.2" font-weight="900" fill="#111">${label}</text>`;
-  }).join('');
-  const lines=items.filter(i=>['run','shot','feed','zone'].includes(i.type)).map(i=>{
-    const color=i.color||'#f5d75e';
-    if(i.type==='zone') return `<rect x="${i.x||28}" y="${i.y||70}" width="${i.w||20}" height="${i.h||28}" fill="${color}22" stroke="${color}" stroke-width="1.3" stroke-dasharray="2 2"/>`;
-    const dash=i.type==='run'?'3 2':'';
-    const curve=i.type==='shot'&&String(i.label||'').toLowerCase().includes('lob');
-    return curve
-      ? `<path d="M ${i.x||25} ${i.y||150} Q 50 36 ${i.x2||75} ${i.y2||45}" fill="none" stroke="${color}" stroke-width="1.5" marker-end="url(#arr)"/>`
-      : `<line x1="${i.x||25}" y1="${i.y||150}" x2="${i.x2||75}" y2="${i.y2||45}" stroke="${color}" stroke-width="1.5" stroke-dasharray="${dash}" marker-end="url(#arr)"/>`;
-  }).join('');
-  return `<svg class="exercise-court-svg" viewBox="0 0 100 130" aria-label="Schéma exercice">
-    <defs><marker id="arr" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#f5d75e"/></marker></defs>
-    <rect x="7" y="5" width="86" height="120" rx="2" fill="#155f2a" stroke="#f6f1df" stroke-width="1.4"/>
-    <line x1="7" y1="65" x2="93" y2="65" stroke="#f6f1df" stroke-width="1.2"/>
-    <line x1="50" y1="5" x2="50" y2="125" stroke="#f6f1df" stroke-width="1"/>
-    <line x1="7" y1="27" x2="93" y2="27" stroke="#f6f1df" stroke-width="1"/>
-    <line x1="7" y1="103" x2="93" y2="103" stroke="#f6f1df" stroke-width="1"/>
-    <rect x="7" y="5" width="86" height="120" rx="2" fill="none" stroke="#0b3718" stroke-width="4" opacity=".35"/>
-    ${lines||`<line x1="25" y1="102" x2="75" y2="28" stroke="#f5d75e" stroke-width="1.5" marker-end="url(#arr)"/><line x1="25" y1="104" x2="40" y2="86" stroke="#fff" stroke-width="1.5" stroke-dasharray="3 2" marker-end="url(#arr)"/>`}
-    ${markers||`<circle cx="25" cy="104" r="4.3" fill="#c0392b" stroke="#fff" stroke-width="1"/><text x="25" y="105.6" text-anchor="middle" font-size="4.2" font-weight="900" fill="#111">J1</text><circle cx="75" cy="104" r="4.3" fill="#2980b9" stroke="#fff" stroke-width="1"/><text x="75" y="105.6" text-anchor="middle" font-size="4.2" font-weight="900" fill="#111">J2</text><rect x="71" y="24" width="8" height="8" fill="none" stroke="#fff" stroke-width="1.4"/>`}
-  </svg>`;
+  return printDiagramSvg(ex);
 }
 function exerciseMiniCardHtml(ex){
   const pl=exercisePillarMeta(ex);
@@ -4677,7 +4769,7 @@ function exerciseMiniCardHtml(ex){
     <div class="exercise-page">
       <div class="exercise-page-head">
         <div class="exercise-page-num">${pageNo}</div>
-        <div><div class="exercise-page-kicker">${esc(pl.name)} · carnet exercice</div><div class="exercise-page-title">${esc(ex.title||ex.exerciseName||'Exercice HWBT')}</div></div>
+        <div><div class="exercise-page-kicker">${esc(ex.exerciseType||'Exercice')} · ${esc(pl.name)} · carnet exercice</div><div class="exercise-page-title">${esc(ex.title||ex.exerciseName||'Exercice HWBT')}</div></div>
         <div class="exercise-page-meta">${esc(ex.duration||'Durée ?')}<br>${esc(ex.players||'1-4')} joueurs<br>${hasVideo?'Vidéo OK':'Vidéo à ajouter'}</div>
       </div>
       <div class="exercise-page-body">
@@ -4734,20 +4826,21 @@ function printExerciseMiniPdf(id){
   const w=window.open('','_blank');
   if(!w){showNotif('Autorise les popups pour imprimer la mini-fiche');return;}
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(ex.title)}</title><style>
+    :root{--border2:#2a2a3a;--bronze:#A67C52}
     @page{size:A4 landscape;margin:10mm}
     *{box-sizing:border-box}body{margin:0;background:#f3efe5;color:#080808;font-family:Arial,sans-serif}
     .sheet{min-height:190mm;padding:12mm;background:#f3efe5}
     .top{height:42mm;background:#070707;color:white;border-bottom:5px solid #b88928;padding:10mm 12mm;display:flex;justify-content:space-between;gap:18mm;align-items:flex-start}
     .brand{font:800 13px Arial;letter-spacing:5px;color:#c9a227}.title{font:900 32px Arial;letter-spacing:1px;margin-top:5mm;text-transform:uppercase;line-height:.95}.meta{border:1px solid #8b6a28;border-radius:7px;padding:6mm;min-width:70mm;background:#0b0b0bdd}
     .tag{font-size:10px;letter-spacing:2px;color:#8b5d20;text-transform:uppercase;font-weight:800;margin-bottom:2mm}.box{border:1px solid #d4c7ac;border-left:4px solid #b88928;border-radius:6px;background:#fffaf0;padding:5mm;break-inside:avoid}
-    .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5mm;margin-top:6mm}.text{font-size:11px;line-height:1.45;white-space:pre-wrap}.wide{grid-column:span 2}.footer{margin-top:5mm;background:#070707;color:#c9a227;padding:4mm 6mm;font-size:10px;letter-spacing:3px;font-weight:800;display:flex;justify-content:space-between}
-    @media print{button{display:none}.sheet{padding:0}.top{margin:-10mm -10mm 0 -10mm}}
+    .grid{display:grid;grid-template-columns:78mm 1fr 1fr;gap:5mm;margin-top:6mm}.text{font-size:10.5px;line-height:1.4;white-space:pre-wrap}.wide{grid-column:span 2}.footer{margin-top:5mm;background:#070707;color:#c9a227;padding:4mm 6mm;font-size:10px;letter-spacing:3px;font-weight:800;display:flex;justify-content:space-between}.diagram{border:1px solid #d4c7ac;background:#fffaf0;border-radius:6px;padding:4mm;grid-row:span 2}.actions{position:sticky;bottom:0;background:#f3efe5dd;padding:4mm;text-align:right}.actions button{padding:10px 16px;background:#111;color:white;border:0;border-radius:6px;font-weight:800;margin-left:8px}.actions button:first-child{background:#b88928}
+    @media print{button,.actions{display:none}.sheet{padding:0}.top{margin:-10mm -10mm 0 -10mm}}
   </style></head><body><div class="sheet">
-    <div class="top"><div><div class="brand">HWBT ACADEMY · MINI-FICHE EXERCICE</div><div class="title">${esc(ex.title)}</div></div><div class="meta"><div style="font-size:22px;font-weight:900;color:#fff">${esc(pl.name)}</div><div style="color:#c9a227;margin-top:3mm">${esc(ex.aspect||'Aspect')} · ${esc(ex.secondary||'Secondaire')}</div><div style="font-size:12px;margin-top:4mm">${esc(ex.duration||'Durée ?')} · ${esc(ex.players||'1-4')} joueurs · ${esc(exerciseLevelLabel(ex.level||'tous'))}</div></div></div>
-    <div class="grid">${rows.map(([label,text],i)=>`<div class="box ${i===2?'wide':''}"><div class="tag">${esc(label)}</div><div class="text">${esc(text||'À préciser')}</div></div>`).join('')}</div>
+    <div class="top"><div><div class="brand">HWBT ACADEMY · MINI-FICHE EXERCICE</div><div class="title">${esc(ex.title)}</div></div><div class="meta"><div style="font-size:22px;font-weight:900;color:#fff">${esc(ex.exerciseType||'Exercice')}</div><div style="color:#c9a227;margin-top:3mm">${esc(pl.name)} · ${esc(ex.aspect||'Aspect')} · ${esc(ex.secondary||'Secondaire')}</div><div style="font-size:12px;margin-top:4mm">${esc(ex.duration||'Durée ?')} · ${esc(ex.players||'1-4')} joueurs · ${esc(exerciseLevelLabel(ex.level||'tous'))}</div></div></div>
+    <div class="grid"><div class="diagram"><div class="tag">Schéma terrain</div>${printDiagramSvg(ex)}</div>${rows.map(([label,text],i)=>`<div class="box ${i===2?'wide':''}"><div class="tag">${esc(label)}</div><div class="text">${esc(text||'À préciser')}</div></div>`).join('')}</div>
     <div class="footer"><span>COMPRENDRE · S’ENTRAÎNER · VALIDER · ÉVOLUER</span><span>${ex.videoMeta?'VIDÉO TERRAIN DISPONIBLE':'VIDÉO À AJOUTER'}</span></div>
-    <div style="text-align:right;margin-top:4mm"><button onclick="window.print()" style="padding:10px 16px;background:#111;color:white;border:0;border-radius:6px;font-weight:800">IMPRIMER / PDF</button></div>
-  </div><script>setTimeout(()=>window.print(),450)<\/script></body></html>`);
+    <div class="actions"><button onclick="window.print()">IMPRIMER / PDF</button><button onclick="window.close(); if(!window.closed) history.back();">RETOUR</button></div>
+  </div></body></html>`);
   w.document.close();
 }
 function pageExercises(){
@@ -5811,15 +5904,21 @@ function exerciseEditFormHtml(id){
   const ex=(STATE.customExercises||[]).find(e=>e.id===id);
   if(!ex) return `<div class="modal-title">EXERCICE INTROUVABLE</div><button class="modal-close" onclick="closeModal()">×</button>`;
   const levelOptions=['débutant','intermédiaire','avancé','tous'];
+  const typeOptions=['Échauffement','Jeu de départ','Jeu d’apprentissage','Jeu d’application','Cooling down','Exercice HWBT','Autre'];
+  const aspectOptions=(selected)=>{
+    const exists=BASE44_ASPECT_CATALOG.some(a=>a.name===selected);
+    return `${selected&&!exists?`<option value="${esc(selected)}" selected>${esc(selected)}</option>`:''}${BASE44_ASPECT_CATALOG.map(a=>`<option value="${esc(a.name)}" ${selected===a.name?'selected':''}>${esc(a.category)} · ${esc(a.name)}</option>`).join('')}`;
+  };
   return `<div class="modal-title">MODIFIER MINI-FICHE EXERCICE</div><button class="modal-close" onclick="closeModal()">×</button>
     <div class="session-config-note">Cette fiche est la version propre de l’exercice. Elle servira pour la bibliothèque, la vidéo explicative, le PDF et les futurs reels.</div>
     <div class="form-group"><label class="form-label">NOM DE L’EXERCICE</label><input class="form-input" id="ex_title" value="${esc(ex.title||'')}" placeholder="Ex: Jeu de départ - lobs avant vitre"></div>
+    <div class="form-group"><label class="form-label">TYPE D’EXERCICE</label><select class="form-select" id="ex_type">${typeOptions.map(t=>`<option value="${esc(t)}" ${(ex.exerciseType||'')===t?'selected':''}>${esc(t)}</option>`).join('')}</select></div>
     <div class="g2">
       <div class="form-group"><label class="form-label">PILIER PRINCIPAL</label><select class="form-select" id="ex_pillar">${PILLARS.map(p=>`<option value="${p.id}" ${ex.pillar===p.id?'selected':''}>${p.name}</option>`).join('')}</select></div>
       <div class="form-group"><label class="form-label">ASPECT PRINCIPAL</label><input class="form-input" id="ex_aspect" value="${esc(ex.aspect||'')}" placeholder="Ex: Lob avant vitre"></div>
     </div>
     <div class="g2">
-      <div class="form-group"><label class="form-label">ASPECT SECONDAIRE</label><input class="form-input" id="ex_secondary" value="${esc(ex.secondary||'')}" placeholder="Ex: Lecture du jeu"></div>
+      <div class="form-group"><label class="form-label">ASPECT SECONDAIRE</label><select class="form-select" id="ex_secondary"><option value="">— Choisir —</option>${aspectOptions(ex.secondary||'')}</select></div>
       <div class="form-group"><label class="form-label">NIVEAU</label><select class="form-select" id="ex_level">${levelOptions.map(l=>`<option value="${l}" ${(ex.level||'tous')===l?'selected':''}>${exerciseLevelLabel(l)}</option>`).join('')}</select></div>
     </div>
     <div class="g2">
@@ -5839,6 +5938,11 @@ function exerciseEditFormHtml(id){
       <div class="form-group"><label class="form-label">QUESTION D’INDUCTION</label><textarea class="form-input" id="ex_questions" rows="3">${esc(ex.questions||'')}</textarea></div>
       <div class="form-group"><label class="form-label">MESSAGE CLÉ / BIENFAITS</label><textarea class="form-input" id="ex_benefits" rows="3">${esc(ex.benefits||'')}</textarea></div>
     </div>
+    <div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:12px">
+      <div class="card-title">SCHÉMA DE L’EXERCICE</div>
+      ${exerciseDiagramToolsHtml(ex.id)}
+      ${exerciseDiagramCanvasHtml(ex.id,true)}
+    </div>
     <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">ANNULER</button><button class="btn btn-primary" onclick="saveExerciseEdit('${ex.id}')">ENREGISTRER</button></div>`;
 }
 function saveExerciseEdit(id){
@@ -5848,6 +5952,7 @@ function saveExerciseEdit(id){
   Object.assign(ex,{
     title:val('ex_title')||ex.title,
     exerciseName:val('ex_title')||ex.exerciseName||ex.title,
+    exerciseType:val('ex_type')||'Exercice',
     pillar:val('ex_pillar')||ex.pillar,
     aspect:val('ex_aspect')||ex.aspect,
     secondary:val('ex_secondary')||'À définir',
