@@ -344,6 +344,7 @@ body{min-width:0}
       <div class="nav-item active" data-page="players" onclick="setUI({page:'players',selectedPlayerId:null,subpage:'profil'})" style="display: flex;"><span class="nav-icon">◉</span>PLAYERS</div>
       <div class="nav-item" data-page="sessions" onclick="setUI({page:'sessions'})" style="display: flex;"><span class="nav-icon">▦</span>SESSIONS</div>
       <div class="nav-item" data-page="commandCenter" onclick="setUI({page:'commandCenter',commandTab:'brief'})" style="display: flex;"><span class="nav-icon">◆</span>COMMAND CENTER</div>
+      <div class="nav-item" data-page="contentStudio" onclick="setUI({page:'contentStudio',contentTab:'dashboard'})" style="display: flex;"><span class="nav-icon">▣</span>CONTENT STUDIO</div>
       <div class="nav-item" data-page="shop" onclick="setUI({page:'shop'})" style="display: flex;"><span class="nav-icon">◫</span>SHOP</div>
     </div>
     <div class="nav-section">
@@ -484,7 +485,8 @@ let STATE = {
   matches: [],
   customExercises: [],
   testResults: {},
-  commandCenter: {briefs:[],chats:[],debriefs:[],contentIdeas:[],decisions:[],tasks:[]}
+  commandCenter: {briefs:[],chats:[],debriefs:[],contentIdeas:[],decisions:[],tasks:[]},
+  contentStudio: {posts:[],ideas:[]}
 };
 
 let UI = {page:'dashboard', subpage:'profil', pillarFilter:'T', selectedPlayerId:null, selectedSessionId:null, testState:null};
@@ -492,15 +494,24 @@ const STORAGE_KEY='hwbt_academy_v3_state';
 let REMOTE_SAVE_TIMER=null;
 let REMOTE_READY=false;
 function statePayload(){
-  return {players:STATE.players,sessions:STATE.sessions,matches:STATE.matches,customExercises:STATE.customExercises||[],testResults:STATE.testResults,commandCenter:STATE.commandCenter||{},updatedAt:new Date().toISOString()};
+  return {players:STATE.players,sessions:STATE.sessions,matches:STATE.matches,customExercises:STATE.customExercises||[],testResults:STATE.testResults,commandCenter:STATE.commandCenter||{},contentStudio:STATE.contentStudio||{},updatedAt:new Date().toISOString()};
 }
 function applySavedState(saved){
   if(!saved||typeof saved!=='object') return false;
   ['players','sessions','matches','customExercises'].forEach(k=>{if(Array.isArray(saved[k]))STATE[k]=saved[k];});
   if(saved.testResults&&typeof saved.testResults==='object')STATE.testResults=saved.testResults;
   if(saved.commandCenter&&typeof saved.commandCenter==='object')STATE.commandCenter={briefs:[],chats:[],debriefs:[],contentIdeas:[],decisions:[],tasks:[],...saved.commandCenter};
+  if(saved.contentStudio&&typeof saved.contentStudio==='object')STATE.contentStudio={posts:[],ideas:[],...saved.contentStudio};
   if(!Array.isArray(STATE.customExercises)) STATE.customExercises=[];
   if(!STATE.commandCenter) STATE.commandCenter={briefs:[],chats:[],debriefs:[],contentIdeas:[],decisions:[],tasks:[]};
+  if(!STATE.contentStudio) STATE.contentStudio={posts:[],ideas:[]};
+  if(!Array.isArray(STATE.contentStudio.posts)) STATE.contentStudio.posts=[];
+  if(!Array.isArray(STATE.contentStudio.ideas)) STATE.contentStudio.ideas=[];
+  if(!localStorage.getItem('hwbt_exercise_library_reset_20260710')){
+    STATE.customExercises=[];
+    saved.customExercises=[];
+    localStorage.setItem('hwbt_exercise_library_reset_20260710','1');
+  }
   return true;
 }
 function saveState(){
@@ -2473,7 +2484,7 @@ function sessionWorkBlocksHtml(s){
       ? `<div class="aft-prep-grid"><div style="min-width:0">${prepBlock}</div><div class="aft-prep-diagram" style="min-width:0">${diagramBlock}</div></div>`
       : `${prepBlock}${diagramBlock}`;
     return `<div class="aspect-input-block">
-      <div class="aib-header" style="align-items:flex-end;flex-wrap:wrap"><span class="aib-pillar" style="background:var(--bronze-dim);color:var(--bronze)">${String(idx+1).padStart(2,'0')}</span><span class="aib-name">${esc(label)}</span>${aft&&canEdit?`<div style="flex:1;min-width:220px"><label class="form-label" style="margin-bottom:4px">NOM DE L’EXERCICE</label><input class="form-input" value="${esc(exerciseName)}" oninput="updateSessionBlock(${s.id},${idx},'exerciseName',this.value)"></div>`:aft?`<span style="font-size:12px;color:var(--offwhite);font-family:var(--font-body)">— ${esc(exerciseName)}</span>`:''}${!aft&&closed&&b.coachState?`<span style="margin-left:auto;font-size:10px;color:${pl.color};font-weight:700">${ASPECT_STATE_LABEL[b.coachState]} · ${score}/20</span>`:''}</div>
+      <div class="aib-header" style="align-items:flex-end;flex-wrap:wrap"><span class="aib-pillar" style="background:var(--bronze-dim);color:var(--bronze)">${String(idx+1).padStart(2,'0')}</span><span class="aib-name">${esc(label)}</span>${canEdit?`<div style="flex:1;min-width:220px"><label class="form-label" style="margin-bottom:4px">NOM DE L’EXERCICE</label><input class="form-input" value="${esc(exerciseName)}" oninput="updateSessionBlock(${s.id},${idx},'exerciseName',this.value)" placeholder="Ex: Jeu de départ - lobs avant vitre"></div>`:`<span style="font-size:12px;color:var(--offwhite);font-family:var(--font-body)">— ${esc(exerciseName)}</span>`}${!aft&&closed&&b.coachState?`<span style="margin-left:auto;font-size:10px;color:${pl.color};font-weight:700">${ASPECT_STATE_LABEL[b.coachState]} · ${score}/20</span>`:''}</div>
       <div style="font-size:10px;color:var(--bronze);letter-spacing:1.4px;margin-bottom:8px">${esc(sub)}</div>
       <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:10px">${esc(desc)}</div>
       ${body}
@@ -2851,7 +2862,7 @@ function setLang(lang){
   render();
 }
 function updateChromeText(){
-  const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
+  const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
   document.querySelectorAll('.nav-item').forEach(n=>{
     const icon=n.querySelector('.nav-icon')?.textContent||'';
     const label=navNames[n.dataset.page]||n.dataset.page;
@@ -2873,7 +2884,7 @@ function render(){
   if(STATE.role==='player'){
     if(!STATE.activePlayerId) STATE.activePlayerId=STATE.players[0]?.id||null;
     const linkedPlayerTest=UI.page==='test'&&UI.testState&&UI.testState.playerId===STATE.activePlayerId;
-    if(['exercises','aspectsLibrary','commandCenter'].includes(UI.page)||(UI.page==='test'&&!linkedPlayerTest)) UI.page='dashboard';
+    if(['exercises','aspectsLibrary','commandCenter','contentStudio'].includes(UI.page)||(UI.page==='test'&&!linkedPlayerTest)) UI.page='dashboard';
     if(UI.page==='players') UI.selectedPlayerId=STATE.activePlayerId;
   }
   document.getElementById('lb-fr').classList.toggle('active',STATE.lang==='fr');
@@ -2884,18 +2895,19 @@ function render(){
   document.getElementById('roleTag').textContent=tr(STATE.role==='coach'?'COACH':'JOUEUR');
   const nav=document.querySelectorAll('.nav-item');
   nav.forEach(n=>{
-    const coachOnly=['exercises','aspectsLibrary','commandCenter'].includes(n.dataset.page);
+    const coachOnly=['exercises','aspectsLibrary','commandCenter','contentStudio'].includes(n.dataset.page);
     const playerHidden=['test'].includes(n.dataset.page);
     n.style.display=STATE.role==='player'&&(coachOnly||playerHidden)?'none':'flex';
     n.classList.toggle('active',n.dataset.page===UI.page);
   });
-  const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
+  const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
   document.getElementById('pageTitle').textContent=tr(STATE.role==='player'&&UI.page==='dashboard'?'MON CARNET JOUEUR':(titles[UI.page]||UI.page.toUpperCase()));
   const mc=document.getElementById('mainContent');
   if(UI.page==='dashboard') mc.innerHTML=STATE.role==='player'?pagePlayerPortal():pageDashboard();
   else if(UI.page==='players') mc.innerHTML=UI.selectedPlayerId?pagePlayerDetail(UI.selectedPlayerId):pagePlayersList();
   else if(UI.page==='sessions') mc.innerHTML=UI.selectedSessionId?pageSessionDetail(UI.selectedSessionId):pageSessionsList();
   else if(UI.page==='commandCenter') mc.innerHTML=pageCommandCenter();
+  else if(UI.page==='contentStudio') mc.innerHTML=pageContentStudio();
   else if(UI.page==='shop') mc.innerHTML=pageShop();
   else if(UI.page==='exercises') mc.innerHTML=pageExercises();
   else if(UI.page==='profiles') mc.innerHTML=UI.selectedProfileId?pageProfileDetail(UI.selectedProfileId):pageProfilesList();
@@ -4030,7 +4042,7 @@ function exerciseById(id){
   return allExercises().find(e=>e.id===id)||null;
 }
 function allExercises(){
-  return [...EXERCISE_LIBRARY,...(STATE.customExercises||[])];
+  return [...(STATE.customExercises||[])];
 }
 function exerciseKey(ex){
   return norm([ex.pillar,ex.aspect,ex.flow||ex.exercise||ex.title].join('|'));
@@ -4044,7 +4056,8 @@ function saveCustomExerciseFromBlock(block,source='session'){
   const pillar=block?.pillar;
   if(!pillar||!aspect||text.length<6) return null;
   if(!Array.isArray(STATE.customExercises)) STATE.customExercises=[];
-  const candidate={pillar,aspect,flow:text,title:text.split(/[.\n]/)[0].trim().slice(0,58)||aspect};
+  const prep=block?.prep&&typeof block.prep==='object'?block.prep:sessionPrepFromText(text,false);
+  const candidate={pillar,aspect,flow:text,title:block?.exerciseName||text.split(/[.\n]/)[0].trim().slice(0,58)||aspect};
   const key=exerciseKey(candidate);
   const exists=allExercises().find(e=>exerciseKey(e)===key);
   if(exists) return exists;
@@ -4052,16 +4065,23 @@ function saveCustomExerciseFromBlock(block,source='session'){
   const custom={
     id:'cx'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
     title:candidate.title,
+    exerciseName:block?.exerciseName||candidate.title,
     pillar,
     aspect,
     secondary:block.secondaryAspect||'À définir',
     level:'tous',
     players:'1-4',
     duration:'À définir',
-    setup:'Exercice créé depuis une séance coach.',
-    flow:text,
-    scoring:'À évaluer avec les 3 axes HWBT: exécution, compréhension et sous pression.',
-    coach:`Exercice sauvegardé dans la bibliothèque ${pl?pl.name:'HWBT'} pour être réutilisé dans une prochaine séance.`,
+    setup:prep.setup||'Exercice créé depuis une séance coach.',
+    objective:prep.objective||'',
+    flow:prep.flow||text,
+    scoring:prep.rule||'À évaluer avec les 3 axes HWBT: exécution, compréhension et sous pression.',
+    coach:prep.coach||`Exercice sauvegardé dans la bibliothèque ${pl?pl.name:'HWBT'} pour être réutilisé dans une prochaine séance.`,
+    questions:prep.questions||'',
+    benefits:prep.benefits||'',
+    prep,
+    diagramItems:JSON.parse(JSON.stringify(block.diagramItems||[])),
+    videoMeta:null,
     custom:true,
     source,
     createdAt:new Date().toISOString()
@@ -4083,8 +4103,421 @@ function deleteCustomExercise(id){
   if(!ex) return;
   if(!confirm(`Supprimer l'exercice "${ex.title}" de la bibliothèque ?`)) return;
   STATE.customExercises=STATE.customExercises.filter(e=>e.id!==id);
+  deleteExerciseVideo(id);
   showNotif('Exercice supprimé');
   render();
+}
+function exerciseVideoDb(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open('hwbt_exercise_media',1);
+    req.onupgradeneeded=()=>req.result.createObjectStore('videos',{keyPath:'id'});
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function putExerciseVideo(id,file){
+  const db=await exerciseVideoDb();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction('videos','readwrite');
+    tx.objectStore('videos').put({id,blob:file,name:file.name,type:file.type,size:file.size,updatedAt:new Date().toISOString()});
+    tx.oncomplete=()=>resolve(true);
+    tx.onerror=()=>reject(tx.error);
+  });
+}
+async function getExerciseVideo(id){
+  const db=await exerciseVideoDb();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction('videos','readonly');
+    const req=tx.objectStore('videos').get(id);
+    req.onsuccess=()=>resolve(req.result||null);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function deleteExerciseVideo(id){
+  try{
+    const db=await exerciseVideoDb();
+    const tx=db.transaction('videos','readwrite');
+    tx.objectStore('videos').delete(id);
+  }catch(e){}
+}
+async function attachVideoToExercise(id,input){
+  const file=input.files&&input.files[0];
+  if(!file) return;
+  if(!String(file.type||'').startsWith('video/')){showNotif('Choisis une vidéo');return;}
+  const ex=(STATE.customExercises||[]).find(e=>e.id===id);
+  if(!ex){showNotif('Ajoute une vidéo sur un exercice coach enregistré');return;}
+  await putExerciseVideo(id,file);
+  ex.videoMeta={name:file.name,type:file.type,size:file.size,updatedAt:new Date().toISOString()};
+  saveState();
+  render();
+  showNotif('Vidéo ajoutée à l’exercice');
+}
+async function previewExerciseVideo(id){
+  const data=await getExerciseVideo(id);
+  if(!data?.blob){showNotif('Aucune vidéo enregistrée pour cet exercice');return;}
+  const url=URL.createObjectURL(data.blob);
+  const box=document.getElementById('exercise_video_'+id);
+  if(box){
+    box.innerHTML=`<video controls playsinline style="width:100%;max-height:320px;border-radius:8px;border:1px solid var(--border2);background:#000" src="${url}"></video>`;
+  }else{
+    window.open(url,'_blank');
+  }
+}
+function createReelFromExercise(id){
+  const ex=exerciseById(id);
+  if(!ex){showNotif('Exercice introuvable');return;}
+  const pl=exercisePillarMeta(ex);
+  const cs=contentState();
+  const title=`Reel exercice · ${ex.title}`;
+  const main=`${String(ex.aspect||pl.name).toUpperCase()}`;
+  const benefits=pdfTextLines(ex.benefits||ex.prep?.benefits||ex.coach||'').slice(0,3).join(' · ');
+  const questions=pdfTextLines(ex.questions||ex.prep?.questions||'').slice(0,2).join(' · ');
+  const caption=[
+    `${ex.title}`,
+    `Objectif: ${contentShortText(ex.objective||ex.setup||'',120)}`,
+    benefits?`Bienfaits: ${benefits}`:'',
+    questions?`Question d’induction: ${questions}`:'',
+    ex.videoMeta?`Vidéo terrain disponible dans la bibliothèque: ${ex.videoMeta.name}`:'',
+    'Sauvegarde ce repère pour ta prochaine séance.',
+    '#HWBTAcademy #HardWorkBeatsTalent #PadelTraining #PadelCoach'
+  ].filter(Boolean).join('\n\n');
+  const prompt=[
+    'Créer un reel / cover reel HWBT à partir d’un exercice terrain.',
+    `Exercice: ${ex.title}.`,
+    `Pilier: ${pl.name}. Aspect travaillé: ${ex.aspect}.`,
+    `Objectif: ${ex.objective||'faire découvrir par le jeu'}.`,
+    `Déroulement: ${contentShortText(ex.flow,260)}.`,
+    `Question d’induction: ${questions||'Quelle décision t’a aidé à gagner le point ?'}.`,
+    `Bienfaits: ${benefits||'relier décision, technique et progression mesurable'}.`,
+    'Style: noir/blanc/or HWBT, premium, terrain de padel, texte très lisible, format 1080x1920.'
+  ].join('\n');
+  cs.posts.unshift({id:contentId(),templateKey:'reel_cover',type:'Reel exercice',format:'1080x1920 · 9:16',channel:'Instagram',status:'idée',createdAt:new Date().toISOString(),plannedDate:todayIso(),title,main,detail:`Exercice sauvegardé: ${ex.title}`,cta:'Sauvegarde pour ta prochaine séance',source:'Bibliothèque exercices HWBT',caption,prompt,playerId:null,sessionId:null,exerciseId:id,image:''});
+  saveState();
+  setUI({page:'contentStudio',contentTab:'library'});
+  showNotif('Reel créé dans Content Studio');
+}
+function reelSleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
+function reelWrapText(ctx,text,x,y,maxWidth,lineHeight,maxLines=6){
+  const words=String(text||'').replace(/\n/g,' ').split(/\s+/).filter(Boolean);
+  const lines=[];
+  let line='';
+  words.forEach(word=>{
+    const test=line?line+' '+word:word;
+    if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}
+    else line=test;
+  });
+  if(line) lines.push(line);
+  const shown=lines.slice(0,maxLines);
+  shown.forEach((l,i)=>ctx.fillText(l,x,y+i*lineHeight));
+  return y+shown.length*lineHeight;
+}
+function loadReelImage(src){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>resolve(img);
+    img.onerror=reject;
+    img.src=src;
+  });
+}
+async function loadReelStoryBackground(){
+  const sources=[
+    'assets/reel/hwbt-story-launch.png',
+    'file:///C:/Users/demar/Downloads/ChatGPT Image 9 juil. 2026, 19_58_58.png',
+    'file:///C:/Users/demar/Downloads/ChatGPT Image 9 juil. 2026, 19_58_43.png'
+  ];
+  for(const src of sources){
+    try{return await loadReelImage(encodeURI(src));}
+    catch(e){}
+  }
+  return null;
+}
+function reelDrawCoverImage(ctx,img,w,h,alpha=1){
+  const iw=img.naturalWidth||img.width;
+  const ih=img.naturalHeight||img.height;
+  const scale=Math.max(w/iw,h/ih);
+  const dw=iw*scale, dh=ih*scale;
+  ctx.save();
+  ctx.globalAlpha=alpha;
+  ctx.drawImage(img,(w-dw)/2,(h-dh)/2,dw,dh);
+  ctx.restore();
+}
+function reelFillBackground(ctx,w,h,bgImg=null){
+  if(bgImg){
+    reelDrawCoverImage(ctx,bgImg,w,h,1);
+    const shade=ctx.createLinearGradient(0,0,0,h);
+    shade.addColorStop(0,'rgba(0,0,0,.12)');
+    shade.addColorStop(.45,'rgba(0,0,0,.34)');
+    shade.addColorStop(1,'rgba(0,0,0,.72)');
+    ctx.fillStyle=shade;ctx.fillRect(0,0,w,h);
+  }else{
+    const g=ctx.createLinearGradient(0,0,w,h);
+    g.addColorStop(0,'#020203');g.addColorStop(.62,'#0b0b0b');g.addColorStop(1,'#231606');
+    ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+  }
+  ctx.strokeStyle='rgba(201,162,39,.55)';
+  ctx.lineWidth=4;
+  ctx.strokeRect(34,34,w-68,h-68);
+  ctx.globalAlpha=.08;
+  ctx.strokeStyle='#fff';
+  for(let y=0;y<h;y+=18){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
+  ctx.globalAlpha=1;
+}
+function reelDrawLogo(ctx,w,y=130,scale=1){
+  ctx.textAlign='center';
+  ctx.fillStyle='#f5f0e8';
+  ctx.font=`900 ${Math.round(104*scale)}px Oswald, Arial`;
+  ctx.fillText('HWBT',w/2,y);
+  ctx.strokeStyle='#c9a227';ctx.lineWidth=4;
+  ctx.beginPath();ctx.moveTo(w/2-230*scale,y+26*scale);ctx.lineTo(w/2+230*scale,y+26*scale);ctx.stroke();
+  ctx.fillStyle='#c9a227';
+  ctx.font=`700 ${Math.round(42*scale)}px Oswald, Arial`;
+  ctx.fillText('ACADEMY',w/2,y+82*scale);
+  ctx.fillStyle='#f5f0e8';
+  ctx.font=`400 ${Math.round(22*scale)}px Arial`;
+  ctx.fillText('HARD  WORK  BEATS  TALENT',w/2,y+128*scale);
+}
+function reelDrawBullets(ctx,items,x,y,maxWidth,color='#f5f0e8'){
+  ctx.textAlign='left';
+  ctx.fillStyle=color;
+  ctx.font='400 31px Arial';
+  (items||[]).slice(0,4).forEach(item=>{
+    ctx.fillStyle='#c9a227';
+    ctx.fillText('-',x,y);
+    ctx.fillStyle=color;
+    y=reelWrapText(ctx,String(item).replace(/^[-•]\s*/,''),x+28,y,maxWidth-28,39,2)+12;
+  });
+  return y;
+}
+function reelDrawIntro(ctx,ex,pl,w,h,p,bgImg=null){
+  reelFillBackground(ctx,w,h,bgImg);
+  const introLift=Math.sin(Math.min(1,p)*Math.PI)*18;
+  reelDrawLogo(ctx,w,150-introLift,.86);
+  ctx.textAlign='center';
+  ctx.fillStyle='#c9a227';
+  ctx.font='700 32px Oswald, Arial';
+  ctx.fillText('PRÉPARATION TERRAIN',w/2,515);
+  ctx.fillStyle='#f5f0e8';
+  ctx.font='900 88px Oswald, Arial';
+  reelWrapText(ctx,String(ex.title||'EXERCICE HWBT').toUpperCase(),105,660,w-210,94,3);
+  ctx.fillStyle=pl.color||'#c9a227';
+  ctx.font='700 38px Oswald, Arial';
+  ctx.fillText(String(ex.aspect||pl.name||'ASPECT').toUpperCase(),w/2,1035);
+  ctx.strokeStyle='#c9a227';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(220,1115);ctx.lineTo(w-220,1115);ctx.stroke();
+  ctx.fillStyle='#f5f0e8';
+  ctx.font='400 30px Arial';
+  reelWrapText(ctx,ex.objective||'Faire découvrir par le jeu, observer, puis guider par induction.',150,1210,w-300,45,4);
+  ctx.fillStyle='rgba(201,162,39,.18)';
+  ctx.font='900 260px Oswald, Arial';
+  ctx.fillText(String(Math.round(p*100)).padStart(2,'0'),w/2,h-90);
+}
+function reelDrawExerciseSheet(ctx,ex,pl,w,h){
+  reelFillBackground(ctx,w,h);
+  const sheetX=70;
+  const sheetY=118;
+  const sheetW=w-140;
+  const x1=105;
+  const gap=70;
+  const colW=(sheetW-70-gap)/2;
+  const x2=x1+colW+gap;
+  ctx.fillStyle='#f7f3ea';
+  ctx.fillRect(sheetX,sheetY,sheetW,1600);
+  ctx.strokeStyle='#c9a227';ctx.lineWidth=6;
+  ctx.strokeRect(sheetX,sheetY,sheetW,1600);
+  ctx.fillStyle='#0b0b0b';
+  ctx.fillRect(sheetX,sheetY,sheetW,170);
+  ctx.textAlign='left';
+  ctx.fillStyle='#c9a227';
+  ctx.font='700 26px Oswald, Arial';
+  ctx.fillText('HWBT ACADEMY · FICHE EXERCICE',105,178);
+  ctx.fillStyle='#f5f0e8';
+  ctx.font='900 54px Oswald, Arial';
+  reelWrapText(ctx,String(ex.title||'EXERCICE').toUpperCase(),105,250,810,58,2);
+  ctx.fillStyle=pl.color||'#c9a227';
+  ctx.font='700 28px Oswald, Arial';
+  ctx.fillText(`${String(pl.name||'PILIER').toUpperCase()} · ${String(ex.aspect||'ASPECT').toUpperCase()}`,105,340);
+  const cols=[
+    ['OBJECTIF',ex.objective],
+    ['ORGANISATION',ex.setup],
+    ['DÉROULEMENT',ex.flow],
+    ['COMPTAGE',ex.scoring],
+    ['CONSIGNES',ex.coach],
+    ['QUESTION D’INDUCTION',ex.questions],
+    ['BIENFAITS',ex.benefits]
+  ];
+  let x=105,y=420;
+  cols.forEach((c,i)=>{
+    if(i===3){x=x2;y=420;}
+    ctx.fillStyle='#8b5d20';
+    ctx.font='900 23px Oswald, Arial';
+    ctx.fillText(c[0],x,y);
+    ctx.fillStyle='#171717';
+    ctx.font='400 23px Arial';
+    const lines=pdfTextLines(c[1]||'À préciser').slice(0,c[0]==='DÉROULEMENT'?5:3);
+    y=reelDrawBullets(ctx,lines,x,y+38,colW,'#171717')+14;
+  });
+  ctx.fillStyle='#0b0b0b';
+  ctx.fillRect(105,1518,sheetW-70,74);
+  ctx.fillStyle='#c9a227';
+  ctx.font='700 25px Oswald, Arial';
+  ctx.textAlign='center';
+  ctx.fillText('COMPRENDRE · S’ENTRAÎNER · VALIDER · ÉVOLUER',w/2,1565);
+}
+function reelDrawExerciseSheetPan(ctx,ex,pl,w,h,p){
+  const sheetW=1500;
+  const sheetH=1920;
+  const off=document.createElement('canvas');
+  off.width=sheetW;
+  off.height=sheetH;
+  const offCtx=off.getContext('2d');
+  reelDrawExerciseSheet(offCtx,ex,pl,sheetW,sheetH);
+  const ease=p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
+  const zoom=1.18;
+  const viewW=w/zoom;
+  const viewH=h/zoom;
+  const sx=Math.max(0,(sheetW-viewW)*ease);
+  const sy=Math.max(0,(sheetH-viewH)*.08);
+  ctx.fillStyle='#020203';
+  ctx.fillRect(0,0,w,h);
+  ctx.drawImage(off,sx,sy,viewW,viewH,0,0,w,h);
+  const edge=ctx.createLinearGradient(0,0,0,h);
+  edge.addColorStop(0,'rgba(0,0,0,.45)');
+  edge.addColorStop(.2,'rgba(0,0,0,0)');
+  edge.addColorStop(.82,'rgba(0,0,0,0)');
+  edge.addColorStop(1,'rgba(0,0,0,.58)');
+  ctx.fillStyle=edge;
+  ctx.fillRect(0,0,w,h);
+  ctx.fillStyle='rgba(5,5,5,.84)';
+  ctx.fillRect(54,74,972,92);
+  ctx.textAlign='left';
+  ctx.fillStyle='#c9a227';
+  ctx.font='700 24px Oswald, Arial';
+  ctx.fillText('FICHE PDF · PRÉPARATION COACH',82,130);
+  ctx.textAlign='right';
+  ctx.fillStyle='#f5f0e8';
+  ctx.font='700 24px Oswald, Arial';
+  ctx.fillText(`${Math.round(1+ease*2)}/3`,998,130);
+  ctx.strokeStyle='rgba(201,162,39,.62)';
+  ctx.lineWidth=3;
+  ctx.strokeRect(54,74,972,92);
+}
+function reelDrawVideoFrame(ctx,video,ex,w,h){
+  reelFillBackground(ctx,w,h);
+  const vw=video.videoWidth||w, vh=video.videoHeight||h;
+  const scale=Math.max(w/vw,h/vh);
+  const dw=vw*scale, dh=vh*scale;
+  ctx.drawImage(video,(w-dw)/2,(h-dh)/2,dw,dh);
+  const grad=ctx.createLinearGradient(0,h*.55,0,h);
+  grad.addColorStop(0,'rgba(0,0,0,0)');
+  grad.addColorStop(1,'rgba(0,0,0,.88)');
+  ctx.fillStyle=grad;ctx.fillRect(0,h*.55,w,h*.45);
+  ctx.textAlign='left';
+  ctx.fillStyle='#f5f0e8';
+  ctx.font='900 66px Oswald, Arial';
+  reelWrapText(ctx,String(ex.title||'EXERCICE HWBT').toUpperCase(),80,h-300,w-160,70,2);
+  ctx.fillStyle='#c9a227';
+  ctx.font='700 31px Oswald, Arial';
+  ctx.fillText('EXERCICE TERRAIN · HWBT ACADEMY',80,h-145);
+}
+function reelDrawOutro(ctx,ex,w,h){
+  reelFillBackground(ctx,w,h);
+  reelDrawLogo(ctx,w,250,1.08);
+  ctx.textAlign='center';
+  ctx.fillStyle='#f5f0e8';
+  ctx.font='900 66px Oswald, Arial';
+  ctx.fillText('NO WORK.',w/2,760);
+  ctx.fillStyle='#c9a227';
+  ctx.fillText('NO PROGRESS.',w/2,840);
+  ctx.strokeStyle='#c9a227';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(245,930);ctx.lineTo(w-245,930);ctx.stroke();
+  ctx.fillStyle='#f5f0e8';
+  ctx.font='400 32px Arial';
+  ctx.fillText('Sauvegarde cet exercice pour ta prochaine séance.',w/2,1030);
+  ctx.fillStyle='#c9a227';
+  ctx.font='700 40px Oswald, Arial';
+  ctx.fillText('@HWBT.PADEL.ACADEMY',w/2,1180);
+  ctx.fillStyle='#f5f0e8';
+  ctx.font='700 34px Oswald, Arial';
+  ctx.fillText('#HWBTAcademy  #HardWorkBeatsTalent',w/2,1270);
+}
+async function reelDrawTimed(ctx,durationMs,draw){
+  const start=performance.now();
+  while(performance.now()-start<durationMs){
+    const p=Math.min(1,(performance.now()-start)/durationMs);
+    draw(p);
+    await new Promise(requestAnimationFrame);
+  }
+}
+function getBestReelRecorderFormat(){
+  const formats=[
+    {mime:'video/mp4;codecs=avc1.42E01E',ext:'mp4',label:'MP4'},
+    {mime:'video/mp4',ext:'mp4',label:'MP4'},
+    {mime:'video/webm;codecs=vp8',ext:'webm',label:'WebM'},
+    {mime:'video/webm;codecs=vp9',ext:'webm',label:'WebM'},
+    {mime:'video/webm',ext:'webm',label:'WebM'}
+  ];
+  return formats.find(f=>MediaRecorder.isTypeSupported(f.mime))||formats[formats.length-1];
+}
+async function downloadExerciseReel(id,quality='light'){
+  const ex=exerciseById(id);
+  if(!ex){showNotif('Exercice introuvable');return;}
+  const data=await getExerciseVideo(id);
+  if(!data?.blob){showNotif('Ajoute d’abord une vidéo terrain à cet exercice');return;}
+  if(typeof MediaRecorder==='undefined'){showNotif('Ton navigateur ne peut pas générer la vidéo automatiquement');return;}
+  const reelFormat=getBestReelRecorderFormat();
+  const mime=reelFormat.mime;
+  const reelSize=quality==='full'
+    ?{w:1080,h:1920,fps:30,bitrate:6500000,intro:2400,sheet:4300,outro:2300,maxVideo:15000,suffix:'HD'}
+    :{w:720,h:1280,fps:24,bitrate:2200000,intro:1700,sheet:2800,outro:1500,maxVideo:9000,suffix:'LIGHT'};
+  const canvas=document.createElement('canvas');
+  canvas.width=reelSize.w;canvas.height=reelSize.h;
+  const ctx=canvas.getContext('2d');
+  const stream=canvas.captureStream(reelSize.fps);
+  const chunks=[];
+  const recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:reelSize.bitrate});
+  recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  const recorderError=new Promise((_,reject)=>recorder.onerror=e=>reject(e.error||e));
+  const stopped=new Promise(resolve=>recorder.onstop=resolve);
+  const pl=exercisePillarMeta(ex);
+  const video=document.createElement('video');
+  video.src=URL.createObjectURL(data.blob);
+  video.muted=true;video.playsInline=true;
+  video.preload='auto';
+  try{
+    await new Promise((resolve,reject)=>{video.onloadedmetadata=resolve;video.onerror=reject;});
+    reelDrawIntro(ctx,ex,pl,reelSize.w,reelSize.h,0,null);
+    recorder.start(250);
+    showNotif(`${quality==='full'?'Création du reel HD':'Création du reel léger'} en cours (${reelFormat.label})...`,5000);
+    const storyBg=await loadReelStoryBackground();
+    await Promise.race([reelDrawTimed(ctx,reelSize.intro,p=>reelDrawIntro(ctx,ex,pl,reelSize.w,reelSize.h,p,storyBg)),recorderError]);
+    await Promise.race([reelDrawTimed(ctx,reelSize.sheet,p=>reelDrawExerciseSheetPan(ctx,ex,pl,reelSize.w,reelSize.h,p)),recorderError]);
+    try{
+      video.currentTime=0;
+      await video.play();
+    }catch(e){}
+    const maxVideo=Math.min(Number.isFinite(video.duration)?video.duration*1000:7000,reelSize.maxVideo);
+    await Promise.race([reelDrawTimed(ctx,maxVideo,()=>reelDrawVideoFrame(ctx,video,ex,reelSize.w,reelSize.h)),recorderError]);
+    video.pause();
+    await Promise.race([reelDrawTimed(ctx,reelSize.outro,()=>reelDrawOutro(ctx,ex,reelSize.w,reelSize.h)),recorderError]);
+    if(recorder.state!=='inactive') recorder.stop();
+    await stopped;
+    const blob=new Blob(chunks,{type:mime.split(';')[0]||'video/webm'});
+    if(!blob.size){
+      showNotif('La vidéo n’a pas pu être générée. Réessaie dans Chrome/Edge avec une vidéo plus courte.',6000);
+      return;
+    }
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`HWBT_reel_${reelSize.suffix}_${String(ex.title||'exercice').replace(/[^a-z0-9]+/gi,'_').slice(0,38)}.${reelFormat.ext}`;
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1200);
+    showNotif(`${quality==='full'?'Reel HD':'Reel léger'} téléchargé en ${reelFormat.label}`);
+  }catch(e){
+    if(recorder.state!=='inactive') recorder.stop();
+    showNotif('Erreur génération reel: essaye avec Chrome/Edge et une vidéo MP4 courte.',6500);
+  }finally{
+    URL.revokeObjectURL(video.src);
+  }
 }
 function applyExerciseToSessionModal(pillar,id){
   const ex=exerciseById(id);
@@ -4113,17 +4546,29 @@ Niveau: ${exerciseLevelLabel(ex.level)}
 Joueurs: ${ex.players}
 Durée: ${ex.duration}
 
-Mise en place:
+Objectif:
+${ex.objective||'À préciser'}
+
+Organisation:
 ${ex.setup}
 
-Déroulé:
+Déroulement:
 ${ex.flow}
 
-Scoring:
+Comptage:
 ${ex.scoring}
 
-Conseil coach:
-${ex.coach}${ex.profiles?`
+Consignes coach:
+${ex.coach}
+
+Question d’induction:
+${ex.questions||'À préciser'}
+
+Bienfaits / message clé:
+${ex.benefits||'À préciser'}${ex.videoMeta?`
+
+Vidéo terrain:
+${ex.videoMeta.name||'Vidéo enregistrée dans la bibliothèque locale'}`:''}${ex.profiles?`
 
 Communication profils:
 ${ex.profiles}`:''}`;
@@ -4161,6 +4606,84 @@ function exerciseMatchesFilter(ex){
   const matchPlayers=players==='all'||String(ex.players).includes(players);
   const hay=[ex.title,ex.aspect,ex.secondary,ex.setup,ex.flow,ex.scoring,ex.coach,ex.profiles].join(' ').toLowerCase();
   return matchPillar&&matchAspect&&matchLevel&&matchPlayers&&(!query||hay.includes(query));
+}
+function exerciseFieldPreview(text,max=120){
+  const raw=String(text||'').replace(/\s+/g,' ').trim();
+  return raw.length>max?raw.slice(0,max-1).trim()+'…':raw||'À préciser';
+}
+function exerciseMiniCardHtml(ex){
+  const pl=exercisePillarMeta(ex);
+  const hasVideo=!!ex.videoMeta;
+  return `<div class="card" style="border-color:${pl.color}44;overflow:hidden">
+    <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:12px">
+      <div>
+        <div style="font-size:10px;letter-spacing:1.5px;color:${pl.color};margin-bottom:5px">${esc(pl.name)} · ${esc(ex.aspect||'Aspect')}</div>
+        <div style="font-size:24px;font-weight:800;letter-spacing:.5px;line-height:1.02">${esc(ex.title||ex.exerciseName||'Exercice HWBT')}</div>
+      </div>
+      <div style="text-align:right;font-size:10px;color:var(--gray3);font-family:var(--font-body);white-space:nowrap">${esc(ex.duration||'Durée ?')}<br>${esc(ex.players||'1-4')} joueurs</div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+      <span class="badge" style="background:var(--bronze-dim);color:var(--bronze);border:1px solid var(--bronze-dim2)">FICHE COACH</span>
+      <span class="badge" style="background:${pl.color}22;color:${pl.color};border:1px solid ${pl.color}44">PRINCIPAL · ${esc(ex.aspect||'—')}</span>
+      <span class="badge" style="background:var(--bg4);color:var(--offwhite);border:1px solid var(--border2)">SECONDAIRE · ${esc(ex.secondary||'—')}</span>
+      <span class="badge" style="background:${hasVideo?'#27ae6022':'var(--bg4)'};color:${hasVideo?'#27ae60':'var(--gray)'};border:1px solid ${hasVideo?'#27ae6044':'var(--border2)'}">${hasVideo?'VIDÉO OK':'VIDÉO À AJOUTER'}</span>
+    </div>
+    <div style="background:linear-gradient(135deg,rgba(201,162,39,.12),rgba(255,255,255,.03));border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
+      <div style="font-size:9px;letter-spacing:1.4px;color:var(--bronze);margin-bottom:4px">OBJECTIF</div>
+      <div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.55">${esc(exerciseFieldPreview(ex.objective||ex.flow,150))}</div>
+    </div>
+    <div class="g2" style="gap:10px">
+      ${[['ORGANISATION',ex.setup],['DÉROULEMENT',ex.flow],['COMPTAGE',ex.scoring],['MESSAGE CLÉ',ex.benefits||ex.coach]].map(([label,text])=>`<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px;min-height:92px"><div style="font-size:8px;letter-spacing:1.3px;color:var(--bronze);margin-bottom:5px">${label}</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.45">${esc(exerciseFieldPreview(text,105))}</div></div>`).join('')}
+    </div>
+    ${hasVideo?`<div style="background:var(--bg4);border:1px solid var(--bronze-dim2);border-radius:8px;padding:12px;margin-top:12px">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+        <div><div style="font-size:9px;letter-spacing:1.5px;color:var(--bronze);margin-bottom:4px">VIDÉO TERRAIN</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body)">${esc(ex.videoMeta.name||'Vidéo enregistrée')}</div></div>
+        <button class="btn btn-primary btn-sm" onclick="previewExerciseVideo('${ex.id}')">VOIR VIDÉO</button>
+      </div>
+      <div id="exercise_video_${ex.id}" style="margin-top:10px"></div>
+    </div>`:''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+      <button class="btn btn-primary" onclick="openModal('editExercise','${ex.id}')">MODIFIER</button>
+      <button class="btn btn-ghost" onclick="printExerciseMiniPdf('${ex.id}')">MINI-FICHE PDF</button>
+      <label class="btn btn-ghost" style="cursor:pointer">AJOUTER VIDÉO<input type="file" accept="video/*" style="display:none" onchange="attachVideoToExercise('${ex.id}',this)"></label>
+      <button class="btn btn-ghost" onclick="createReelFromExercise('${ex.id}')">BRIEF REEL</button>
+      <button class="btn btn-primary" onclick="downloadExerciseReel('${ex.id}','light')">REEL LÉGER</button>
+      <button class="btn btn-ghost" onclick="downloadExerciseReel('${ex.id}','full')">REEL HD</button>
+      <button class="btn btn-danger" onclick="deleteCustomExercise('${ex.id}')">SUPPRIMER</button>
+    </div>
+  </div>`;
+}
+function printExerciseMiniPdf(id){
+  const ex=exerciseById(id);
+  if(!ex){showNotif('Exercice introuvable');return;}
+  const pl=exercisePillarMeta(ex);
+  const rows=[
+    ['Objectif',ex.objective],
+    ['Organisation',ex.setup],
+    ['Déroulement',ex.flow],
+    ['Comptage',ex.scoring],
+    ['Consignes coach',ex.coach],
+    ['Question d’induction',ex.questions],
+    ['Message clé',ex.benefits]
+  ];
+  const w=window.open('','_blank');
+  if(!w){showNotif('Autorise les popups pour imprimer la mini-fiche');return;}
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(ex.title)}</title><style>
+    @page{size:A4 landscape;margin:10mm}
+    *{box-sizing:border-box}body{margin:0;background:#f3efe5;color:#080808;font-family:Arial,sans-serif}
+    .sheet{min-height:190mm;padding:12mm;background:#f3efe5}
+    .top{height:42mm;background:#070707;color:white;border-bottom:5px solid #b88928;padding:10mm 12mm;display:flex;justify-content:space-between;gap:18mm;align-items:flex-start}
+    .brand{font:800 13px Arial;letter-spacing:5px;color:#c9a227}.title{font:900 32px Arial;letter-spacing:1px;margin-top:5mm;text-transform:uppercase;line-height:.95}.meta{border:1px solid #8b6a28;border-radius:7px;padding:6mm;min-width:70mm;background:#0b0b0bdd}
+    .tag{font-size:10px;letter-spacing:2px;color:#8b5d20;text-transform:uppercase;font-weight:800;margin-bottom:2mm}.box{border:1px solid #d4c7ac;border-left:4px solid #b88928;border-radius:6px;background:#fffaf0;padding:5mm;break-inside:avoid}
+    .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5mm;margin-top:6mm}.text{font-size:11px;line-height:1.45;white-space:pre-wrap}.wide{grid-column:span 2}.footer{margin-top:5mm;background:#070707;color:#c9a227;padding:4mm 6mm;font-size:10px;letter-spacing:3px;font-weight:800;display:flex;justify-content:space-between}
+    @media print{button{display:none}.sheet{padding:0}.top{margin:-10mm -10mm 0 -10mm}}
+  </style></head><body><div class="sheet">
+    <div class="top"><div><div class="brand">HWBT ACADEMY · MINI-FICHE EXERCICE</div><div class="title">${esc(ex.title)}</div></div><div class="meta"><div style="font-size:22px;font-weight:900;color:#fff">${esc(pl.name)}</div><div style="color:#c9a227;margin-top:3mm">${esc(ex.aspect||'Aspect')} · ${esc(ex.secondary||'Secondaire')}</div><div style="font-size:12px;margin-top:4mm">${esc(ex.duration||'Durée ?')} · ${esc(ex.players||'1-4')} joueurs · ${esc(exerciseLevelLabel(ex.level||'tous'))}</div></div></div>
+    <div class="grid">${rows.map(([label,text],i)=>`<div class="box ${i===2?'wide':''}"><div class="tag">${esc(label)}</div><div class="text">${esc(text||'À préciser')}</div></div>`).join('')}</div>
+    <div class="footer"><span>COMPRENDRE · S’ENTRAÎNER · VALIDER · ÉVOLUER</span><span>${ex.videoMeta?'VIDÉO TERRAIN DISPONIBLE':'VIDÉO À AJOUTER'}</span></div>
+    <div style="text-align:right;margin-top:4mm"><button onclick="window.print()" style="padding:10px 16px;background:#111;color:white;border:0;border-radius:6px;font-weight:800">IMPRIMER / PDF</button></div>
+  </div><script>setTimeout(()=>window.print(),450)<\/script></body></html>`);
+  w.document.close();
 }
 function pageExercises(){
   const currentPillar=UI.exercisePillar||'all';
@@ -4202,36 +4725,7 @@ function pageExercises(){
       </div>
     </div>
     <div class="g2">
-      ${list.length?list.map(ex=>{
-        const pl=exercisePillarMeta(ex);
-        return `<div class="card" style="border-color:${pl.color}44">
-          <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:12px">
-            <div>
-              <div style="font-size:10px;letter-spacing:1.5px;color:${pl.color};margin-bottom:5px">${pl.name}</div>
-              <div style="font-size:22px;font-weight:700;letter-spacing:.4px;line-height:1.1">${esc(ex.title)}</div>
-            </div>
-            <div style="text-align:right;font-size:10px;color:var(--gray3);font-family:var(--font-body);white-space:nowrap">${esc(ex.duration)}<br>${esc(ex.players)} joueurs</div>
-          </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-            ${ex.custom?`<span class="badge" style="background:var(--bronze-dim);color:var(--bronze);border:1px solid var(--bronze-dim2)">COACH</span>`:''}
-            <span class="badge" style="background:${pl.color}22;color:${pl.color};border:1px solid ${pl.color}44">PRINCIPAL · ${esc(ex.aspect)}</span>
-            <span class="badge" style="background:var(--bg4);color:var(--offwhite);border:1px solid var(--border2)">SECONDAIRE · ${esc(ex.secondary)}</span>
-            <span class="badge" style="background:var(--bg4);color:var(--gray);border:1px solid var(--border2)">${exerciseLevelLabel(ex.level)}</span>
-          </div>
-          ${[
-            ['MISE EN PLACE',ex.setup],
-            ['DÉROULÉ',ex.flow],
-            ['SCORING RAPIDE',ex.scoring],
-            ['CONSEIL COACH',ex.coach]
-          ].map(([label,text])=>`<div style="border-top:1px solid var(--border);padding:10px 0"><div style="font-size:9px;letter-spacing:1.3px;color:var(--bronze);margin-bottom:4px">${label}</div><div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.55">${esc(text)}</div></div>`).join('')}
-          ${ex.profiles?`<div style="background:var(--bg4);border-left:3px solid ${pl.color};padding:10px 12px;border-radius:0 6px 6px 0;margin-top:4px"><div style="font-size:9px;letter-spacing:1.3px;color:${pl.color};margin-bottom:4px">COMMUNICATION PROFILS</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55">${esc(ex.profiles)}</div></div>`:''}
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
-            <button class="btn btn-primary" onclick="copyExerciseText('${ex.id}')">COPIER CONSIGNE</button>
-            <button class="btn btn-ghost" onclick="setUI({page:'sessions'});openModal('newSession')">UTILISER EN SÉANCE</button>
-            ${ex.custom?`<button class="btn btn-danger" onclick="deleteCustomExercise('${ex.id}')">SUPPRIMER</button>`:''}
-          </div>
-        </div>`;
-      }).join(''):`<div class="card" style="grid-column:1/-1;text-align:center;color:var(--gray);font-family:var(--font-body)">Aucun exercice avec ces filtres.</div>`}
+      ${list.length?list.map(exerciseMiniCardHtml).join(''):`<div class="card" style="grid-column:1/-1;text-align:center;color:var(--gray);font-family:var(--font-body);line-height:1.7"><div style="font-size:18px;color:var(--white);font-weight:800;margin-bottom:8px">Ta bibliothèque est vide.</div>Va dans une séance préparée, donne un nom à un bloc exercice, puis clique <b style="color:var(--bronze)">ENREGISTRER EN BIBLIOTHÈQUE</b>. Ensuite tu pourras ajouter une vidéo, modifier la mini-fiche et préparer un reel.</div>`}
     </div>
   </div>`;
 }
@@ -4422,6 +4916,196 @@ function commandStrategyRoomHtml(){
   const priorities=['Coaching mesurable','Portail joueur plus simple','PDF séance premium','Sponsor local','Shop academy'];
   const sponsors=['Club local','Marque sport/santé','Commerce padel','Kinésithérapeute','Préparateur physique'];
   return `${commandStrategyTasksHtml()}<div class="g2"><div>${commandCard('OBJECTIFS DU MOIS',`<ul>${goals.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`)}${commandCard('PRIORITÉS HWBT',`<div style="display:flex;gap:8px;flex-wrap:wrap">${priorities.map(x=>`<span class="session-group-chip">${esc(x)}</span>`).join('')}</div>`,'var(--rouge)')}${commandCard('SPONSORS / PARTENARIATS À CONTACTER',`<ul>${sponsors.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`,'var(--vert)')}</div><div><div class="card"><div class="card-title">SAUVEGARDER UNE DÉCISION</div><select class="form-select" id="decisionArea" style="margin-bottom:8px"><option>Stratégie</option><option>Business</option><option>Plateforme</option><option>Contenu</option><option>Coaching</option></select><textarea class="form-input" id="decisionText" rows="3" placeholder="Décision importante, idée long terme ou amélioration plateforme..."></textarea><button class="btn btn-primary" style="margin-top:10px" onclick="saveCommandDecision()">SAUVEGARDER DÉCISION</button></div><div class="card"><div class="card-title">DÉBRIEF CEO</div><textarea class="form-input" id="dbActions" rows="2" placeholder="Actions réalisées aujourd’hui"></textarea><textarea class="form-input" id="dbLearnings" rows="2" placeholder="Apprentissages"></textarea><textarea class="form-input" id="dbProblems" rows="2" placeholder="Problèmes rencontrés"></textarea><textarea class="form-input" id="dbIdeas" rows="2" placeholder="Idées nouvelles"></textarea><textarea class="form-input" id="dbTomorrow" rows="2" placeholder="Priorité pour demain"></textarea><button class="btn btn-primary" style="margin-top:10px" onclick="saveCEODebrief()">SAUVEGARDER DÉBRIEF</button></div></div></div><div class="g2"><div class="card"><div class="card-title">DÉCISIONS</div>${cc.decisions.map(d=>`<div style="border-top:1px solid var(--border);padding:10px 0"><div style="font-size:10px;color:var(--bronze);letter-spacing:1px">${esc(d.area)} · ${esc(d.date)}</div><div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.6">${esc(d.text)}</div><button class="btn btn-ghost btn-sm" onclick="markCommandItemDone('decisions','${d.id}')">${d.done?'RÉOUVRIR':'TERMINÉ'}</button></div>`).join('')||'<div class="muted-help">Aucune décision enregistrée.</div>'}</div><div class="card"><div class="card-title">HISTORIQUE DÉBRIEFS</div>${cc.debriefs.map(d=>`<div style="border-top:1px solid var(--border);padding:10px 0"><div style="font-size:10px;color:var(--bronze);letter-spacing:1px">${esc(d.date)}</div><div class="muted-help"><b>Actions:</b> ${esc(d.actions||'-')}<br><b>Apprentissages:</b> ${esc(d.learnings||'-')}<br><b>Problèmes:</b> ${esc(d.problems||'-')}<br><b>Idées:</b> ${esc(d.ideas||'-')}<br><b>Demain:</b> ${esc(d.tomorrow||'-')}</div></div>`).join('')||'<div class="muted-help">Aucun débrief enregistré.</div>'}</div></div>`;
+}
+
+// ══════════════════════════════════════════════════
+// CONTENT STUDIO - V1 offline/localStorage
+// ══════════════════════════════════════════════════
+function contentState(){
+  if(!STATE.contentStudio) STATE.contentStudio={posts:[],ideas:[]};
+  if(!Array.isArray(STATE.contentStudio.posts)) STATE.contentStudio.posts=[];
+  if(!Array.isArray(STATE.contentStudio.ideas)) STATE.contentStudio.ideas=[];
+  return STATE.contentStudio;
+}
+function contentTemplates(){
+  return [
+    {key:'result_win',type:'Résultat tournoi',format:'1080x1350 · 4:5',channel:'Instagram',title:'Résultat tournoi premium',hook:'QUALIFIÉS',tone:'Victoire, étape franchie, fierté sans arrogance.',caption:'Résultat HWBT. Le travail continue, mais cette étape valide la direction prise.',prompt:'Image Instagram premium 1080x1350 pour HWBT Academy. Photo terrain padel sombre, noir/blanc/or. Grand titre résultat, joueurs au centre, ligne or, partenaires en bas.'},
+    {key:'progress',type:'Progression joueur',format:'1080x1350 · 4:5',channel:'Instagram',title:'Building experience',hook:'BUILDING EXPERIENCE',tone:'Défaite utile, apprentissage, mental, expérience.',caption:'Un match perdu peut devenir une vraie victoire si le joueur comprend ce qu’il doit reprendre.',prompt:'Visuel HWBT sombre et premium. Joueur ou duo en contexte match. Grand titre BUILDING EXPERIENCE, sous-texte apprentissage, mental, expérience.'},
+    {key:'quote',type:'Citation HWBT',format:'1080x1080 · 1:1',channel:'Instagram',title:'Citation / philosophie',hook:'NO WORK. NO PROGRESS.',tone:'Court, frontal, mémorisable.',caption:'Une phrase simple. Un rappel clair. Le progrès se construit dans les détails.',prompt:'Image carrée HWBT, fond terrain de nuit, lampadaire, texte héro en blanc et or. Minimaliste, très lisible.'},
+    {key:'launch',type:'Annonce',format:'1080x1920 · Story',channel:'Instagram',title:'Annonce lancement',hook:'LANCÉE.',tone:'Fort, direct, premium.',caption:'HWBT Academy est lancée: coaching structuré, progression mesurable, compétition et suivi joueur.',prompt:'Story verticale HWBT, terrain de nuit, grand mot en or, bullets coaching structuré, progression mesurable, compétition et suivi joueur.'},
+    {key:'formation',type:'Formation',format:'1080x1350 · 4:5',channel:'Facebook',title:'Formation validée',hook:'VALIDÉE',tone:'Crédibilité, progression coach, transmission.',caption:'Une étape de plus dans la construction HWBT. Apprendre, appliquer, transmettre.',prompt:'Visuel formation HWBT. Fond terrain sombre. Grand titre formation validée. Encadré clair avec organisme, date, résultats, check or.'},
+    {key:'stage',type:'Stage / événement',format:'1080x1920 · Story/Reel',channel:'Instagram',title:'Stage express',hook:'STAGE EXPRESS',tone:'Énergie groupe, terrain, progression.',caption:'Stage express HWBT: beaucoup de touches, du cadre, du rythme, et un objectif clair.',prompt:'Visuel vertical stage HWBT. Grande photo groupe sur terrain, encart photo secondaire, titre STAGE EXPRESS, localisation, description, date.'},
+    {key:'method',type:'Éducatif / méthode',format:'1080x1080 · 1:1',channel:'Instagram',title:'Conseil méthode',hook:'3 REPÈRES',tone:'Utile, simple, pédagogique.',caption:'Un conseil court à garder pour le prochain match. Sauvegarde-le avant ta prochaine séance.',prompt:'Post éducatif HWBT carré. Terrain de nuit discret, grand chiffre ou titre, trois repères courts, CTA en bas.'},
+    {key:'profile',type:'Profil mental',format:'1080x1350 · 4:5',channel:'Instagram',title:'Carte profil joueur',hook:'12 PROFILS',tone:'Identité joueur, personnalité, partage.',caption:'Chaque joueur a une manière différente d’entrer dans le match. Découvre ton profil HWBT.',prompt:'Carte profil HWBT premium type joueur. Photo joueur, grand nom du profil, texte court, note visuelle, noir/or/blanc.'},
+    {key:'shop',type:'Shop',format:'1080x1350 · 4:5',channel:'Instagram',title:'Produit academy',hook:'HWBT SHOP',tone:'Identité groupe, sobre, premium.',caption:'Porter HWBT, ce n’est pas juste porter un logo. C’est rappeler une exigence.',prompt:'Visuel produit HWBT premium avec t-shirt/hoodie/chaussettes, fond sombre, éclairage sport, prix discret, CTA commander.'},
+    {key:'reel_cover',type:'Cover reel',format:'1080x1920 · 9:16',channel:'Instagram',title:'Miniature reel',hook:'POURQUOI TU STAGNES',tone:'Très lisible, impact feed.',caption:'Un reel court, un problème clair, une correction simple.',prompt:'Cover reel HWBT verticale. Titre en deux lignes énorme, blanc + or, terrain sombre, icône play discret, lisible en miniature.'}
+  ];
+}
+function contentStatusColor(status){
+  return ({'idée':'var(--bronze)','à créer':'var(--jaune)','prêt':'var(--bleu)','publié':'var(--vert)'})[status]||'var(--gray)';
+}
+function contentId(prefix='post'){return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2,7)}`;}
+function contentTabs(){
+  const tabs=[['dashboard','Dashboard'],['create','Créer'],['calendar','Calendrier'],['library','Bibliothèque'],['templates','Templates']];
+  const active=UI.contentTab||'dashboard';
+  return `<div class="tabs" style="margin-bottom:18px;overflow:auto">${tabs.map(t=>`<button class="tab ${active===t[0]?'active':''}" onclick="setUI({contentTab:'${t[0]}'})">${t[1]}</button>`).join('')}</div>`;
+}
+function contentShortText(text,n=140){
+  text=String(text||'');
+  return text.length>n?text.slice(0,n-1)+'…':text;
+}
+function selectedContentTemplate(){
+  const key=document.getElementById('cs_template')?.value||'result_win';
+  return contentTemplates().find(t=>t.key===key)||contentTemplates()[0];
+}
+function contentDraftFromForm(){
+  const tpl=selectedContentTemplate();
+  const playerId=parseInt(document.getElementById('cs_player')?.value||'0');
+  const sessionId=parseInt(document.getElementById('cs_session')?.value||'0');
+  const player=STATE.players.find(p=>p.id===playerId);
+  const session=STATE.sessions.find(s=>s.id===sessionId);
+  const title=document.getElementById('cs_title')?.value.trim()||tpl.title;
+  const main=document.getElementById('cs_main')?.value.trim()||tpl.hook;
+  const detail=document.getElementById('cs_detail')?.value.trim()||'';
+  const cta=document.getElementById('cs_cta')?.value.trim()||'Découvre la méthode HWBT';
+  const plannedDate=document.getElementById('cs_date')?.value||todayIso();
+  const source=[player?`Joueur: ${player.name}`:'',session?`Séance: ${sessionTitle(session)} · ${sessionDateLine(session)}`:''].filter(Boolean).join(' · ');
+  const caption=[
+    `${main}`,
+    detail||tpl.caption,
+    source?`Contexte: ${source}`:'',
+    cta?`CTA: ${cta}`:'',
+    '#HWBTAcademy #HardWorkBeatsTalent #Padel #PadelAcademy'
+  ].filter(Boolean).join('\n\n');
+  const prompt=[
+    tpl.prompt,
+    `Charte obligatoire: noir #0B0B0B, blanc #F5F0E8, or #C9A227, style premium cinématique sport de haut niveau.`,
+    `Format: ${tpl.format}. Canal: ${tpl.channel}.`,
+    `Texte principal: "${main}".`,
+    title?`Titre / contexte: "${title}".`:'',
+    detail?`Texte secondaire: "${detail}".`:'',
+    player?`Joueur concerné: ${player.name}.`:'',
+    session?`Séance liée: ${sessionTitle(session)}.`:'',
+    `CTA: "${cta}".`
+  ].filter(Boolean).join('\n');
+  return {tpl,title,main,detail,cta,plannedDate,source,caption,prompt,playerId:playerId||null,sessionId:sessionId||null};
+}
+function previewContentDraft(){
+  const d=contentDraftFromForm();
+  const out=document.getElementById('cs_preview');
+  if(!out) return;
+  out.innerHTML=`<div class="card-title">APERÇU GÉNÉRÉ</div><div style="font-size:18px;font-weight:900;line-height:1.15;margin-bottom:8px">${esc(d.main)}</div><div class="muted-help" style="margin-bottom:12px">${esc(d.detail||d.tpl.caption)}</div><div style="display:grid;gap:8px"><div style="background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:10px"><b style="color:var(--bronze)">Caption</b><pre style="white-space:pre-wrap;font-family:var(--font-body);font-size:11px;color:var(--offwhite);line-height:1.55;margin-top:8px">${esc(d.caption)}</pre></div><div style="background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:10px"><b style="color:var(--bronze)">Brief visuel</b><pre style="white-space:pre-wrap;font-family:var(--font-body);font-size:11px;color:var(--offwhite);line-height:1.55;margin-top:8px">${esc(d.prompt)}</pre></div></div>`;
+}
+function createContentPost(){
+  const d=contentDraftFromForm();
+  const cs=contentState();
+  cs.posts.unshift({id:contentId(),templateKey:d.tpl.key,type:d.tpl.type,format:d.tpl.format,channel:d.tpl.channel,status:'idée',createdAt:new Date().toISOString(),plannedDate:d.plannedDate,title:d.title,main:d.main,detail:d.detail,cta:d.cta,source:d.source,caption:d.caption,prompt:d.prompt,playerId:d.playerId,sessionId:d.sessionId,image:''});
+  saveState();
+  setUI({contentTab:'library'});
+  showNotif('Post ajouté au Content Studio');
+}
+function generateSmartContentIdea(){
+  const cs=contentState();
+  const lastClosed=STATE.sessions.filter(s=>s.status==='completed'||s.status==='closed_coach').slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];
+  const noProfile=STATE.players.find(p=>!p.profileId);
+  const suggestions=[
+    {templateKey:'method',title:'3 repères pour mieux communiquer',main:'3 REPÈRES',detail:'Un contenu éducatif court sur la communication au centre et les mots simples à utiliser.',cta:'Sauvegarde avant ton prochain match'},
+    {templateKey:'profile',title:'12 profils HWBT',main:'LEQUEL ES-TU ?',detail:noProfile?`${noProfile.name} doit encore faire le test: parfait pour relancer le thème des profils.`:'Faire découvrir un profil HWBT avec une carte simple et partageable.',cta:'Teste ton profil joueur'},
+    {templateKey:lastClosed?'progress':'quote',title:lastClosed?`Progression · ${sessionTitle(lastClosed)}`:'Citation mindset',main:lastClosed?'PROGRESSION MESURABLE':'NO WORK. NO PROGRESS.',detail:lastClosed?`Transformer la séance du ${formatShortDate(lastClosed.date)||lastClosed.date} en post apprentissage.`:'Rappeler la philosophie HWBT avec une phrase courte.',cta:'Découvre la méthode HWBT'}
+  ];
+  const pick=suggestions[(cs.ideas.length+cs.posts.length)%suggestions.length];
+  cs.ideas.unshift({id:contentId('idea'),date:todayIso(),done:false,...pick});
+  saveState();render();showNotif('Idée contenu ajoutée');
+}
+function createPostFromIdea(id){
+  const cs=contentState();
+  const idea=cs.ideas.find(x=>x.id===id);
+  if(!idea) return;
+  const tpl=contentTemplates().find(t=>t.key===idea.templateKey)||contentTemplates()[0];
+  cs.posts.unshift({id:contentId(),templateKey:tpl.key,type:tpl.type,format:tpl.format,channel:tpl.channel,status:'idée',createdAt:new Date().toISOString(),plannedDate:todayIso(),title:idea.title,main:idea.main,detail:idea.detail,cta:idea.cta,source:'Idée automatique HWBT',caption:`${idea.main}\n\n${idea.detail}\n\n${idea.cta}\n\n#HWBTAcademy #HardWorkBeatsTalent #Padel`,prompt:`${tpl.prompt}\nTexte principal: "${idea.main}".\nTexte secondaire: "${idea.detail}".\nCharte HWBT noir/blanc/or premium.`,image:''});
+  idea.done=true;
+  saveState();setUI({contentTab:'library'});showNotif('Post créé depuis l’idée');
+}
+function nextContentPostStatus(id){
+  const post=contentState().posts.find(p=>p.id===id);
+  if(!post) return;
+  const statuses=['idée','à créer','prêt','publié'];
+  post.status=statuses[(statuses.indexOf(post.status)+1+statuses.length)%statuses.length];
+  saveState();render();
+}
+function deleteContentPost(id){
+  if(!confirm('Supprimer ce post du Content Studio ?')) return;
+  const cs=contentState();
+  cs.posts=cs.posts.filter(p=>p.id!==id);
+  saveState();render();showNotif('Post supprimé');
+}
+function copyContentText(id,field){
+  const post=contentState().posts.find(p=>p.id===id);
+  if(!post) return;
+  const text=post[field]||'';
+  if(navigator.clipboard) navigator.clipboard.writeText(text).then(()=>showNotif('Texte copié'));
+  else {prompt('Copie le texte:',text);showNotif('Texte prêt à copier');}
+}
+function attachContentImage(id,input){
+  const file=input.files&&input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=()=>{const post=contentState().posts.find(p=>p.id===id);if(post){post.image=reader.result;saveState();render();showNotif('Image ajoutée au post');}};
+  reader.readAsDataURL(file);
+}
+function contentPostCard(post){
+  const color=contentStatusColor(post.status);
+  return `<div class="card" style="border-color:${color}55;overflow:hidden">
+    ${post.image?`<div style="height:180px;background:url('${post.image}') center/cover;border-radius:7px;margin-bottom:12px;border:1px solid var(--border)"></div>`:''}
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px">
+      <div><div class="card-title" style="color:${color};margin-bottom:6px">${esc(post.type)} · ${esc(post.channel)}</div><div style="font-size:18px;font-weight:900;line-height:1.1">${esc(post.main||post.title)}</div></div>
+      <span class="badge" style="background:${color}22;color:${color};border:1px solid ${color}55">${esc((post.status||'idée').toUpperCase())}</span>
+    </div>
+    <div class="muted-help">${esc(contentShortText(post.detail||post.caption,180))}</div>
+    <div style="font-size:9px;color:var(--gray3);letter-spacing:1px;margin-top:10px">${esc(post.plannedDate||'date ?')} · ${esc(post.format||'format ?')}</div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn btn-primary btn-sm" onclick="nextContentPostStatus('${post.id}')">STATUT</button>
+      <button class="btn btn-ghost btn-sm" onclick="copyContentText('${post.id}','caption')">CAPTION</button>
+      <button class="btn btn-ghost btn-sm" onclick="copyContentText('${post.id}','prompt')">BRIEF</button>
+      <label class="btn btn-ghost btn-sm" style="cursor:pointer">IMAGE<input type="file" accept="image/*" style="display:none" onchange="attachContentImage('${post.id}',this)"></label>
+      <button class="btn btn-danger btn-sm" onclick="deleteContentPost('${post.id}')">SUPPRIMER</button>
+    </div>
+  </div>`;
+}
+function contentCalendarHtml(posts){
+  const key=UI.contentMonth||monthKeyFromDate(todayIso());
+  const [year,month]=key.split('-').map(Number);
+  const first=new Date(year,month-1,1);
+  const daysInMonth=new Date(year,month,0).getDate();
+  const start=(first.getDay()+6)%7;
+  const cells=[];
+  for(let i=0;i<start;i++) cells.push(null);
+  for(let d=1;d<=daysInMonth;d++) cells.push(d);
+  while(cells.length%7) cells.push(null);
+  const byDate={};
+  posts.filter(p=>monthKeyFromDate(p.plannedDate)===key).forEach(p=>{(byDate[p.plannedDate]=byDate[p.plannedDate]||[]).push(p);});
+  const days=['LUN','MAR','MER','JEU','VEN','SAM','DIM'];
+  return `<div class="card" style="border-color:var(--bronze-dim2)"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div><div class="card-title">CALENDRIER ÉDITORIAL</div><div style="font-size:28px;font-weight:900;text-transform:uppercase">${esc(monthLabel(key))}</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({contentMonth:'${shiftMonthKey(key,-1)}'})">← MOIS</button><button class="btn btn-primary btn-sm" onclick="setUI({contentMonth:'${monthKeyFromDate(todayIso())}'})">AUJOURD'HUI</button><button class="btn btn-ghost btn-sm" onclick="setUI({contentMonth:'${shiftMonthKey(key,1)}'})">MOIS →</button></div></div><div style="overflow-x:auto"><div style="min-width:760px"><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px">${days.map(d=>`<div style="font-size:9px;letter-spacing:1.5px;color:var(--bronze);text-align:center">${d}</div>`).join('')}</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">${cells.map(day=>{if(!day)return`<div style="min-height:112px;border:1px solid transparent"></div>`;const date=`${key}-${String(day).padStart(2,'0')}`;const list=byDate[date]||[];const today=date===todayIso();return `<div style="min-height:112px;background:${today?'linear-gradient(180deg,var(--bronze-dim),var(--bg4))':'var(--bg4)'};border:1px solid ${today?'var(--bronze-dim2)':'var(--border)'};border-radius:8px;padding:8px"><div style="display:flex;justify-content:space-between;margin-bottom:7px"><b style="color:${today?'var(--bronze)':'var(--white)'}">${day}</b>${list.length?`<span style="font-size:8px;color:var(--gray)">${list.length} POST</span>`:''}</div><div style="display:grid;gap:5px">${list.slice(0,3).map(p=>`<div style="border-left:3px solid ${contentStatusColor(p.status)};background:#050507;border-radius:5px;padding:6px"><div style="font-size:9px;color:${contentStatusColor(p.status)};letter-spacing:1px">${esc(p.channel)}</div><div style="font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.main||p.title)}</div></div>`).join('')}${list.length>3?`<div style="font-size:8px;color:var(--bronze)">+${list.length-3} autres</div>`:''}</div></div>`;}).join('')}</div></div></div></div>`;
+}
+function pageContentStudio(){
+  if(STATE.role!=='coach') return pageDashboard();
+  const cs=contentState();
+  const posts=cs.posts.slice().sort((a,b)=>String(b.plannedDate||'').localeCompare(String(a.plannedDate||'')));
+  const tab=UI.contentTab||'dashboard';
+  const counts={ideas:posts.filter(p=>p.status==='idée').length,create:posts.filter(p=>p.status==='à créer').length,ready:posts.filter(p=>p.status==='prêt').length,published:posts.filter(p=>p.status==='publié').length};
+  const content={
+    dashboard:()=>`<div class="g4"><div class="stat-card"><div class="stat-label">IDÉES</div><div class="stat-value">${counts.ideas}</div><div class="stat-sub">à trier</div></div><div class="stat-card"><div class="stat-label">À CRÉER</div><div class="stat-value">${counts.create}</div><div class="stat-sub">production</div></div><div class="stat-card"><div class="stat-label">PRÊTS</div><div class="stat-value">${counts.ready}</div><div class="stat-sub">à publier</div></div><div class="stat-card"><div class="stat-label">PUBLIÉS</div><div class="stat-value">${counts.published}</div><div class="stat-sub">historique</div></div></div><div class="g2"><div class="card"><div class="card-title">IDÉES INTELLIGENTES HWBT</div><div class="muted-help" style="margin-bottom:12px">La plateforme propose des idées liées aux joueurs, séances, profils et résultats. V1 locale: suggestions simples, sans IA connectée.</div><button class="btn btn-primary" onclick="generateSmartContentIdea()">GÉNÉRER UNE IDÉE</button><div style="display:grid;gap:8px;margin-top:14px">${cs.ideas.slice(0,5).map(i=>`<div style="background:var(--bg4);border:1px solid ${i.done?'var(--vert)':'var(--border)'};border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--bronze);letter-spacing:1px">${esc(i.date)}</div><div style="font-size:14px;font-weight:900">${esc(i.main)}</div><div class="muted-help">${esc(i.detail)}</div><button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="createPostFromIdea('${i.id}')">CRÉER POST</button></div>`).join('')||'<div class="muted-help">Aucune idée pour l’instant.</div>'}</div></div><div>${contentCalendarHtml(posts)}</div></div>`,
+    create:()=>contentCreateHtml(),
+    calendar:()=>contentCalendarHtml(posts),
+    library:()=>`<div class="g3">${posts.map(contentPostCard).join('')||'<div class="card"><div class="muted-help">Aucun post enregistré. Crée ton premier brief dans l’onglet Créer.</div></div>'}</div>`,
+    templates:()=>`<div class="g2">${contentTemplates().map(t=>`<div class="card" style="border-color:var(--bronze-dim2)"><div class="card-title">${esc(t.type)} · ${esc(t.format)}</div><div style="font-size:20px;font-weight:900;margin-bottom:8px">${esc(t.title)}</div><div class="muted-help"><b>Hook:</b> ${esc(t.hook)}<br><b>Ton:</b> ${esc(t.tone)}<br><b>Canal:</b> ${esc(t.channel)}</div><button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="setUI({contentTab:'create',contentTemplate:'${t.key}'})">UTILISER</button></div>`).join('')}</div>`
+  }[tab]();
+  return `<div class="content">${quoteBand()}<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px"><div><div style="font-size:34px;font-weight:900;letter-spacing:1px;line-height:1">Content Studio HWBT</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-top:6px">Réseaux sociaux: idées, templates, calendrier éditorial, captions et briefs visuels prêts à copier.</div></div><button class="btn btn-primary" onclick="setUI({contentTab:'create'})">+ CRÉER UN POST</button></div>${contentTabs()}${content}</div>`;
+}
+function contentCreateHtml(){
+  const templates=contentTemplates();
+  const defaultKey=UI.contentTemplate||templates[0].key;
+  return `<div class="g2"><div class="card" style="border-color:var(--bronze-dim2)"><div class="card-title">GÉNÉRATEUR DE BRIEF HWBT</div><div class="form-group"><label class="form-label">TEMPLATE</label><select class="form-select" id="cs_template" onchange="previewContentDraft()">${templates.map(t=>`<option value="${t.key}" ${t.key===defaultKey?'selected':''}>${esc(t.type)} · ${esc(t.title)}</option>`).join('')}</select></div><div class="g2"><div class="form-group"><label class="form-label">JOUEUR LIÉ</label><select class="form-select" id="cs_player" onchange="previewContentDraft()"><option value="">— Aucun —</option>${STATE.players.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">SÉANCE LIÉE</label><select class="form-select" id="cs_session" onchange="previewContentDraft()"><option value="">— Aucune —</option>${STATE.sessions.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,20).map(s=>`<option value="${s.id}">${esc(s.date)} · ${esc(sessionTitle(s))}</option>`).join('')}</select></div></div><div class="form-group"><label class="form-label">TITRE INTERNE</label><input class="form-input" id="cs_title" placeholder="Ex: Qualification Lucas & Julien" oninput="previewContentDraft()"></div><div class="form-group"><label class="form-label">TEXTE PRINCIPAL VISUEL</label><input class="form-input" id="cs_main" placeholder="Ex: QUALIFIÉS / 12 PROFILS / STAGE EXPRESS" oninput="previewContentDraft()"></div><div class="form-group"><label class="form-label">MESSAGE / CONTEXTE</label><textarea class="form-input" id="cs_detail" rows="4" placeholder="Ce que tu veux raconter dans le post..." oninput="previewContentDraft()"></textarea></div><div class="g2"><div class="form-group"><label class="form-label">DATE PRÉVUE</label><input class="form-input" type="date" id="cs_date" value="${todayIso()}" onchange="previewContentDraft()"></div><div class="form-group"><label class="form-label">CTA</label><input class="form-input" id="cs_cta" value="Découvre la méthode HWBT" oninput="previewContentDraft()"></div></div><div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><button class="btn btn-ghost" onclick="previewContentDraft()">APERÇU</button><button class="btn btn-primary" onclick="createContentPost()">SAUVEGARDER POST</button></div></div><div class="card" id="cs_preview"><div class="card-title">APERÇU GÉNÉRÉ</div><div class="muted-help">Complète les champs puis clique Aperçu. La plateforme génère une caption et un brief visuel à copier.</div></div></div>`;
 }
 
 function pageNutrition(){
@@ -5058,10 +5742,73 @@ function newSessionModalHtml(extra){
   ${modalAftPrepHtml()}
   <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">ANNULER</button><button class="btn btn-primary" onclick="createSession()">CRÉER ET PRÉPARER</button></div>`;
 }
+function exerciseEditFormHtml(id){
+  const ex=(STATE.customExercises||[]).find(e=>e.id===id);
+  if(!ex) return `<div class="modal-title">EXERCICE INTROUVABLE</div><button class="modal-close" onclick="closeModal()">×</button>`;
+  const levelOptions=['débutant','intermédiaire','avancé','tous'];
+  return `<div class="modal-title">MODIFIER MINI-FICHE EXERCICE</div><button class="modal-close" onclick="closeModal()">×</button>
+    <div class="session-config-note">Cette fiche est la version propre de l’exercice. Elle servira pour la bibliothèque, la vidéo explicative, le PDF et les futurs reels.</div>
+    <div class="form-group"><label class="form-label">NOM DE L’EXERCICE</label><input class="form-input" id="ex_title" value="${esc(ex.title||'')}" placeholder="Ex: Jeu de départ - lobs avant vitre"></div>
+    <div class="g2">
+      <div class="form-group"><label class="form-label">PILIER PRINCIPAL</label><select class="form-select" id="ex_pillar">${PILLARS.map(p=>`<option value="${p.id}" ${ex.pillar===p.id?'selected':''}>${p.name}</option>`).join('')}</select></div>
+      <div class="form-group"><label class="form-label">ASPECT PRINCIPAL</label><input class="form-input" id="ex_aspect" value="${esc(ex.aspect||'')}" placeholder="Ex: Lob avant vitre"></div>
+    </div>
+    <div class="g2">
+      <div class="form-group"><label class="form-label">ASPECT SECONDAIRE</label><input class="form-input" id="ex_secondary" value="${esc(ex.secondary||'')}" placeholder="Ex: Lecture du jeu"></div>
+      <div class="form-group"><label class="form-label">NIVEAU</label><select class="form-select" id="ex_level">${levelOptions.map(l=>`<option value="${l}" ${(ex.level||'tous')===l?'selected':''}>${exerciseLevelLabel(l)}</option>`).join('')}</select></div>
+    </div>
+    <div class="g2">
+      <div class="form-group"><label class="form-label">JOUEURS</label><input class="form-input" id="ex_players" value="${esc(ex.players||'1-4')}" placeholder="Ex: 2-4"></div>
+      <div class="form-group"><label class="form-label">DURÉE</label><input class="form-input" id="ex_duration" value="${esc(ex.duration||'')}" placeholder="Ex: 15 min"></div>
+    </div>
+    <div class="form-group"><label class="form-label">OBJECTIF</label><textarea class="form-input" id="ex_objective" rows="2">${esc(ex.objective||'')}</textarea></div>
+    <div class="g2">
+      <div class="form-group"><label class="form-label">ORGANISATION / MATÉRIEL</label><textarea class="form-input" id="ex_setup" rows="4">${esc(ex.setup||'')}</textarea></div>
+      <div class="form-group"><label class="form-label">DÉROULEMENT</label><textarea class="form-input" id="ex_flow" rows="4">${esc(ex.flow||'')}</textarea></div>
+    </div>
+    <div class="g2">
+      <div class="form-group"><label class="form-label">COMPTAGE / SCORE</label><textarea class="form-input" id="ex_scoring" rows="3">${esc(ex.scoring||'')}</textarea></div>
+      <div class="form-group"><label class="form-label">CONSIGNES COACH</label><textarea class="form-input" id="ex_coach" rows="3">${esc(ex.coach||'')}</textarea></div>
+    </div>
+    <div class="g2">
+      <div class="form-group"><label class="form-label">QUESTION D’INDUCTION</label><textarea class="form-input" id="ex_questions" rows="3">${esc(ex.questions||'')}</textarea></div>
+      <div class="form-group"><label class="form-label">MESSAGE CLÉ / BIENFAITS</label><textarea class="form-input" id="ex_benefits" rows="3">${esc(ex.benefits||'')}</textarea></div>
+    </div>
+    <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">ANNULER</button><button class="btn btn-primary" onclick="saveExerciseEdit('${ex.id}')">ENREGISTRER</button></div>`;
+}
+function saveExerciseEdit(id){
+  const ex=(STATE.customExercises||[]).find(e=>e.id===id);
+  if(!ex) return;
+  const val=id=>document.getElementById(id)?.value?.trim()||'';
+  Object.assign(ex,{
+    title:val('ex_title')||ex.title,
+    exerciseName:val('ex_title')||ex.exerciseName||ex.title,
+    pillar:val('ex_pillar')||ex.pillar,
+    aspect:val('ex_aspect')||ex.aspect,
+    secondary:val('ex_secondary')||'À définir',
+    level:val('ex_level')||'tous',
+    players:val('ex_players')||'1-4',
+    duration:val('ex_duration')||'À définir',
+    objective:val('ex_objective'),
+    setup:val('ex_setup'),
+    flow:val('ex_flow'),
+    scoring:val('ex_scoring'),
+    coach:val('ex_coach'),
+    questions:val('ex_questions'),
+    benefits:val('ex_benefits'),
+    updatedAt:new Date().toISOString()
+  });
+  ex.prep={objective:ex.objective,setup:ex.setup,flow:ex.flow,rule:ex.scoring,coach:ex.coach,questions:ex.questions,benefits:ex.benefits};
+  saveState();
+  closeModal();
+  showNotif('Mini-fiche exercice mise à jour');
+  render();
+}
 function renderModal(type,extra){
   if(type==='addPlayer') return playerFormHtml();
   if(type==='editPlayer'){const p=STATE.players.find(p=>p.id===extra);return p?playerFormHtml(p):`<div class="modal-title">JOUEUR INTROUVABLE</div><button class="modal-close" onclick="closeModal()">×</button>`}
   if(type==='newSession') return newSessionModalHtml(extra);
+  if(type==='editExercise') return exerciseEditFormHtml(extra);
   return `<div class="modal-title">—</div><button class="modal-close" onclick="closeModal()">×</button>`;
 }
 function addPlayer(){const data=readPlayerForm();if(!data.firstName||!data.lastName){showNotif('Prénom et nom requis');return;}const id=Math.max(0,...STATE.players.map(p=>p.id))+1;if(!data.code)data.code=(data.firstName[0]+data.lastName[0]+String(id).padStart(3,'0')).toUpperCase();if(!data.playerPassword)data.playerPassword=String(data.code).toLowerCase();STATE.players.push({...data,id,profileId:null,level:null,levelManual:false,scores:{T:0,TA:0,P:0,M:0},aspects:{},futureAspects:[],sessions:[]});closeModal();showNotif('Fiche joueur créée');setUI({page:'players',selectedPlayerId:id,subpage:'profil'});}
