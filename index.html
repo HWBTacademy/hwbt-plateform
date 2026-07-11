@@ -1548,20 +1548,20 @@ const AFT_SESSION_BLOCKS = [
   {num:'05',name:'COOLING DOWN',time:'5 MIN',desc:'Retour au calme, bilan sandwich, question ouverte et vérification de ce que les joueurs retiennent.',focus:'Bilan'},
 ];
 const HWBT_COURSE_60_BLOCKS = [
-  {num:'01',name:'ÉCHAUFFEMENT',time:'10 MIN',desc:'Mettre le corps en route, installer l’attention et faire entrer le thème sans longue explication.',focus:'Activation + induction',pillar:'P'},
-  {num:'02',name:'SITUATION RÉVÉLATRICE',time:'15 MIN',desc:'Un défi de départ qui montre le problème à résoudre et donne envie d’apprendre.',focus:'Lecture du jeu',pillar:'TA'},
-  {num:'03',name:'ATELIER GUIDÉ',time:'15 MIN',desc:'Construire les repères techniques et tactiques avec une situation plus claire, plus répétable.',focus:'Repères + progression',pillar:'T'},
-  {num:'04',name:'TRANSFERT MATCH',time:'15 MIN',desc:'Revenir au jeu avec contrainte, bonus ou score pour vérifier si le joueur transfère en situation réelle.',focus:'Application',pillar:'TA'},
-  {num:'05',name:'RETOUR AU CALME',time:'5 MIN',desc:'Bilan sandwich, ressenti joueur, message clé et point à reprendre.',focus:'Bilan',pillar:'M'},
+  {num:'01',name:'GET READY',time:'10 MIN',desc:'Échauffement: mettre le corps en route, installer l’attention et faire entrer le thème sans longue explication.',focus:'Échauffement',pillar:'P'},
+  {num:'02',name:'FACE THE GAME',time:'15 MIN',desc:'Situation révélatrice: un défi de départ qui montre le problème à résoudre et donne envie d’apprendre.',focus:'Situation révélatrice',pillar:'TA'},
+  {num:'03',name:'BUILD THE ANSWER',time:'15 MIN',desc:'Atelier guidé: construire les repères techniques et tactiques avec une situation plus claire, plus répétable.',focus:'Atelier guidé',pillar:'T'},
+  {num:'04',name:'PROVE IT',time:'15 MIN',desc:'Transfert match: revenir au jeu avec contrainte, bonus ou score pour vérifier si le joueur transfère en situation réelle.',focus:'Transfert match',pillar:'TA'},
+  {num:'05',name:'RESET',time:'5 MIN',desc:'Retour au calme: bilan sandwich, ressenti joueur, message clé et point à reprendre.',focus:'Retour au calme',pillar:'M'},
 ];
 const HWBT_COURSE_90_BLOCKS = [
-  {num:'01',name:'ÉCHAUFFEMENT',time:'10 MIN',desc:'Mettre le corps en route, installer l’attention et faire entrer le premier thème.',focus:'Activation + induction',pillar:'P'},
-  {num:'02',name:'SITUATION RÉVÉLATRICE 1',time:'15 MIN',desc:'Premier défi de départ: faire apparaître le problème tactique ou technique.',focus:'Thème 1 · lecture',pillar:'TA'},
-  {num:'03',name:'ATELIER GUIDÉ 1',time:'15 MIN',desc:'Construire les repères du premier thème avec répétition, correction courte et variation.',focus:'Thème 1 · progression',pillar:'T'},
-  {num:'04',name:'SITUATION RÉVÉLATRICE 2',time:'15 MIN',desc:'Deuxième défi de départ: ouvrir un nouveau problème ou relier le thème 1 au thème 2.',focus:'Thème 2 · lecture',pillar:'TA'},
-  {num:'05',name:'ATELIER GUIDÉ 2',time:'15 MIN',desc:'Construire les repères du deuxième thème avec une difficulté adaptée au niveau.',focus:'Thème 2 · progression',pillar:'T'},
-  {num:'06',name:'TRANSFERT MATCH',time:'15 MIN',desc:'Jeu global qui mélange les deux thèmes et récompense les bons choix en point réel.',focus:'Application des 2 thèmes',pillar:'TA'},
-  {num:'07',name:'RETOUR AU CALME',time:'5 MIN',desc:'Bilan sandwich, ressenti joueur, message clé et point à reprendre.',focus:'Bilan',pillar:'M'},
+  {num:'01',name:'GET READY',time:'10 MIN',desc:'Échauffement: mettre le corps en route, installer l’attention et faire entrer le premier thème.',focus:'Échauffement',pillar:'P'},
+  {num:'02',name:'FACE THE GAME 1',time:'15 MIN',desc:'Situation révélatrice 1: faire apparaître le premier problème tactique ou technique.',focus:'Situation révélatrice 1',pillar:'TA'},
+  {num:'03',name:'BUILD THE ANSWER 1',time:'15 MIN',desc:'Atelier guidé 1: construire les repères du premier thème avec répétition, correction courte et variation.',focus:'Atelier guidé 1',pillar:'T'},
+  {num:'04',name:'FACE THE GAME 2',time:'15 MIN',desc:'Situation révélatrice 2: ouvrir un nouveau problème ou relier le thème 1 au thème 2.',focus:'Situation révélatrice 2',pillar:'TA'},
+  {num:'05',name:'BUILD THE ANSWER 2',time:'15 MIN',desc:'Atelier guidé 2: construire les repères du deuxième thème avec une difficulté adaptée au niveau.',focus:'Atelier guidé 2',pillar:'T'},
+  {num:'06',name:'PROVE IT',time:'15 MIN',desc:'Transfert match: jeu global qui mélange les deux thèmes et récompense les bons choix en point réel.',focus:'Transfert match',pillar:'TA'},
+  {num:'07',name:'RESET',time:'5 MIN',desc:'Retour au calme: bilan sandwich, ressenti joueur, message clé et point à reprendre.',focus:'Retour au calme',pillar:'M'},
 ];
 function isCourseSession(s){
   const type=typeof s==='string'?s:s?.sessionType;
@@ -2532,7 +2532,7 @@ function sessionWorkBlocksHtml(s){
     const score=measuredBlockScore(b);
     const actionButtons=isCooling
       ? `<button class="btn btn-primary btn-sm" onclick="enhanceSessionBlockAft(${s.id},${idx})">CORRIGER + COMPLÉTER LE BILAN</button>`
-      : `<button class="btn btn-primary btn-sm" onclick="openModal('sessionExercisePicker',{sessionId:${s.id},blockIdx:${idx}})">CHOISIR DANS LE CARNET</button>${aft?`<button class="btn btn-primary btn-sm" onclick="enhanceSessionBlockAft(${s.id},${idx})">CORRIGER + COMPLÉTER</button>${isApplication?`<button class="btn btn-ghost btn-sm" onclick="copyStartGameToApplication(${s.id})">COPIER SITUATION RÉVÉLATRICE</button>`:''}`:''}<button class="btn btn-ghost btn-sm" onclick="diagramToText(${s.id},${idx})">SCHÉMA → TEXTE</button><button class="btn btn-ghost btn-sm" onclick="diagramFromText(${s.id},${idx})">TEXTE → SCHÉMA</button><button class="btn btn-ghost btn-sm" onclick="saveBlockExerciseToLibrary(${s.id},${idx})">ENREGISTRER EN BIBLIOTHÈQUE</button>`;
+      : `<button class="btn btn-primary btn-sm" onclick="openModal('sessionExercisePicker',{sessionId:${s.id},blockIdx:${idx}})">CHOISIR DANS LE CARNET</button>${aft?`<button class="btn btn-primary btn-sm" onclick="enhanceSessionBlockAft(${s.id},${idx})">CORRIGER + COMPLÉTER</button>${isApplication?`<button class="btn btn-ghost btn-sm" onclick="copyStartGameToApplication(${s.id})">COPIER FACE THE GAME</button>`:''}`:''}<button class="btn btn-ghost btn-sm" onclick="diagramToText(${s.id},${idx})">SCHÉMA → TEXTE</button><button class="btn btn-ghost btn-sm" onclick="diagramFromText(${s.id},${idx})">TEXTE → SCHÉMA</button><button class="btn btn-ghost btn-sm" onclick="saveBlockExerciseToLibrary(${s.id},${idx})">ENREGISTRER EN BIBLIOTHÈQUE</button>`;
     const prepBlock=canEdit?(aft?`${sessionPrepEditorHtml(s,idx,b,isCooling)}<div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${actionButtons}</div>`:`<div class="form-group"><label class="form-label">EXERCICE / CONSIGNE</label><textarea class="form-input" rows="2" oninput="updateSessionBlock(${s.id},${idx},'exercise',this.value)">${esc(b.exercise||'')}</textarea><div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${actionButtons}</div></div>`):(aft?sessionPrepReadOnlyHtml(b,isCooling):`${b.exercise?`<div class="exercise-card"><div style="font-size:8px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:5px">${isCooling?'BILAN DONNÉ':'EXERCICE DONNÉ'}</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.5;white-space:pre-wrap">${esc(b.exercise)}</div></div>`:''}`);
     const diagramBlock=isCooling?`<div style="background:var(--bg4);border-left:3px solid var(--bronze);border-radius:0 8px 8px 0;padding:12px;font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.65"><b style="color:var(--offwhite)">Pas de schéma terrain pour cette étape.</b><br>Le cooling down sert à revenir au calme, vérifier ce que les joueurs retiennent et fermer la séance avec un feedback sandwich.</div>`:diagramHtml(s,idx,canEdit);
     const body=aft&&!isCooling
@@ -5908,11 +5908,11 @@ function modalPrepTextArea(idx,key,label,rows=3){
 }
 function defaultExerciseName(step,idx){
   const name=String(step?.name||'').toLowerCase();
-  if(name.includes('échauffement')) return 'Mise en route thème';
-  if(name.includes('départ')||name.includes('révélatrice')) return 'Situation révélatrice';
-  if(name.includes('apprentissage')||name.includes('guidé')) return 'Atelier guidé';
-  if(name.includes('application')||name.includes('transfert')) return 'Transfert match';
-  if(name.includes('cooling')||name.includes('retour')) return 'Bilan final';
+  if(name.includes('get ready')||name.includes('échauffement')) return 'Get Ready';
+  if(name.includes('face the game')||name.includes('départ')||name.includes('révélatrice')) return 'Face the Game';
+  if(name.includes('build the answer')||name.includes('apprentissage')||name.includes('guidé')) return 'Build the Answer';
+  if(name.includes('prove it')||name.includes('application')||name.includes('transfert')) return 'Prove It';
+  if(name.includes('reset')||name.includes('cooling')||name.includes('retour')) return 'Reset';
   return `Exercice ${idx+1}`;
 }
 function modalAftPrepHtml(){
@@ -5926,7 +5926,7 @@ function modalAftPrepHtml(){
       const isCooling=idx===steps.length-1;
       const isApplication=/application/i.test(st.name||'');
       return `<div class="aspect-input-block">
-        <div class="aib-header" style="align-items:flex-end;flex-wrap:wrap"><span class="aib-pillar" style="background:var(--bronze-dim);color:var(--bronze)">${String(idx+1).padStart(2,'0')}</span><span class="aib-name">${esc(st.name)}</span><div style="flex:1;min-width:220px"><label class="form-label" style="margin-bottom:4px">NOM DE L’EXERCICE</label><input class="form-input" id="m_aft_ex_name_${idx}" value="${esc(defaultExerciseName(st,idx))}" placeholder="Ex: Lob avant vitre, jeu des zones..."></div>${isApplication?`<button type="button" class="btn btn-ghost btn-sm" onclick="copyModalStartGameToApplication()">COPIER SITUATION RÉVÉLATRICE</button>`:''}</div>
+        <div class="aib-header" style="align-items:flex-end;flex-wrap:wrap"><span class="aib-pillar" style="background:var(--bronze-dim);color:var(--bronze)">${String(idx+1).padStart(2,'0')}</span><span class="aib-name">${esc(st.name)}</span><div style="flex:1;min-width:220px"><label class="form-label" style="margin-bottom:4px">NOM DE L’EXERCICE</label><input class="form-input" id="m_aft_ex_name_${idx}" value="${esc(defaultExerciseName(st,idx))}" placeholder="Ex: Lob avant vitre, jeu des zones..."></div>${isApplication?`<button type="button" class="btn btn-ghost btn-sm" onclick="copyModalStartGameToApplication()">COPIER FACE THE GAME</button>`:''}</div>
         <div style="font-size:10px;color:var(--bronze);letter-spacing:1.4px;margin-bottom:10px">${esc(st.time)}${st.focus?` · ${esc(st.focus)}`:''}</div>
         <div class="aft-prep-grid">
           <div style="min-width:0">
@@ -6378,9 +6378,9 @@ function fillAftSessionAssistant(){
   setVal('m_aft_mental',mentalAspect);
   const plan=[
     {pillar:'T',aspect:technicalAspect,exercise:detailedAftExerciseText(`ÉCHAUFFEMENT (${level})`,theme,level,technicalAspect,mentalAspect,teacherGoal,constraint,theme.exercises[0],`Qualité du premier contact, disponibilité corporelle, repère technique "${technicalAspect}" sans surcorriger.`)},
-    {pillar:'TA',aspect:theme.tacticAspect,exercise:detailedAftExerciseText('SITUATION RÉVÉLATRICE',theme,level,technicalAspect,mentalAspect,teacherGoal,constraint,theme.exercises[1],`Décision tactique, placement avant/après frappe, lecture de la position adverse et cohérence avec le thème.`)},
-    {pillar:'P',aspect:theme.physical,exercise:detailedAftExerciseText("ATELIER GUIDÉ",theme,level,technicalAspect,mentalAspect,teacherGoal,constraint,theme.exercises[2],`Répétition utile, déplacement, équilibre et capacité à garder la qualité quand le rythme augmente.`)},
-    {pillar:'M',aspect:mentalAspect,exercise:detailedAftExerciseText("TRANSFERT MATCH",theme,level,technicalAspect,mentalAspect,teacherGoal,constraint,theme.exercises[3],`Transfert en situation réelle, attitude, concentration, confiance et capacité à répéter le bon choix sous score.`)}
+    {pillar:'TA',aspect:theme.tacticAspect,exercise:detailedAftExerciseText('FACE THE GAME',theme,level,technicalAspect,mentalAspect,teacherGoal,constraint,theme.exercises[1],`Décision tactique, placement avant/après frappe, lecture de la position adverse et cohérence avec le thème.`)},
+    {pillar:'P',aspect:theme.physical,exercise:detailedAftExerciseText("BUILD THE ANSWER",theme,level,technicalAspect,mentalAspect,teacherGoal,constraint,theme.exercises[2],`Répétition utile, déplacement, équilibre et capacité à garder la qualité quand le rythme augmente.`)},
+    {pillar:'M',aspect:mentalAspect,exercise:detailedAftExerciseText("PROVE IT",theme,level,technicalAspect,mentalAspect,teacherGoal,constraint,theme.exercises[3],`Transfert en situation réelle, attitude, concentration, confiance et capacité à répéter le bon choix sous score.`)}
   ];
   plan.forEach(p=>{
     const sel=document.getElementById('m_aspect_'+p.pillar);
