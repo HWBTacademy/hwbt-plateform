@@ -4224,6 +4224,17 @@ function exerciseKey(ex){
 function savedExercisesForPillar(pillar){
   return allExercises().filter(e=>e.pillar===pillar);
 }
+const EXERCISE_METHOD_STEPS = ['Get Ready','Face the Game','Build the Answer','Prove It','Reset','Exercice HWBT','Autre'];
+function normalizeExerciseType(type){
+  const t=String(type||'').toLowerCase();
+  if(t.includes('get ready')||t.includes('échauff')||t.includes('echauff')) return 'Get Ready';
+  if(t.includes('face the game')||t.includes('révél')||t.includes('revel')||t.includes('départ')||t.includes('depart')) return 'Face the Game';
+  if(t.includes('build the answer')||t.includes('atelier')||t.includes('apprentissage')||t.includes('guidé')||t.includes('guide')) return 'Build the Answer';
+  if(t.includes('prove it')||t.includes('application')||t.includes('transfert')) return 'Prove It';
+  if(t.includes('reset')||t.includes('cooling')||t.includes('retour')) return 'Reset';
+  if(t.includes('hwbt')) return 'Exercice HWBT';
+  return type||'Exercice HWBT';
+}
 function saveCustomExerciseFromBlock(block,source='session'){
   const text=String(block?.exercise||'').trim();
   const aspect=String(block?.aspect||'').trim();
@@ -4240,7 +4251,10 @@ function saveCustomExerciseFromBlock(block,source='session'){
     id:'cx'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
     title:candidate.title,
     exerciseName:block?.exerciseName||candidate.title,
-    exerciseType:block?.exerciseType||block?.sessionPart||'Exercice',
+    exerciseType:normalizeExerciseType(block?.exerciseType||block?.sessionPart||'Exercice HWBT'),
+    theme:block?.theme||block?.sessionTheme||'À définir',
+    materials:block?.materials||'Raquettes · Balles',
+    tags:block?.tags||[block?.sessionPart,aspect,block?.secondaryAspect].filter(Boolean).join(', '),
     pillar,
     aspect,
     secondary:block.secondaryAspect||'À définir',
@@ -4259,6 +4273,8 @@ function saveCustomExerciseFromBlock(block,source='session'){
     videoMeta:null,
     custom:true,
     source,
+    sourceSessionId:block?.sourceSessionId||null,
+    sourceSessionTitle:block?.sourceSessionTitle||'',
     createdAt:new Date().toISOString()
   };
   STATE.customExercises.unshift(custom);
@@ -4268,7 +4284,8 @@ function saveBlockExerciseToLibrary(sessionId,blockIdx){
   const s=STATE.sessions.find(s=>s.id===sessionId);
   const b=s?.blocks?.[blockIdx];
   const step=isCourseSession(s)?sessionStructure(s)[blockIdx]:null;
-  const fallback={...(b||{}),pillar:b?.pillar||'M',aspect:b?.aspect||step?.name||'',exercise:b?.exercise||'',sessionPart:step?.name||b?.sessionPart||''};
+  const materialSource=[s?.aftMeta?.constraint||'',b?.prep?.setup||'',b?.exercise||''].join(' ');
+  const fallback={...(b||{}),pillar:b?.pillar||'M',aspect:b?.aspect||step?.name||'',exercise:b?.exercise||'',sessionPart:step?.name||b?.sessionPart||'',theme:s?.aftMeta?.theme||sessionThemeLabel(s),materials:pdfInferMaterials(materialSource).join(' · '),tags:[step?.name,b?.aspect,b?.secondaryAspect,s?.aftMeta?.theme].filter(Boolean).join(', '),sourceSessionId:s?.id||null,sourceSessionTitle:s?sessionTitle(s):''};
   const ex=saveCustomExerciseFromBlock(fallback,'manual');
   if(ex){showNotif('Exercice enregistré dans la bibliothèque');render();}
   else showNotif('Choisis un aspect et écris une consigne');
@@ -4279,7 +4296,7 @@ function sessionExercisePickerHtml(extra={}){
   const s=STATE.sessions.find(x=>x.id===sessionId);
   const b=s?.blocks?.[blockIdx]||{};
   const list=(STATE.customExercises||[]);
-  const types=[...new Set(list.map(e=>e.exerciseType||'Exercice').filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const types=[...new Set(list.map(e=>normalizeExerciseType(e.exerciseType||'Exercice HWBT')).filter(Boolean))].sort((a,b)=>EXERCISE_METHOD_STEPS.indexOf(a)-EXERCISE_METHOD_STEPS.indexOf(b));
   return `<div class="modal-title">CHOISIR UN EXERCICE DU CARNET</div><button class="modal-close" onclick="closeModal()">×</button>
     <div class="session-config-note">Choisis un exercice déjà validé. La plateforme remplit le nom, le déroulement, les aspects et le schéma dans cette séance.</div>
     <div class="g2">
@@ -4290,10 +4307,11 @@ function sessionExercisePickerHtml(extra={}){
     <div id="exercisePickerList" style="display:grid;gap:10px;max-height:58vh;overflow:auto;padding-right:4px">
       ${list.length?list.map(ex=>{
         const pl=exercisePillarMeta(ex);
-        const search=norm([ex.title,ex.exerciseType,ex.aspect,ex.secondary,ex.level,ex.players,ex.duration,ex.objective,ex.setup,ex.flow,ex.coach,ex.questions,ex.benefits].join(' '));
-        return `<div class="exercise-picker-item" data-type="${esc(ex.exerciseType||'Exercice')}" data-search="${esc(search)}" style="background:var(--bg4);border:1px solid ${pl.color}44;border-radius:8px;padding:12px">
+        const type=normalizeExerciseType(ex.exerciseType||'Exercice HWBT');
+        const search=norm([ex.title,type,ex.theme,ex.tags,ex.materials,ex.aspect,ex.secondary,ex.level,ex.players,ex.duration,ex.objective,ex.setup,ex.flow,ex.coach,ex.questions,ex.benefits].join(' '));
+        return `<div class="exercise-picker-item" data-type="${esc(type)}" data-search="${esc(search)}" style="background:var(--bg4);border:1px solid ${pl.color}44;border-radius:8px;padding:12px">
           <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
-            <div><div style="font-size:9px;letter-spacing:1.5px;color:${pl.color};margin-bottom:4px">${esc(ex.exerciseType||'Exercice')} · ${esc(pl.name)}</div><div style="font-size:18px;font-weight:800;color:var(--white);line-height:1.08">${esc(ex.title)}</div></div>
+            <div><div style="font-size:9px;letter-spacing:1.5px;color:${pl.color};margin-bottom:4px">${esc(type)} · ${esc(pl.name)}</div><div style="font-size:18px;font-weight:800;color:var(--white);line-height:1.08">${esc(ex.title)}</div></div>
             <button class="btn btn-primary btn-sm" onclick="applyLibraryExerciseToSession(${sessionId},${blockIdx},'${ex.id}')">UTILISER</button>
           </div>
           <div style="display:flex;gap:5px;flex-wrap:wrap;margin:10px 0">${exerciseKeyThemes(ex).map(t=>`<span class="badge" style="background:var(--bg2);border:1px solid var(--border2);color:var(--offwhite)">${esc(t)}</span>`).join('')}</div>
@@ -4771,12 +4789,16 @@ function exerciseLevelLabel(level){
 }
 function exerciseText(ex){
   return `${ex.title}
+Étape HWBT: ${normalizeExerciseType(ex.exerciseType)}
+Thème: ${ex.theme||'À définir'}
 Pilier: ${exercisePillarMeta(ex).name}
 Aspect principal: ${ex.aspect}
 Aspect secondaire: ${ex.secondary}
 Niveau: ${exerciseLevelLabel(ex.level)}
 Joueurs: ${ex.players}
 Durée: ${ex.duration}
+Matériel: ${ex.materials||'À définir'}
+Tags: ${ex.tags||'À définir'}
 
 Objectif:
 ${ex.objective||'À préciser'}
@@ -4836,8 +4858,10 @@ function exerciseMatchesFilter(ex){
   const matchAspect=aspect==='all'||ex.aspect===aspect||ex.secondary===aspect;
   const matchLevel=level==='all'||ex.level===level||ex.level==='tous';
   const matchPlayers=players==='all'||String(ex.players).includes(players);
-  const hay=[ex.title,ex.aspect,ex.secondary,ex.setup,ex.flow,ex.scoring,ex.coach,ex.profiles].join(' ').toLowerCase();
-  return matchPillar&&matchAspect&&matchLevel&&matchPlayers&&(!query||hay.includes(query));
+  const step=UI.exerciseStep||'all';
+  const matchStep=step==='all'||normalizeExerciseType(ex.exerciseType)===step;
+  const hay=[ex.title,ex.exerciseType,ex.theme,ex.tags,ex.materials,ex.aspect,ex.secondary,ex.setup,ex.flow,ex.scoring,ex.coach,ex.profiles].join(' ').toLowerCase();
+  return matchPillar&&matchAspect&&matchLevel&&matchPlayers&&matchStep&&(!query||hay.includes(query));
 }
 function exerciseFieldPreview(text,max=120){
   const raw=String(text||'').replace(/\s+/g,' ').trim();
@@ -4845,7 +4869,8 @@ function exerciseFieldPreview(text,max=120){
 }
 function exerciseKeyThemes(ex){
   return [
-    ex.exerciseType,
+    normalizeExerciseType(ex.exerciseType),
+    ex.theme,
     ex.aspect,
     ex.secondary,
     ex.level&&exerciseLevelLabel(ex.level),
@@ -4860,11 +4885,12 @@ function exerciseMiniCardHtml(ex){
   const pl=exercisePillarMeta(ex);
   const hasVideo=!!ex.videoMeta;
   const pageNo=String((STATE.customExercises||[]).findIndex(e=>e.id===ex.id)+1||1).padStart(2,'0');
+  const type=normalizeExerciseType(ex.exerciseType);
   return `<div class="exercise-notebook">
     <div class="exercise-page">
       <div class="exercise-page-head">
         <div class="exercise-page-num">${pageNo}</div>
-        <div><div class="exercise-page-kicker">${esc(ex.exerciseType||'Exercice')} · ${esc(pl.name)} · carnet exercice</div><div class="exercise-page-title">${esc(ex.title||ex.exerciseName||'Exercice HWBT')}</div></div>
+        <div><div class="exercise-page-kicker">${esc(type)} · ${esc(pl.name)} · carnet exercice</div><div class="exercise-page-title">${esc(ex.title||ex.exerciseName||'Exercice HWBT')}</div></div>
         <div class="exercise-page-meta">${esc(ex.duration||'Durée ?')}<br>${esc(ex.players||'1-4')} joueurs<br>${hasVideo?'Vidéo OK':'Vidéo à ajouter'}</div>
       </div>
       <div class="exercise-page-body">
@@ -4877,6 +4903,10 @@ function exerciseMiniCardHtml(ex){
             <div class="exercise-page-label">Repères</div>
             <div class="exercise-page-text"><b>${esc(ex.aspect||'Aspect principal')}</b><br>${esc(ex.secondary||'Aspect secondaire')}<br>${esc(exerciseLevelLabel(ex.level||'tous'))}</div>
           </div>
+          <div class="exercise-page-note" style="margin-top:9px">
+            <div class="exercise-page-label">Thème / matériel</div>
+            <div class="exercise-page-text">${esc(ex.theme||'Thème à définir')}<br>${esc(ex.materials||'Matériel à définir')}</div>
+          </div>
         </div>
         <div>
           ${[['OBJECTIF',ex.objective||ex.flow],['ORGANISATION',ex.setup],['DÉROULEMENT',ex.flow],['COMPTAGE',ex.scoring]].map(([label,text])=>`<div class="exercise-page-section"><div class="exercise-page-label">${label}</div><div class="exercise-page-text">${esc(exerciseFieldPreview(text,label==='DÉROULEMENT'?170:120))}</div></div>`).join('')}
@@ -4886,6 +4916,7 @@ function exerciseMiniCardHtml(ex){
         <div class="exercise-page-note"><div class="exercise-page-label">Consignes coach</div><div class="exercise-page-text">${esc(exerciseFieldPreview(ex.coach,135))}</div></div>
         <div class="exercise-page-note"><div class="exercise-page-label">Question / message clé</div><div class="exercise-page-text">${esc(exerciseFieldPreview(ex.questions||ex.benefits,135))}</div></div>
       </div>
+      ${ex.sourceSessionTitle?`<div class="exercise-page-text" style="margin-top:8px;color:#5a4b35;font-size:10px">Créé depuis: ${esc(ex.sourceSessionTitle)}</div>`:''}
       ${hasVideo?`<div style="background:#fff6e6;border:1px solid #decaa4;border-radius:8px;padding:10px;margin-top:10px">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
         <div><div class="exercise-page-label">VIDÉO TERRAIN</div><div style="font-size:11px;color:#25221d;font-family:var(--font-body)">${esc(ex.videoMeta.name||'Vidéo enregistrée')}</div></div>
@@ -4931,7 +4962,7 @@ function printExerciseMiniPdf(id){
     .grid{display:grid;grid-template-columns:78mm 1fr 1fr;gap:5mm;margin-top:6mm}.text{font-size:10.5px;line-height:1.4;white-space:pre-wrap}.wide{grid-column:span 2}.footer{margin-top:5mm;background:#070707;color:#c9a227;padding:4mm 6mm;font-size:10px;letter-spacing:3px;font-weight:800;display:flex;justify-content:space-between}.diagram{border:1px solid #d4c7ac;background:#fffaf0;border-radius:6px;padding:4mm;grid-row:span 2}.actions{position:sticky;bottom:0;background:#f3efe5dd;padding:4mm;text-align:right}.actions button{padding:10px 16px;background:#111;color:white;border:0;border-radius:6px;font-weight:800;margin-left:8px}.actions button:first-child{background:#b88928}
     @media print{button,.actions{display:none}.sheet{padding:0}.top{margin:-10mm -10mm 0 -10mm}}
   </style></head><body><div class="sheet">
-    <div class="top"><div><div class="brand">HWBT ACADEMY · MINI-FICHE EXERCICE</div><div class="title">${esc(ex.title)}</div></div><div class="meta"><div style="font-size:22px;font-weight:900;color:#fff">${esc(ex.exerciseType||'Exercice')}</div><div style="color:#c9a227;margin-top:3mm">${esc(pl.name)} · ${esc(ex.aspect||'Aspect')} · ${esc(ex.secondary||'Secondaire')}</div><div style="font-size:12px;margin-top:4mm">${esc(ex.duration||'Durée ?')} · ${esc(ex.players||'1-4')} joueurs · ${esc(exerciseLevelLabel(ex.level||'tous'))}</div></div></div>
+    <div class="top"><div><div class="brand">HWBT ACADEMY · MINI-FICHE EXERCICE</div><div class="title">${esc(ex.title)}</div></div><div class="meta"><div style="font-size:22px;font-weight:900;color:#fff">${esc(normalizeExerciseType(ex.exerciseType))}</div><div style="color:#c9a227;margin-top:3mm">${esc(pl.name)} · ${esc(ex.aspect||'Aspect')} · ${esc(ex.secondary||'Secondaire')}</div><div style="font-size:12px;margin-top:4mm">${esc(ex.theme||'Thème à définir')}<br>${esc(ex.duration||'Durée ?')} · ${esc(ex.players||'1-4')} joueurs · ${esc(exerciseLevelLabel(ex.level||'tous'))}<br>${esc(ex.materials||'Matériel à définir')}</div></div></div>
     <div class="grid"><div class="diagram"><div class="tag">Schéma terrain</div>${printDiagramSvg(ex)}</div>${rows.map(([label,text],i)=>`<div class="box ${i===2?'wide':''}"><div class="tag">${esc(label)}</div><div class="text">${esc(text||'À préciser')}</div></div>`).join('')}</div>
     <div class="footer"><span>COMPRENDRE · S’ENTRAÎNER · VALIDER · ÉVOLUER</span><span>${ex.videoMeta?'VIDÉO TERRAIN DISPONIBLE':'VIDÉO À AJOUTER'}</span></div>
     <div class="actions"><button onclick="window.print()">IMPRIMER / PDF</button><button onclick="window.close(); if(!window.closed) history.back();">RETOUR</button></div>
@@ -4949,6 +4980,7 @@ function pageExercises(){
   const list=exercises.filter(exerciseMatchesFilter);
   const levelOptions=[['all','Tous niveaux'],['débutant','Débutant'],['intermédiaire','Intermédiaire'],['avancé','Avancé'],['tous','Multi-niveaux']];
   const playerOptions=[['all','Tous formats'],['1','1 joueur'],['2','2 joueurs'],['3','3 joueurs'],['4','4 joueurs']];
+  const stepOptions=[['all','Toutes les étapes'],...EXERCISE_METHOD_STEPS.map(s=>[s,s])];
   return `<div class="content">
     ${quoteBand()}
     <div class="card exercise-library-cover" style="display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap">
@@ -4965,16 +4997,17 @@ function pageExercises(){
     <div class="card">
       <div class="g3" style="align-items:end">
         <div class="form-group"><label class="form-label">RECHERCHE</label><input class="form-input" value="${esc(UI.exerciseQuery||'')}" placeholder="ex: volée, stress, centre..." oninput="setUI({exerciseQuery:this.value})"></div>
+        <div class="form-group"><label class="form-label">ÉTAPE HWBT</label><select class="form-select" onchange="setUI({exerciseStep:this.value})">${stepOptions.map(([v,l])=>`<option value="${esc(v)}" ${(UI.exerciseStep||'all')===v?'selected':''}>${esc(l)}</option>`).join('')}</select></div>
         <div class="form-group"><label class="form-label">PILIER</label><select class="form-select" onchange="setUI({exercisePillar:this.value,exerciseAspect:'all'})"><option value="all">Tous les piliers</option>${PILLARS.map(pl=>`<option value="${pl.id}" ${currentPillar===pl.id?'selected':''}>${pl.name}</option>`).join('')}</select></div>
-        <div class="form-group"><label class="form-label">ASPECT</label><select class="form-select" onchange="setUI({exerciseAspect:this.value})"><option value="all">Tous les aspects</option>${aspects.map(a=>`<option value="${esc(a)}" ${(UI.exerciseAspect||'all')===a?'selected':''}>${esc(a)}</option>`).join('')}</select></div>
       </div>
-      <div class="g2" style="margin-top:10px">
+      <div class="g3" style="margin-top:10px">
+        <div class="form-group"><label class="form-label">ASPECT</label><select class="form-select" onchange="setUI({exerciseAspect:this.value})"><option value="all">Tous les aspects</option>${aspects.map(a=>`<option value="${esc(a)}" ${(UI.exerciseAspect||'all')===a?'selected':''}>${esc(a)}</option>`).join('')}</select></div>
         <div class="form-group"><label class="form-label">NIVEAU</label><select class="form-select" onchange="setUI({exerciseLevel:this.value})">${levelOptions.map(([v,l])=>`<option value="${v}" ${(UI.exerciseLevel||'all')===v?'selected':''}>${l}</option>`).join('')}</select></div>
         <div class="form-group"><label class="form-label">NOMBRE DE JOUEURS</label><select class="form-select" onchange="setUI({exercisePlayers:this.value})">${playerOptions.map(([v,l])=>`<option value="${v}" ${(UI.exercisePlayers||'all')===v?'selected':''}>${l}</option>`).join('')}</select></div>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px">
         <div style="font-size:11px;color:var(--gray);font-family:var(--font-body)">${list.length} exercice${list.length>1?'s':''} trouvé${list.length>1?'s':''}</div>
-        <button class="btn btn-ghost btn-sm" onclick="setUI({exercisePillar:'all',exerciseAspect:'all',exerciseLevel:'all',exercisePlayers:'all',exerciseQuery:''})">RÉINITIALISER</button>
+        <button class="btn btn-ghost btn-sm" onclick="setUI({exercisePillar:'all',exerciseAspect:'all',exerciseLevel:'all',exercisePlayers:'all',exerciseStep:'all',exerciseQuery:''})">RÉINITIALISER</button>
       </div>
     </div>
     <div class="exercise-notebook-grid">
@@ -5996,15 +6029,19 @@ function exerciseEditFormHtml(id){
   const ex=(STATE.customExercises||[]).find(e=>e.id===id);
   if(!ex) return `<div class="modal-title">EXERCICE INTROUVABLE</div><button class="modal-close" onclick="closeModal()">×</button>`;
   const levelOptions=['débutant','intermédiaire','avancé','tous'];
-  const typeOptions=['Échauffement','Jeu de départ','Jeu d’apprentissage','Jeu d’application','Cooling down','Exercice HWBT','Autre'];
+  const typeOptions=EXERCISE_METHOD_STEPS;
   const aspectOptions=(selected)=>{
     const exists=BASE44_ASPECT_CATALOG.some(a=>a.name===selected);
     return `${selected&&!exists?`<option value="${esc(selected)}" selected>${esc(selected)}</option>`:''}${BASE44_ASPECT_CATALOG.map(a=>`<option value="${esc(a.name)}" ${selected===a.name?'selected':''}>${esc(a.category)} · ${esc(a.name)}</option>`).join('')}`;
   };
   return `<div class="modal-title">MODIFIER MINI-FICHE EXERCICE</div><button class="modal-close" onclick="closeModal()">×</button>
     <div class="session-config-note">Cette fiche est la version propre de l’exercice. Elle servira pour la bibliothèque, la vidéo explicative, le PDF et les futurs reels.</div>
-    <div class="form-group"><label class="form-label">NOM DE L’EXERCICE</label><input class="form-input" id="ex_title" value="${esc(ex.title||'')}" placeholder="Ex: Jeu de départ - lobs avant vitre"></div>
-    <div class="form-group"><label class="form-label">TYPE D’EXERCICE</label><select class="form-select" id="ex_type">${typeOptions.map(t=>`<option value="${esc(t)}" ${(ex.exerciseType||'')===t?'selected':''}>${esc(t)}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">NOM DE L’EXERCICE</label><input class="form-input" id="ex_title" value="${esc(ex.title||'')}" placeholder="Ex: Face the Game - lobs avant vitre"></div>
+    <div class="form-group"><label class="form-label">TYPE D’EXERCICE</label><select class="form-select" id="ex_type">${typeOptions.map(t=>`<option value="${esc(t)}" ${normalizeExerciseType(ex.exerciseType)===t?'selected':''}>${esc(t)}</option>`).join('')}</select></div>
+    <div class="g2">
+      <div class="form-group"><label class="form-label">THÈME / FAMILLE</label><input class="form-input" id="ex_theme" value="${esc(ex.theme||'')}" placeholder="Ex: Les lobs avant vitres"></div>
+      <div class="form-group"><label class="form-label">MATÉRIEL</label><input class="form-input" id="ex_materials" value="${esc(ex.materials||'')}" placeholder="Ex: Raquettes · Balles · Cônes · Câble"></div>
+    </div>
     <div class="g2">
       <div class="form-group"><label class="form-label">PILIER PRINCIPAL</label><select class="form-select" id="ex_pillar">${PILLARS.map(p=>`<option value="${p.id}" ${ex.pillar===p.id?'selected':''}>${p.name}</option>`).join('')}</select></div>
       <div class="form-group"><label class="form-label">ASPECT PRINCIPAL</label><input class="form-input" id="ex_aspect" value="${esc(ex.aspect||'')}" placeholder="Ex: Lob avant vitre"></div>
@@ -6017,6 +6054,7 @@ function exerciseEditFormHtml(id){
       <div class="form-group"><label class="form-label">JOUEURS</label><input class="form-input" id="ex_players" value="${esc(ex.players||'1-4')}" placeholder="Ex: 2-4"></div>
       <div class="form-group"><label class="form-label">DURÉE</label><input class="form-input" id="ex_duration" value="${esc(ex.duration||'')}" placeholder="Ex: 15 min"></div>
     </div>
+    <div class="form-group"><label class="form-label">TAGS / MOTS CLÉS</label><input class="form-input" id="ex_tags" value="${esc(ex.tags||'')}" placeholder="Ex: lob, défense, prise tôt, vitre, débutant"></div>
     <div class="form-group"><label class="form-label">OBJECTIF</label><textarea class="form-input" id="ex_objective" rows="2">${esc(ex.objective||'')}</textarea></div>
     <div class="g2">
       <div class="form-group"><label class="form-label">ORGANISATION / MATÉRIEL</label><textarea class="form-input" id="ex_setup" rows="4">${esc(ex.setup||'')}</textarea></div>
@@ -6044,7 +6082,10 @@ function saveExerciseEdit(id){
   Object.assign(ex,{
     title:val('ex_title')||ex.title,
     exerciseName:val('ex_title')||ex.exerciseName||ex.title,
-    exerciseType:val('ex_type')||'Exercice',
+    exerciseType:normalizeExerciseType(val('ex_type')||'Exercice HWBT'),
+    theme:val('ex_theme')||'À définir',
+    materials:val('ex_materials')||'Raquettes · Balles',
+    tags:val('ex_tags')||'',
     pillar:val('ex_pillar')||ex.pillar,
     aspect:val('ex_aspect')||ex.aspect,
     secondary:val('ex_secondary')||'À définir',
