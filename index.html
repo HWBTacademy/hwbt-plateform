@@ -3343,6 +3343,37 @@ function pageDashboard(){
     </div>
     <button class="btn btn-ghost btn-sm" onclick="${onclick}">${button}</button>
   </div>`;
+  const priorityActions=[];
+  const pushAction=(priority,key,title,subtitle,button,onclick,color='var(--bronze)',tag='ACTION')=>{
+    if(priorityActions.some(a=>a.key===key)) return;
+    priorityActions.push({priority,key,title,subtitle,button,onclick,color,tag});
+  };
+  todaySessions.forEach(s=>pushAction(1,`today-${s.id}`,`Aujourd'hui · ${sessionTitle(s)}`,s.status==='open'?'Séance ouverte: termine avec le point 5 évaluation.':'Séance prévue: ouvre le mode terrain au début.',s.status==='open'?'ÉVALUER':'OUVRIR',`setUI({page:'sessions',selectedSessionId:${s.id},sessionMode:${s.status==='open'?'"field"':'null'}})`,s.status==='open'?'var(--rouge)':'var(--bronze)','TERRAIN'));
+  open.forEach(s=>pushAction(2,`open-${s.id}`,`Évaluer · ${sessionTitle(s)}`,`${s.date} · clôture la séance pour faire évoluer les profils joueur.`,'ÉVALUER',`setUI({page:'sessions',selectedSessionId:${s.id}})`,'var(--rouge)','ÉVALUATION'));
+  waitingPlayer.forEach(s=>pushAction(3,`feedback-${s.id}`,`Retour joueur attendu · ${sessionTitle(s)}`,`${missingFeedbackPlayers(s).map(p=>p.name).join(', ')||'Joueur'} doit donner son ressenti.`,'VOIR',`setUI({page:'sessions',selectedSessionId:${s.id}})`,'var(--vert)','RETOUR'));
+  sessionRecos.forEach(({player,objective})=>pushAction(4,`reco-${player.id}-${objective.pillar}-${objective.aspect}`,`Construire séance · ${player.name}`,`${objective.aspect} · ${objective.reason}`,'CRÉER',`openModal('newSession',${player.id})`,PILLARS.find(p=>p.id===objective.pillar)?.color||'var(--bronze)','RECOMMANDÉ'));
+  noProfile.forEach(p=>pushAction(5,`profile-${p.id}`,`Test mental · ${p.name}`,'Le profil couleur manque encore dans son carnet joueur.','OUVRIR',`setUI({page:'players',selectedPlayerId:${p.id},subpage:'profil'})`,'var(--bleu)','PROFIL'));
+  incompletePlayers.forEach(({player,missing})=>pushAction(6,`missing-${player.id}`,`Fiche à compléter · ${player.name}`,`Manque: ${missing.slice(0,5).join(', ')}${missing.length>5?'...':''}`,'FICHE',`setUI({page:'players',selectedPlayerId:${player.id},subpage:'profil'})`,'var(--bronze)','ADMIN'));
+  lowMeasurePlayers.forEach(p=>pushAction(7,`measure-${p.id}`,`Mesures faibles · ${p.name}`,`${playerEvaluationCount(p)} évaluation${playerEvaluationCount(p)>1?'s':''}. Programme une séance pour stabiliser ses stats.`,'SÉANCE',`openModal('newSession',${p.id})`,'var(--bleu)','MESURE'));
+  signals.forEach(r=>pushAction(8,`signal-${r.type}-${r.title}`,r.title,r.text,r.button,r.action,r.color,r.type));
+  const priorityFlowHtml=`<div class="card" style="border-color:var(--bronze-dim2)">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+      <div>
+        <div class="card-title" style="margin-bottom:5px">FLUX D’ACTIONS PRIORITAIRES</div>
+        <div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.55">Une seule liste dédupliquée: terrain, évaluation, retours joueur, fiches et séances à créer.</div>
+      </div>
+      <div style="font-size:22px;font-weight:800;color:var(--bronze)">${priorityActions.length}</div>
+    </div>
+    ${priorityActions.sort((a,b)=>a.priority-b.priority).slice(0,9).map(a=>`<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+      <div style="width:8px;height:42px;border-radius:5px;background:${a.color};flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:9px;letter-spacing:1.4px;color:${a.color};font-weight:800;margin-bottom:3px">${esc(a.tag)}</div>
+        <div style="font-size:13px;font-weight:800;letter-spacing:.3px">${esc(a.title)}</div>
+        <div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:3px">${esc(a.subtitle)}</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="${a.onclick}">${esc(a.button)}</button>
+    </div>`).join('') || `<div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7">Tout est propre aujourd’hui. Tu peux créer une séance ou préparer du contenu.</div>`}
+  </div>`;
   return `<div class="content">
     ${quoteBand()}
     <div class="card" style="border-color:${actionCount?'var(--bronze-dim2)':'var(--border)'}">
@@ -3359,30 +3390,19 @@ function pageDashboard(){
         </div>
       </div>
     </div>
-    <div class="g2">
-      <div class="card" style="border-color:var(--bronze-dim2)">
-        <div class="card-title">PRIORITÉ DU JOUR</div>
-        ${dailyFocus.length?dailyFocus.map(r=>`<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
-          <div style="width:8px;height:38px;border-radius:4px;background:${r.color};flex-shrink:0"></div>
-          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:800">${esc(r.title)}</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:3px">${esc(r.text)}</div></div>
-          <button class="btn btn-primary btn-sm" onclick="${r.action}">${r.button}</button>
-        </div>`).join(''):`<div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7">Aucune urgence aujourd’hui. Prépare une séance depuis les recommandations ou complète les fiches joueur.</div>`}
-      </div>
-      <div class="card" style="border-color:var(--bronze-dim2)">
-        <div class="card-title">SÉANCES À CONSTRUIRE</div>
-        ${sessionRecos.length?sessionRecos.map(({player,objective})=>{const pl=PILLARS.find(p=>p.id===objective.pillar);return `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
-          ${avatar(player.name,'av36')}
-          <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:800">${esc(player.name)} · ${esc(objective.aspect)}</div><div style="font-size:10px;color:${pl?pl.color:'var(--bronze)'};letter-spacing:1px;margin-top:2px">${pl?pl.name:objective.pillar} · ${esc(objective.source)}</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:5px">${esc(objective.reason)}</div></div>
-          <button class="btn btn-ghost btn-sm" onclick="openModal('newSession',${player.id})">CRÉER</button>
-        </div>`}).join(''):`<div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7">Les recommandations apparaissent dès que les joueurs ont priorités, retours ou mesures.</div>`}
-      </div>
-    </div>
+    ${priorityFlowHtml}
     <div class="g4">
       <div class="stat-card"><div class="stat-label">AUJOURD'HUI</div><div class="stat-value">${todaySessions.length}</div><div class="stat-sub">séances à gérer</div></div>
       <div class="stat-card"><div class="stat-label">FICHES À COMPLÉTER</div><div class="stat-value">${incompletePlayers.length}</div><div class="stat-sub">données joueur</div></div>
       <div class="stat-card"><div class="stat-label">À ÉVALUER</div><div class="stat-value">${open.length}</div><div class="stat-sub">séances ouvertes</div></div>
       <div class="stat-card"><div class="stat-label">RETOUR JOUEUR</div><div class="stat-value">${waitingPlayer.length}</div><div class="stat-sub">en attente</div></div>
     </div>
+    <details class="card" style="padding:0;overflow:hidden">
+      <summary style="cursor:pointer;list-style:none;padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <span><span class="card-title" style="margin:0">VUE DÉTAILLÉE COACH</span><span style="display:block;font-size:10px;color:var(--gray);font-family:var(--font-body);margin-top:4px">Anciennes listes conservées pour analyser plus finement, sans surcharger le dashboard principal.</span></span>
+        <span style="font-size:10px;color:var(--bronze);letter-spacing:1.5px">OUVRIR</span>
+      </summary>
+      <div style="padding:18px">
     <div class="g2">
       <div class="card">
         <div class="card-title">CE QUE JE DOIS FAIRE</div>
@@ -3460,6 +3480,8 @@ function pageDashboard(){
         }).join(''):`<div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7">Aucun axe futur enregistré pour l’instant. Ils apparaîtront après l’analyse d’une séance.</div>`}
       </div>
     </div>
+      </div>
+    </details>
     <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap">
       <div>
         <div class="card-title" style="margin-bottom:6px">ACCÈS RAPIDE</div>
@@ -3471,6 +3493,12 @@ function pageDashboard(){
         <button class="btn btn-ghost" onclick="setUI({page:'test'})">TEST PROFIL</button>
       </div>
     </div>
+    <details class="card" style="padding:0;overflow:hidden">
+      <summary style="cursor:pointer;list-style:none;padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <span><span class="card-title" style="margin:0">APERÇU SECONDAIRE</span><span style="display:block;font-size:10px;color:var(--gray);font-family:var(--font-body);margin-top:4px">Séances récentes, mini-liste joueurs et structure HWBT, disponibles quand tu veux contrôler le contexte.</span></span>
+        <span style="font-size:10px;color:var(--bronze);letter-spacing:1.5px">OUVRIR</span>
+      </summary>
+      <div style="padding:18px">
     <div class="g2">
       <div class="card">
         <div class="card-title">SÉANCES RÉCENTES</div>
@@ -3509,6 +3537,8 @@ function pageDashboard(){
         </div>`).join('')}
       </div>
     </div>
+      </div>
+    </details>
     <div style="text-align:center;padding:20px 0;font-size:9px;letter-spacing:2px;color:var(--border2)">HARD WORK BEATS TALENT · La progression n'est pas un ressenti. Elle se mesure.</div>
   </div>`;
 }
@@ -3516,20 +3546,82 @@ function pageDashboard(){
 // ══════════════════════════════════════════════════
 // PLAYERS LIST — ultra visual
 // ══════════════════════════════════════════════════
+function playerLastSession(playerId){
+  return STATE.sessions
+    .filter(s=>playerInSession(s,playerId))
+    .sort((a,b)=>`${b.date||''} ${b.time||''}`.localeCompare(`${a.date||''} ${a.time||''}`))[0] || null;
+}
+function playerSearchText(player){
+  const pr=PROFILES.find(x=>x.id===player.profileId);
+  return norm([
+    player.name, player.firstName, player.lastName, player.code, player.email, player.phone,
+    player.aftRanking, player.afpRanking, player.hand, player.position, player.coach,
+    player.parentFirstName, player.parentLastName, player.parentPhone, player.parentEmail,
+    pr?.name, pr?.sub, pr?.c1, pr?.c2
+  ].filter(Boolean).join(' '));
+}
+function playerSortValue(player, sortKey){
+  const pr=PROFILES.find(x=>x.id===player.profileId);
+  const measured=playerMeasuredProfile(player);
+  const last=playerLastSession(player.id);
+  if(sortKey==='level_desc'||sortKey==='level_asc') return Number(measured.level||0);
+  if(sortKey==='profile') return pr ? pr.name : 'zzzz sans profil';
+  if(sortKey==='last_session') return last ? `${last.date||''} ${last.time||''}` : '';
+  return norm(player.name||'');
+}
 function pagePlayersList(){
   const {players}=STATE;
   if(STATE.role==='player') return pagePlayerDetail(STATE.activePlayerId||players[0]?.id);
+  const query=UI.playerQuery||'';
+  const profileFilter=UI.playerProfileFilter||'all';
+  const sortKey=UI.playerSort||'name';
+  const filteredPlayers=players
+    .filter(p=>{
+      if(profileFilter==='withProfile'&&!p.profileId) return false;
+      if(profileFilter==='withoutProfile'&&p.profileId) return false;
+      return !query.trim() || playerSearchText(p).includes(norm(query));
+    })
+    .sort((a,b)=>{
+      if(sortKey==='level_desc') return playerSortValue(b,sortKey)-playerSortValue(a,sortKey);
+      if(sortKey==='level_asc') return playerSortValue(a,sortKey)-playerSortValue(b,sortKey);
+      if(sortKey==='last_session') return String(playerSortValue(b,sortKey)).localeCompare(String(playerSortValue(a,sortKey)));
+      return String(playerSortValue(a,sortKey)).localeCompare(String(playerSortValue(b,sortKey)));
+    });
   return `<div class="content">
     ${quoteBand()}
-    <div style="display:flex;justify-content:flex-end;margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px">
+      <div>
+        <div class="card-title" style="margin-bottom:4px">JOUEURS</div>
+        <div style="font-size:11px;color:var(--gray);font-family:var(--font-body)">${filteredPlayers.length}/${players.length} profil${players.length>1?'s':''} affiché${filteredPlayers.length>1?'s':''}</div>
+      </div>
       <button class="btn btn-primary" onclick="openModal('addPlayer')">+ NOUVEAU JOUEUR</button>
     </div>
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-title">RECHERCHE JOUEUR</div>
+      <div class="g3">
+        <label><span>Nom, code, contact, profil</span><input value="${esc(query)}" oninput="setUI({playerQuery:this.value})" placeholder="Ex: Julien, MD300, Bulldozer..."></label>
+        <label><span>Filtre profil mental</span><select onchange="setUI({playerProfileFilter:this.value})">
+          <option value="all" ${profileFilter==='all'?'selected':''}>Tous les joueurs</option>
+          <option value="withProfile" ${profileFilter==='withProfile'?'selected':''}>Avec profil mental</option>
+          <option value="withoutProfile" ${profileFilter==='withoutProfile'?'selected':''}>Sans profil mental</option>
+        </select></label>
+        <label><span>Tri</span><select onchange="setUI({playerSort:this.value})">
+          <option value="name" ${sortKey==='name'?'selected':''}>Nom A → Z</option>
+          <option value="level_desc" ${sortKey==='level_desc'?'selected':''}>Niveau mesuré haut → bas</option>
+          <option value="level_asc" ${sortKey==='level_asc'?'selected':''}>Niveau mesuré bas → haut</option>
+          <option value="profile" ${sortKey==='profile'?'selected':''}>Profil mental</option>
+          <option value="last_session" ${sortKey==='last_session'?'selected':''}>Dernière séance</option>
+        </select></label>
+      </div>
+      ${(query||profileFilter!=='all'||sortKey!=='name')?`<div style="margin-top:12px"><button class="btn btn-ghost btn-sm" onclick="setUI({playerQuery:'',playerProfileFilter:'all',playerSort:'name'})">RÉINITIALISER</button></div>`:''}
+    </div>
     <div class="player-pass-grid">
-      ${players.map(p=>{
+      ${filteredPlayers.map(p=>{
         const pr=PROFILES.find(pr=>pr.id===p.profileId);
         const c1=pr?ENERGY_COLORS[pr.c1]:'#A67C52';
         const c2=pr?ENERGY_COLORS[pr.c2]:'#666';
         const playerSessions=STATE.sessions.filter(s=>playerInSession(s,p.id));
+        const lastSession=playerLastSession(p.id);
         const measured=playerMeasuredProfile(p);
         const photo=assetUrl(p.photo);
         const first=esc(p.firstName||p.name.split(' ')[0]||p.name);
@@ -3564,6 +3656,7 @@ function pagePlayersList(){
                 <div class="pass-meta">${position}</div>
                 ${(p.aftRanking||p.afpRanking)?`<div class="pass-meta">AFT ${esc(p.aftRanking||'—')} · AFP ${esc(p.afpRanking||'—')}</div>`:''}
                 <div class="pass-meta">${p.isJunior?'JUNIOR':'SENIOR'} · ${esc(p.coach||'Coach')}</div>
+                <div class="pass-meta">${lastSession?`DERNIÈRE · ${formatShortDate(lastSession.date)}`:'AUCUNE SÉANCE'}</div>
               </div>
               <div>
                 <div class="pass-level" style="font-size:${measured.level?'52px':'18px'}">${measured.level||'À mesurer'}</div>
