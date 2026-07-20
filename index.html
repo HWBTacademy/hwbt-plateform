@@ -3872,6 +3872,10 @@ function agendaSessionDot(s){
   const colors={planned:'var(--bronze)',ready:'var(--vert)',open:'var(--bleu)',closed_coach:'var(--jaune)',completed:'var(--gray3)'};
   return colors[s.status]||'var(--border3)';
 }
+function agendaCreateSession(date){
+  if(STATE.role!=='coach') return;
+  openModal('newSession',{date,location:"L'Argayon"});
+}
 function sessionsAgendaMonthHtml(visible){
   const key=UI.agendaMonth||monthKeyFromDate(new Date().toISOString().slice(0,10));
   const [year,month]=key.split('-').map(Number);
@@ -3899,9 +3903,9 @@ function sessionsAgendaMonthHtml(visible){
         const date=`${key}-${String(day).padStart(2,'0')}`;
         const list=(sessionsByDate[date]||[]).sort((a,b)=>String(a.time||'').localeCompare(String(b.time||'')));
         const today=date===new Date().toISOString().slice(0,10);
-        return `<div style="min-height:118px;background:${today?'linear-gradient(180deg,var(--bronze-dim),var(--bg4))':'var(--bg4)'};border:1px solid ${today?'var(--bronze-dim2)':'var(--border)'};border-radius:8px;padding:8px;overflow:hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px"><span style="font-size:17px;font-weight:900;color:${today?'var(--bronze)':'var(--white)'}">${day}</span>${list.length?`<span style="font-size:8px;color:var(--gray);letter-spacing:1px">${list.length} COURS</span>`:''}</div>
-          <div style="display:grid;gap:5px">${list.slice(0,4).map(s=>{const ps=sessionPlayers(s);return `<button onclick="setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'briefing'})" style="width:100%;text-align:left;background:#050507;border:1px solid ${agendaSessionDot(s)}55;border-left:3px solid ${agendaSessionDot(s)};border-radius:5px;padding:6px;color:var(--offwhite);cursor:pointer;min-width:0">
+        return `<div onclick="agendaCreateSession('${date}')" title="Créer une séance le ${date}" style="min-height:118px;background:${today?'linear-gradient(180deg,var(--bronze-dim),var(--bg4))':'var(--bg4)'};border:1px solid ${today?'var(--bronze-dim2)':'var(--border)'};border-radius:8px;padding:8px;overflow:hidden;cursor:${STATE.role==='coach'?'pointer':'default'}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px"><span style="font-size:17px;font-weight:900;color:${today?'var(--bronze)':'var(--white)'}">${day}</span>${list.length?`<span style="font-size:8px;color:var(--gray);letter-spacing:1px">${list.length} COURS</span>`:STATE.role==='coach'?`<span style="font-size:8px;color:var(--bronze);letter-spacing:1px">+ SÉANCE</span>`:''}</div>
+          <div style="display:grid;gap:5px">${list.slice(0,4).map(s=>{const ps=sessionPlayers(s);return `<button onclick="event.stopPropagation();setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'briefing'})" style="width:100%;text-align:left;background:#050507;border:1px solid ${agendaSessionDot(s)}55;border-left:3px solid ${agendaSessionDot(s)};border-radius:5px;padding:6px;color:var(--offwhite);cursor:pointer;min-width:0">
             <div style="font-size:9px;color:${agendaSessionDot(s)};letter-spacing:1px">${esc(s.time||'HEURE ?')} · ${sessionTypeLabel(s.sessionType,s.sessionDuration)}</div>
             <div style="font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(sessionTitle(s))}</div>
             <div style="font-size:8px;color:var(--gray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ps.map(p=>p.firstName||p.name).join(' · ')||sessionThemeLabel(s))}</div>
@@ -6078,7 +6082,15 @@ function modalAftPrepHtml(){
   </div>`;
 }
 function newSessionModalHtml(extra){
-  const selected=Array.isArray(extra)?extra.filter(Boolean):(extra?[extra]:[]);
+  const config=extra&&typeof extra==='object'&&!Array.isArray(extra)?extra:{};
+  const selected=Array.isArray(extra)
+    ? extra.filter(Boolean)
+    : (typeof extra==='number'||typeof extra==='string')
+      ? [parseInt(extra)].filter(Boolean)
+      : (Array.isArray(config.playerIds)?config.playerIds:(Array.isArray(config.players)?config.players:(config.playerId?[config.playerId]:[]))).map(Number).filter(Boolean);
+  const defaultDate=config.date||new Date().toISOString().slice(0,10);
+  const defaultTime=config.time||'';
+  const defaultLocation=config.location||"L'Argayon";
   const typeCards=[
     {value:'hwbt60',title:'ENTRAÎNEMENT 1H',text:"Échauffement, situation révélatrice, atelier guidé, transfert match et retour au calme."},
     {value:'hwbt90',title:'ENTRAÎNEMENT 1H30',text:'Deux thèmes possibles: situation 1, atelier 1, situation 2, atelier 2, puis transfert match.'}
@@ -6086,9 +6098,9 @@ function newSessionModalHtml(extra){
   return `<div class="modal-title">CRÉER UNE SÉANCE</div><button class="modal-close" onclick="closeModal()">×</button>
   <div style="background:var(--bg4);border-left:3px solid var(--bronze);padding:10px 12px;border-radius:0 6px 6px 0;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:14px">Étape 1: tu poses uniquement le cadre. Après création, tu ouvres la fiche de préparation pour compléter les exercices, les schémas et le déroulement détaillé.</div>
   <div class="g3">
-    <div class="form-group"><label class="form-label">DATE</label><input class="form-input" id="m_date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
-    <div class="form-group"><label class="form-label">HEURE</label><input class="form-input" id="m_time" type="time" value=""></div>
-    <div class="form-group"><label class="form-label">LIEU</label><input class="form-input" id="m_location" placeholder="Ex: Padel club, terrain 3"></div>
+    <div class="form-group"><label class="form-label">DATE</label><input class="form-input" id="m_date" type="date" value="${esc(defaultDate)}"></div>
+    <div class="form-group"><label class="form-label">HEURE</label><input class="form-input" id="m_time" type="time" value="${esc(defaultTime)}"></div>
+    <div class="form-group"><label class="form-label">LIEU</label><input class="form-input" id="m_location" value="${esc(defaultLocation)}" placeholder="Ex: L'Argayon"></div>
   </div>
   <div class="form-group"><label class="form-label">JOUEURS (1 À 4)</label><div class="session-player-grid">${STATE.players.map(p=>`<label class="session-player-choice"><input type="checkbox" class="m_session_player" value="${p.id}" ${selected.includes(p.id)?'checked':''} onchange="limitSessionPlayers(this);updateSessionPlanningSuggestions()"><span><span class="session-player-name">${esc(p.name)}</span><span class="session-player-meta">${esc(p.code||'')}</span></span></label>`).join('')}</div></div>
   <div class="form-group"><label class="form-label">TYPE D'ENTRAÎNEMENT</label><div class="g2">
