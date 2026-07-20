@@ -36,6 +36,7 @@ body{min-width:0}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 20px;cursor:pointer;font-size:11px;letter-spacing:1px;color:var(--gray);transition:all .15s;border-left:2px solid transparent;white-space:nowrap}
 .nav-item:hover{color:var(--white);background:var(--bg3)}
 .nav-item.active{color:var(--white);border-left:2px solid var(--bronze);background:var(--bg3)}
+.nav-note{font-size:8px;letter-spacing:1.2px;color:var(--gray3);padding:4px 20px 0;font-family:var(--font-body)}
 .nav-icon{font-size:13px;width:18px;flex-shrink:0}
 .sidebar-footer{margin-top:auto;border-top:1px solid var(--border);padding:16px 20px}
 .role-switcher{display:flex;gap:4px;margin-bottom:12px}
@@ -366,22 +367,26 @@ body{min-width:0}
       <div class="logo-sub">PADEL ACADEMY</div>
     </div>
     <div class="nav-section">
-      <div class="nav-label">ACADEMY</div>
+      <div class="nav-label">COACH</div>
       <div class="nav-item" data-page="dashboard" onclick="setUI({page:'dashboard'})" style="display: flex;"><span class="nav-icon">◈</span>DASHBOARD</div>
       <div class="nav-item active" data-page="players" onclick="setUI({page:'players',selectedPlayerId:null,subpage:'profil'})" style="display: flex;"><span class="nav-icon">◉</span>PLAYERS</div>
       <div class="nav-item" data-page="sessions" onclick="setUI({page:'sessions',sessionView:'agenda'})" style="display: flex;"><span class="nav-icon">▦</span>SESSIONS</div>
-      <div class="nav-item" data-page="commandCenter" onclick="setUI({page:'commandCenter',commandTab:'brief'})" style="display: flex;"><span class="nav-icon">◆</span>COMMAND CENTER</div>
-      <div class="nav-item" data-page="contentStudio" onclick="setUI({page:'contentStudio',contentTab:'dashboard'})" style="display: flex;"><span class="nav-icon">▣</span>CONTENT STUDIO</div>
-      <div class="nav-item" data-page="shop" onclick="setUI({page:'shop'})" style="display: flex;"><span class="nav-icon">◫</span>SHOP</div>
+      <div class="nav-item" data-page="exercises" onclick="setUI({page:'exercises'})" style="display: flex;"><span class="nav-icon">▤</span>EXERCISES</div>
     </div>
     <div class="nav-section">
-      <div class="nav-label">PROFILES &amp; ANALYSIS</div>
-      <div class="nav-item" data-page="profiles" onclick="setUI({page:'profiles'})" style="display: none;"><span class="nav-icon">⬡</span>12 PROFILES</div>
-      <div class="nav-item" data-page="aspectsLibrary" onclick="setUI({page:'aspectsLibrary'})" style="display: none;"><span class="nav-icon">▥</span>ASPECTS &amp; SCORING</div>
-      <div class="nav-item" data-page="communication" onclick="setUI({page:'communication'})" style="display: none;"><span class="nav-icon">◌</span>COMMUNICATION</div>
-      <div class="nav-item" data-page="exercises" onclick="setUI({page:'exercises'})" style="display: none;"><span class="nav-icon">▤</span>EXERCISES</div>
+      <div class="nav-label">ACADÉMIE</div>
+      <div class="nav-item" data-page="profiles" onclick="setUI({page:'profiles'})" style="display: flex;"><span class="nav-icon">⬡</span>12 PROFILES</div>
+      <div class="nav-item" data-page="aspectsLibrary" onclick="setUI({page:'aspectsLibrary'})" style="display: flex;"><span class="nav-icon">▥</span>ASPECTS &amp; SCORING</div>
+      <div class="nav-item" data-page="communication" onclick="setUI({page:'communication'})" style="display: flex;"><span class="nav-icon">◌</span>COMMUNICATION</div>
       <div class="nav-item" data-page="test" onclick="setUI({page:'test'})" style="display: flex;"><span class="nav-icon">◎</span>PERSONALITY TEST</div>
       <div class="nav-item" data-page="nutrition" onclick="setUI({page:'nutrition',nutritionTab:'basics',nutritionFilter:'all',nutritionSearch:'',nutritionPackFilter:null})" style="display: flex;"><span class="nav-icon">◍</span>NUTRITION</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">BUSINESS</div>
+      <div class="nav-item" data-page="shop" onclick="setUI({page:'shop'})" style="display: flex;"><span class="nav-icon">◫</span>SHOP</div>
+      <div class="nav-item" data-page="contentStudio" onclick="setUI({page:'contentStudio',contentTab:'dashboard'})" style="display: flex;"><span class="nav-icon">▣</span>CONTENT STUDIO</div>
+      <div class="nav-item" data-page="commandCenter" onclick="setUI({page:'commandCenter',commandTab:'brief'})" style="display: flex;"><span class="nav-icon">◆</span>COMMAND CENTER</div>
+      <div class="nav-note">CEO · contenu · ventes</div>
     </div>
     <div class="sidebar-footer">
       <div class="lang-switcher">
@@ -3043,8 +3048,11 @@ function updateChromeText(){
     n.innerHTML=`<span class="nav-icon">${icon}</span>${tr(label)}`;
   });
   const labels=document.querySelectorAll('.nav-label');
-  if(labels[0]) labels[0].textContent=tr('ACADÉMIE');
-  if(labels[1]) labels[1].textContent=tr('PROFILS & ANALYSE');
+  if(labels[0]) labels[0].textContent=tr('COACH');
+  if(labels[1]) labels[1].textContent=tr('ACADÉMIE');
+  if(labels[2]) labels[2].textContent=tr('BUSINESS');
+  const navNote=document.querySelector('.nav-note');
+  if(navNote) navNote.textContent=tr('CEO · contenu · ventes');
   document.getElementById('rb-coach').textContent='COACH';
   document.getElementById('rb-player').textContent=tr('JOUEUR');
   document.querySelector('.hwbt-sig').textContent=tr('La progression se mesure.');
@@ -6245,8 +6253,8 @@ function newSessionModalHtml(extra){
     {value:'hwbt60',title:'ENTRAÎNEMENT 1H',text:"Échauffement, situation révélatrice, atelier guidé, transfert match et retour au calme."},
     {value:'hwbt90',title:'ENTRAÎNEMENT 1H30',text:'Deux thèmes possibles: situation 1, atelier 1, situation 2, atelier 2, puis transfert match.'}
   ];
-  return `<div class="modal-title">CRÉER UNE SÉANCE</div><button class="modal-close" onclick="closeModal()">×</button>
-  <div style="background:var(--bg4);border-left:3px solid var(--bronze);padding:10px 12px;border-radius:0 6px 6px 0;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:14px">Étape 1: tu poses uniquement le cadre. Après création, tu ouvres la fiche de préparation pour compléter les exercices, les schémas et le déroulement détaillé.</div>
+  return `<div class="modal-title">PLANIFIER UNE SÉANCE</div><button class="modal-close" onclick="closeModal()">×</button>
+  <div style="background:var(--bg4);border-left:3px solid var(--bronze);padding:10px 12px;border-radius:0 6px 6px 0;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:14px">Étape 1: tu poses le cadre du cours pour l'agenda. Tu peux t'arrêter ici, ou ouvrir directement la préparation terrain pour compléter les exercices, les schémas et le déroulement détaillé.</div>
   <div class="g3">
     <div class="form-group"><label class="form-label">DATE</label><input class="form-input" id="m_date" type="date" value="${esc(defaultDate)}"></div>
     <div class="form-group"><label class="form-label">HEURE</label><input class="form-input" id="m_time" type="time" value="${esc(defaultTime)}"></div>
@@ -6277,7 +6285,7 @@ function newSessionModalHtml(extra){
     <div class="g4">${aspectSelectHtml('T','TECHNIQUE')}${aspectSelectHtml('TA','TACTIQUE')}${aspectSelectHtml('P','PHYSIQUE')}${aspectSelectHtml('M','MENTAL')}</div>
     <div id="sessionPlanningSuggestions" style="margin-top:10px">${sessionPlanningSuggestionsHtml(selected)}</div>
   </div>
-  <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">ANNULER</button><button class="btn btn-primary" onclick="createSession()">CRÉER ET PRÉPARER</button></div>`;
+  <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">ANNULER</button><button class="btn btn-ghost" onclick="createSession('plan')">PLANIFIER SEULEMENT</button><button class="btn btn-primary" onclick="createSession('prepare')">CRÉER ET PRÉPARER</button></div>`;
 }
 function exerciseEditFormHtml(id){
   const ex=(STATE.customExercises||[]).find(e=>e.id===id);
@@ -6734,7 +6742,7 @@ function openNextSessionFromSession(sessionId){
     applySmartSessionPlan();
   },0);
 }
-function createSession(){
+function createSession(mode='prepare'){
   const playerIds=selectedSessionPlayerIds();
   const date=document.getElementById('m_date').value;
   const time=document.getElementById('m_time')?.value||'';
@@ -6772,10 +6780,15 @@ function createSession(){
     sessionPart:st.name
   }}).map((b,idx)=>({...b,sessionPart:steps[idx]?.name||b.sessionPart}));
   const id=Math.max(0,...STATE.sessions.map(s=>s.id))+1;
-  STATE.sessions.push({id,playerId:playerIds[0],playerIds,date,time,location,status:'planned',sessionType,sessionDuration:sessionDurationValue,aftMeta,goal:document.getElementById('m_session_goal')?.value.trim()||'',playerWishes,blocks,futureAspects:[],coachFeedback:{},playerFeedback:{}});
+  STATE.sessions.push({id,playerId:playerIds[0],playerIds,date,time,location,status:'planned',prepared:false,sessionType,sessionDuration:sessionDurationValue,aftMeta,goal:document.getElementById('m_session_goal')?.value.trim()||'',playerWishes,blocks,futureAspects:[],coachFeedback:{},playerFeedback:{}});
   closeModal();
-  showNotif(`Séance ${sessionTypeLabel(sessionType,sessionDurationValue)} créée`);
-  setUI({page:'sessions',selectedSessionId:id});
+  if(mode==='plan'){
+    showNotif('Cours planifié dans l’agenda');
+    setUI({page:'sessions',selectedSessionId:null,sessionView:'agenda',agendaMonth:monthKeyFromDate(date),sessionTab:null});
+  }else{
+    showNotif('Séance créée · prépare le contenu terrain');
+    setUI({page:'sessions',selectedSessionId:id,sessionTab:'preparation'});
+  }
 }
 function limitSessionPlayers(input){const checked=[...document.querySelectorAll('.m_session_player:checked')];if(checked.length>4){input.checked=false;showNotif('Maximum 4 joueurs par séance');}updateSessionPlanningSuggestions();}
 function ensureSessionBlock(s,blockIdx){
