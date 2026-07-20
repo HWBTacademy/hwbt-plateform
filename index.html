@@ -3356,23 +3356,47 @@ function pageDashboard(){
   incompletePlayers.forEach(({player,missing})=>pushAction(6,`missing-${player.id}`,`Fiche à compléter · ${player.name}`,`Manque: ${missing.slice(0,5).join(', ')}${missing.length>5?'...':''}`,'FICHE',`setUI({page:'players',selectedPlayerId:${player.id},subpage:'profil'})`,'var(--bronze)','ADMIN'));
   lowMeasurePlayers.forEach(p=>pushAction(7,`measure-${p.id}`,`Mesures faibles · ${p.name}`,`${playerEvaluationCount(p)} évaluation${playerEvaluationCount(p)>1?'s':''}. Programme une séance pour stabiliser ses stats.`,'SÉANCE',`openModal('newSession',${p.id})`,'var(--bleu)','MESURE'));
   signals.forEach(r=>pushAction(8,`signal-${r.type}-${r.title}`,r.title,r.text,r.button,r.action,r.color,r.type));
-  const priorityFlowHtml=`<div class="card" style="border-color:var(--bronze-dim2)">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px">
-      <div>
-        <div class="card-title" style="margin-bottom:5px">FLUX D’ACTIONS PRIORITAIRES</div>
-        <div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.55">Une seule liste dédupliquée: terrain, évaluation, retours joueur, fiches et séances à créer.</div>
-      </div>
-      <div style="font-size:22px;font-weight:800;color:var(--bronze)">${priorityActions.length}</div>
+  const sortedPriorityActions=priorityActions.slice().sort((a,b)=>a.priority-b.priority);
+  const priorityGroups=[
+    {key:'now',title:'À faire maintenant',desc:'Terrain et évaluations ouvertes.',tags:['TERRAIN','ÉVALUATION'],color:'var(--rouge)'},
+    {key:'feedback',title:'Retours joueurs',desc:'Séances clôturées coach avec ressenti joueur manquant.',tags:['RETOUR'],color:'var(--vert)'},
+    {key:'build',title:'Construire séance',desc:'Recommandations, mesures faibles et séances à programmer.',tags:['RECOMMANDÉ','MESURE'],color:'var(--bronze)'},
+    {key:'profile',title:'Fiches & profils',desc:'Tests mentaux et données joueur à compléter.',tags:['PROFIL','ADMIN','FICHE'],color:'var(--bleu)'}
+  ].map(g=>({...g,items:sortedPriorityActions.filter(a=>g.tags.includes(a.tag))})).filter(g=>g.items.length);
+  const priorityItem=a=>`<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--border)">
+    <div style="width:7px;height:36px;border-radius:5px;background:${a.color};flex-shrink:0"></div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:9px;letter-spacing:1.3px;color:${a.color};font-weight:800;margin-bottom:3px">${esc(a.tag)}</div>
+      <div style="font-size:13px;font-weight:800;letter-spacing:.3px">${esc(a.title)}</div>
+      <div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:3px">${esc(a.subtitle)}</div>
     </div>
-    ${priorityActions.sort((a,b)=>a.priority-b.priority).slice(0,9).map(a=>`<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
-      <div style="width:8px;height:42px;border-radius:5px;background:${a.color};flex-shrink:0"></div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:9px;letter-spacing:1.4px;color:${a.color};font-weight:800;margin-bottom:3px">${esc(a.tag)}</div>
-        <div style="font-size:13px;font-weight:800;letter-spacing:.3px">${esc(a.title)}</div>
-        <div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:3px">${esc(a.subtitle)}</div>
+    <button class="btn btn-primary btn-sm" onclick="${a.onclick}">${esc(a.button)}</button>
+  </div>`;
+  const priorityGroupCard=g=>`<details style="background:var(--bg4);border:1px solid ${g.color}55;border-radius:10px;overflow:hidden">
+    <summary style="cursor:pointer;list-style:none;padding:14px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <span style="display:flex;align-items:center;gap:10px;min-width:0">
+        <span style="width:10px;height:38px;border-radius:6px;background:${g.color};flex-shrink:0"></span>
+        <span style="min-width:0">
+          <span style="display:block;font-size:15px;font-weight:900;letter-spacing:.4px">${esc(g.title)}</span>
+          <span style="display:block;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45;margin-top:3px">${esc(g.desc)}</span>
+        </span>
+      </span>
+      <span style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span style="font-size:24px;font-weight:900;color:${g.color}">${g.items.length}</span>
+        <span style="font-size:9px;color:var(--gray3);letter-spacing:1.2px">OUVRIR</span>
+      </span>
+    </summary>
+    <div style="padding:0 14px 12px">${g.items.slice(0,12).map(priorityItem).join('')}${g.items.length>12?`<div style="font-size:10px;color:var(--bronze);font-family:var(--font-body);padding-top:10px;border-top:1px solid var(--border)">+ ${g.items.length-12} autre${g.items.length-12>1?'s':''} action${g.items.length-12>1?'s':''}. Utilise les pages Joueurs ou Séances pour tout voir.</div>`:''}</div>
+  </details>`;
+  const priorityFlowHtml=`<div class="card" style="border-color:var(--bronze-dim2)">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+      <div>
+        <div class="card-title" style="margin-bottom:5px">ACTIONS PRIORITAIRES</div>
+        <div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.55">Les longues listes sont cachées. Ouvre seulement le sous-groupe utile.</div>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="${a.onclick}">${esc(a.button)}</button>
-    </div>`).join('') || `<div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7">Tout est propre aujourd’hui. Tu peux créer une séance ou préparer du contenu.</div>`}
+      <div style="display:flex;align-items:baseline;gap:7px"><span style="font-size:28px;font-weight:900;color:var(--bronze)">${priorityActions.length}</span><span style="font-size:9px;color:var(--gray3);letter-spacing:1.3px">TOTAL</span></div>
+    </div>
+    ${priorityGroups.length?`<div class="g2">${priorityGroups.map(priorityGroupCard).join('')}</div>`:`<div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7">Tout est propre aujourd’hui. Tu peux créer une séance ou préparer du contenu.</div>`}
   </div>`;
   const todayLabel=new Date().toLocaleDateString('fr-BE',{weekday:'long',day:'numeric',month:'long'});
   const nextSession=[...todaySessions,...open,...planned].sort((a,b)=>`${a.date||''} ${a.time||''}`.localeCompare(`${b.date||''} ${b.time||''}`))[0]||null;
