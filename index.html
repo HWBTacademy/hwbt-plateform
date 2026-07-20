@@ -3348,7 +3348,7 @@ function pageDashboard(){
     if(priorityActions.some(a=>a.key===key)) return;
     priorityActions.push({priority,key,title,subtitle,button,onclick,color,tag});
   };
-  todaySessions.forEach(s=>pushAction(1,`today-${s.id}`,`Aujourd'hui · ${sessionTitle(s)}`,s.status==='open'?'Séance ouverte: termine avec le point 5 évaluation.':'Séance prévue: ouvre le mode terrain au début.',s.status==='open'?'ÉVALUER':'OUVRIR',`setUI({page:'sessions',selectedSessionId:${s.id},sessionMode:${s.status==='open'?'"field"':'null'}})`,s.status==='open'?'var(--rouge)':'var(--bronze)','TERRAIN'));
+  todaySessions.forEach(s=>pushAction(1,`today-${s.id}`,`Aujourd'hui · ${sessionTitle(s)}`,s.status==='open'?'Séance ouverte: termine avec le point 5 évaluation.':'Séance prévue: ouvre le mode terrain au début.',s.status==='open'?'ÉVALUER':'OUVRIR',`setUI({page:'sessions',selectedSessionId:${s.id},sessionMode:${s.status==='open'?"'field'":'null'}})`,s.status==='open'?'var(--rouge)':'var(--bronze)','TERRAIN'));
   open.forEach(s=>pushAction(2,`open-${s.id}`,`Évaluer · ${sessionTitle(s)}`,`${s.date} · clôture la séance pour faire évoluer les profils joueur.`,'ÉVALUER',`setUI({page:'sessions',selectedSessionId:${s.id}})`,'var(--rouge)','ÉVALUATION'));
   waitingPlayer.forEach(s=>pushAction(3,`feedback-${s.id}`,`Retour joueur attendu · ${sessionTitle(s)}`,`${missingFeedbackPlayers(s).map(p=>p.name).join(', ')||'Joueur'} doit donner son ressenti.`,'VOIR',`setUI({page:'sessions',selectedSessionId:${s.id}})`,'var(--vert)','RETOUR'));
   sessionRecos.forEach(({player,objective})=>pushAction(4,`reco-${player.id}-${objective.pillar}-${objective.aspect}`,`Construire séance · ${player.name}`,`${objective.aspect} · ${objective.reason}`,'CRÉER',`openModal('newSession',${player.id})`,PILLARS.find(p=>p.id===objective.pillar)?.color||'var(--bronze)','RECOMMANDÉ'));
@@ -3374,29 +3374,59 @@ function pageDashboard(){
       <button class="btn btn-primary btn-sm" onclick="${a.onclick}">${esc(a.button)}</button>
     </div>`).join('') || `<div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7">Tout est propre aujourd’hui. Tu peux créer une séance ou préparer du contenu.</div>`}
   </div>`;
-  return `<div class="content">
-    ${quoteBand()}
-    <div class="card" style="border-color:${actionCount?'var(--bronze-dim2)':'var(--border)'}">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap">
-        <div>
-          <div class="card-title" style="margin-bottom:6px">COCKPIT COACH</div>
-          <div style="font-size:26px;font-weight:700;letter-spacing:1.2px">${actionCount?`${actionCount} ACTION${actionCount>1?'S':''} À SUIVRE`:'TOUT EST À JOUR'}</div>
-          <div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7;margin-top:6px">Le parcours central: joueur créé → test mental → séance préparée → séance évaluée → profil mis à jour.</div>
+  const todayLabel=new Date().toLocaleDateString('fr-BE',{weekday:'long',day:'numeric',month:'long'});
+  const nextSession=[...todaySessions,...open,...planned].sort((a,b)=>`${a.date||''} ${a.time||''}`.localeCompare(`${b.date||''} ${b.time||''}`))[0]||null;
+  const nextPlayers=nextSession?sessionPlayers(nextSession):[];
+  const nextTheme=nextSession?sessionThemeLabel(nextSession):'Aucune séance planifiée';
+  const topAction=priorityActions.slice().sort((a,b)=>a.priority-b.priority)[0];
+  const todayAgendaHtml=`<div class="card" style="border-color:var(--bronze-dim2);min-height:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px">
+      <div><div class="card-title" style="margin-bottom:4px">AGENDA DU JOUR</div><div style="font-size:18px;font-weight:900;text-transform:uppercase">${esc(todayLabel)}</div></div>
+      <button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',sessionView:'agenda'})">AGENDA</button>
+    </div>
+    ${todaySessions.length?`<div style="display:grid;gap:8px">${todaySessions.slice(0,4).map(s=>{const ps=sessionPlayers(s);return `<button onclick="setUI({page:'sessions',selectedSessionId:${s.id},sessionTab:'briefing'})" style="text-align:left;background:var(--bg4);border:1px solid ${agendaSessionDot(s)}55;border-left:4px solid ${agendaSessionDot(s)};border-radius:8px;padding:11px;color:var(--offwhite);cursor:pointer">
+      <div style="font-size:9px;color:${agendaSessionDot(s)};letter-spacing:1.2px;font-weight:800">${esc(s.time||'HEURE ?')} · ${sessionTypeLabel(s.sessionType,s.sessionDuration)} · ${esc((s.location||'').replace(/^L'/,'L’')||'lieu ?')}</div>
+      <div style="font-size:13px;font-weight:900;margin-top:4px">${esc(sessionTitle(s))}</div>
+      <div style="font-size:10px;color:var(--gray);font-family:var(--font-body);margin-top:3px">${esc(ps.map(p=>p.firstName||p.name).join(' · ')||sessionThemeLabel(s))}</div>
+    </button>`}).join('')}</div>`:`<div style="background:var(--bg4);border:1px dashed var(--bronze-dim2);border-radius:8px;padding:16px;text-align:center">
+      <div style="font-size:15px;font-weight:900;margin-bottom:6px">Pas de cours aujourd’hui</div>
+      <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:12px">Prépare une prochaine séance ou complète les fiches joueur.</div>
+      <button class="btn btn-primary btn-sm" onclick="openModal('newSession')">PLANIFIER</button>
+    </div>`}
+  </div>`;
+  const heroHtml=`<div class="card" style="border-color:var(--bronze-dim2);background:linear-gradient(135deg,#070707 0%,#11100c 58%,#1c1208 100%);overflow:hidden;position:relative;min-height:260px">
+    <div style="position:absolute;right:-26px;top:-22px;font-size:118px;font-weight:900;letter-spacing:6px;color:#ffffff08;pointer-events:none">HWBT</div>
+    <div style="position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,var(--bronze),var(--rouge),var(--bleu))"></div>
+    <div style="position:relative;display:flex;flex-direction:column;min-height:224px;justify-content:space-between;gap:18px">
+      <div>
+        <div class="card-title" style="margin-bottom:8px">COCKPIT COACH</div>
+        <div style="font-size:42px;font-weight:900;letter-spacing:1px;line-height:.96">Bonjour Thomas</div>
+        <div style="font-size:13px;color:var(--gray);font-family:var(--font-body);line-height:1.7;margin-top:10px;max-width:720px">${topAction?`Mission du jour: ${esc(topAction.title)}.`:'Mission du jour: garder le carnet joueur à jour et préparer la prochaine progression.'}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:end">
+        <div style="background:#050507b8;border:1px solid var(--bronze-dim2);border-radius:10px;padding:14px">
+          <div style="font-size:9px;color:var(--bronze);letter-spacing:1.5px;font-weight:800;margin-bottom:6px">PROCHAINE SÉANCE</div>
+          <div style="font-size:20px;font-weight:900;line-height:1.1">${esc(nextTheme)}</div>
+          <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);margin-top:7px">${nextSession?`${esc(sessionDateLine(nextSession))} · ${esc(nextPlayers.map(p=>p.firstName||p.name).join(' · ')||'joueurs à définir')}`:'Clique sur Agenda pour programmer la suite.'}</div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="openModal('newSession')">+ SÉANCE</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          <button class="btn btn-primary" onclick="${topAction?topAction.onclick:"openModal('newSession')"}">${topAction?esc(topAction.button):'+ SÉANCE'}</button>
           <button class="btn btn-ghost" onclick="openModal('addPlayer')">+ JOUEUR</button>
-          <button class="btn btn-ghost" onclick="setUI({page:'test'})">TEST LIBRE</button>
         </div>
       </div>
     </div>
+  </div>`;
+  const commandStrip=`<div class="g4">
+    <button class="stat-card" style="text-align:left;cursor:pointer" onclick="setUI({page:'sessions',sessionView:'agenda'})"><div class="stat-label">AUJOURD'HUI</div><div class="stat-value">${todaySessions.length}</div><div class="stat-sub">ouvrir agenda</div></button>
+    <button class="stat-card" style="text-align:left;cursor:pointer" onclick="setUI({page:'players',selectedPlayerId:null,subpage:'profil'})"><div class="stat-label">JOUEURS</div><div class="stat-value">${players.length}</div><div class="stat-sub">${incompletePlayers.length} fiche${incompletePlayers.length>1?'s':''} à compléter</div></button>
+    <button class="stat-card" style="text-align:left;cursor:pointer" onclick="setUI({page:'sessions',sessionFilter:'open',sessionView:'list'})"><div class="stat-label">ÉVALUATION</div><div class="stat-value">${open.length}</div><div class="stat-sub">séances ouvertes</div></button>
+    <button class="stat-card" style="text-align:left;cursor:pointer" onclick="setUI({page:'sessions',sessionFilter:'feedback',sessionView:'list'})"><div class="stat-label">RETOURS</div><div class="stat-value">${waitingPlayer.length}</div><div class="stat-sub">joueurs à relancer</div></button>
+  </div>`;
+  return `<div class="content">
+    ${quoteBand()}
+    <div class="g2">${heroHtml}${todayAgendaHtml}</div>
+    ${commandStrip}
     ${priorityFlowHtml}
-    <div class="g4">
-      <div class="stat-card"><div class="stat-label">AUJOURD'HUI</div><div class="stat-value">${todaySessions.length}</div><div class="stat-sub">séances à gérer</div></div>
-      <div class="stat-card"><div class="stat-label">FICHES À COMPLÉTER</div><div class="stat-value">${incompletePlayers.length}</div><div class="stat-sub">données joueur</div></div>
-      <div class="stat-card"><div class="stat-label">À ÉVALUER</div><div class="stat-value">${open.length}</div><div class="stat-sub">séances ouvertes</div></div>
-      <div class="stat-card"><div class="stat-label">RETOUR JOUEUR</div><div class="stat-value">${waitingPlayer.length}</div><div class="stat-sub">en attente</div></div>
-    </div>
     <details class="card" style="padding:0;overflow:hidden">
       <summary style="cursor:pointer;list-style:none;padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px">
         <span><span class="card-title" style="margin:0">VUE DÉTAILLÉE COACH</span><span style="display:block;font-size:10px;color:var(--gray);font-family:var(--font-body);margin-top:4px">Anciennes listes conservées pour analyser plus finement, sans surcharger le dashboard principal.</span></span>
@@ -3410,7 +3440,7 @@ function pageDashboard(){
           `Aujourd'hui · ${esc(sessionTitle(s))}`,
           `${s.status==='open'?'Séance ouverte: termine par le point 5 évaluation.':'Séance prévue: ouvre le mode terrain au début.'}`,
           s.status==='open'?'ÉVALUER':'OUVRIR',
-          `setUI({page:'sessions',selectedSessionId:${s.id},sessionMode:${s.status==='open'?'"field"':'null'}})`,
+          `setUI({page:'sessions',selectedSessionId:${s.id},sessionMode:${s.status==='open'?"'field'":'null'}})`,
           s.status==='open'?'var(--rouge)':'var(--bronze)'
         )).join('')}
         ${noProfile.slice(0,3).map(p=>actionRow(
