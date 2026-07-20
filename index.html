@@ -381,7 +381,7 @@ body{min-width:0}
       <div class="nav-item" data-page="communication" onclick="setUI({page:'communication'})" style="display: none;"><span class="nav-icon">◌</span>COMMUNICATION</div>
       <div class="nav-item" data-page="exercises" onclick="setUI({page:'exercises'})" style="display: none;"><span class="nav-icon">▤</span>EXERCISES</div>
       <div class="nav-item" data-page="test" onclick="setUI({page:'test'})" style="display: flex;"><span class="nav-icon">◎</span>PERSONALITY TEST</div>
-      <div class="nav-item" data-page="nutrition" onclick="setUI({page:'nutrition',nutritionTab:'basics',nutritionFilter:'all'})" style="display: flex;"><span class="nav-icon">◍</span>NUTRITION</div>
+      <div class="nav-item" data-page="nutrition" onclick="setUI({page:'nutrition',nutritionTab:'basics',nutritionFilter:'all',nutritionSearch:'',nutritionPackFilter:null})" style="display: flex;"><span class="nav-icon">◍</span>NUTRITION</div>
     </div>
     <div class="sidebar-footer">
       <div class="lang-switcher">
@@ -5509,9 +5509,9 @@ const NUTRITION_PRODUCTS=[
 ];
 const NUTRITION_PACKS=[
   {id:'daily',title:'HWBT Daily Health',priority:'Base quotidienne',target:'Adultes sportifs',goal:'Soutenir la santé générale, la récupération et les besoins quotidiens.',products:['omega3','magnesium','vitamin-d3','probiotics','multi-prz'],benefits:['Soutien général hors terrain','Meilleure base de récupération','Confort digestif et routine quotidienne'],warning:'Les compléments viennent uniquement après alimentation, hydratation, sommeil et récupération.',text:'Produits de base pouvant soutenir la santé générale, le fonctionnement musculaire, la récupération et le confort digestif.'},
-  {id:'performance',title:'HWBT Performance',priority:'Performance régulière',target:'Joueurs adultes qui s’entraînent régulièrement',goal:'Soutenir la récupération et les efforts répétés.',products:['whey-real','creatine','electrolytes','omega3','magnesium'],benefits:['Récupérer plus facilement entre séances','Soutenir les efforts répétés','Garder une meilleure qualité sur une charge élevée'],warning:'La créatine n’est pas obligatoire. Réservée aux adultes ou utilisée sous encadrement professionnel chez les mineurs.',text:'Pack destiné aux joueurs qui s’entraînent régulièrement et veulent mieux récupérer entre les séances.'},
+  {id:'performance',title:'HWBT Performance',priority:'Performance régulière',target:'Joueurs adultes qui s’entraînent régulièrement',goal:'Soutenir la récupération et les efforts répétés.',products:['whey-real','creatine','electrolytes','omega3','magnesium','shaker'],benefits:['Récupérer plus facilement entre séances','Soutenir les efforts répétés','Garder une meilleure qualité sur une charge élevée'],warning:'La créatine n’est pas obligatoire. Réservée aux adultes ou utilisée sous encadrement professionnel chez les mineurs.',text:'Pack destiné aux joueurs qui s’entraînent régulièrement et veulent mieux récupérer entre les séances.'},
   {id:'competition',title:'HWBT Competition',priority:'Jour de compétition',target:'Joueurs adultes engagés en compétition',goal:'Préparer les journées de tournoi et maintenir l’énergie.',products:['electrolytes','isocarb','energy-gel','energy-bar','protein-bar','shaker','bottle'],benefits:['Maintenir l’énergie entre les matchs','Structurer l’hydratation sur la journée','Éviter les creux pendant les longs tournois'],warning:'Ne pas inclure automatiquement de pré-workout ou de forte dose de caféine.',text:'Conçu pour les longues journées de tournoi, quand les besoins en hydratation, énergie et récupération augmentent.'},
-  {id:'junior',title:'HWBT Junior 14+',priority:'Éducation et récupération',target:'Jeunes sportifs à partir de 14 ans',goal:'Structurer alimentation, hydratation et récupération sans pousser la supplémentation.',products:['electrolytes','isocarb','energy-bar','omega3','vitamin-d3','magnesium','whey-real'],benefits:['Apprendre les bonnes habitudes tôt','Soutenir les longues journées sans produits stimulants','Impliquer parents et coach dans les choix'],warning:'Pour un mineur, utilisation régulière uniquement avec accord parental et avis professionnel si nécessaire.',text:'Chez les jeunes, priorité à l’alimentation, l’hydratation, le sommeil et une charge d’entraînement adaptée.'}
+  {id:'junior',title:'HWBT Junior 14+',priority:'Éducation et récupération',target:'Jeunes sportifs à partir de 14 ans',goal:'Structurer alimentation, hydratation et récupération sans pousser la supplémentation.',products:['electrolytes','isocarb','energy-bar','omega3','vitamin-d3','magnesium','whey-real','shaker','bottle'],benefits:['Apprendre les bonnes habitudes tôt','Soutenir les longues journées sans produits stimulants','Impliquer parents et coach dans les choix'],warning:'Pour un mineur, utilisation régulière uniquement avec accord parental et avis professionnel si nécessaire.',text:'Chez les jeunes, priorité à l’alimentation, l’hydratation, le sommeil et une charge d’entraînement adaptée.'}
 ];
 function nutritionProduct(id){return NUTRITION_PRODUCTS.find(p=>p.id===id)||null;}
 function nutritionProductImage(p){
@@ -5519,7 +5519,7 @@ function nutritionProductImage(p){
     ${p.imageUrl?`<img src="${esc(p.imageUrl)}" alt="${esc(p.name)}" loading="lazy" style="width:100%;height:100%;object-fit:contain;padding:12px" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div style="display:none;width:100%;height:100%;align-items:center;justify-content:center;text-align:center;color:var(--bronze);font-size:10px;letter-spacing:1.6px;padding:18px">IMAGE À AJOUTER<br>${esc(p.slug)}.jpg</div>`:`<div style="color:var(--bronze);font-size:10px;letter-spacing:1.6px">IMAGE À AJOUTER</div>`}
   </div>`;
 }
-function nutritionTabButton(key,label,active){return `<button class="tab ${active===key?'active':''}" onclick="setUI({nutritionTab:'${key}'})">${label}</button>`;}
+function nutritionTabButton(key,label,active){return `<button class="tab ${active===key?'active':''}" onclick="setUI({nutritionTab:'${key}',nutritionPackFilter:null,nutritionSearch:'',nutritionFilter:'all'})">${label}</button>`;}
 function nutritionProductCard(p){
   const href=p.affiliateUrl||p.productUrl;
   return `<div class="card" style="border-color:${p.isRecommended?'var(--bronze-dim2)':'var(--border)'}">
@@ -5535,13 +5535,16 @@ function nutritionProductCard(p){
 function nutritionProductsHtml(){
   const filter=UI.nutritionFilter||'all';
   const q=norm(UI.nutritionSearch||'');
+  const packIds=Array.isArray(UI.nutritionPackFilter)&&UI.nutritionPackFilter.length?UI.nutritionPackFilter:null;
+  const pack=NUTRITION_PACKS.find(p=>packIds&&p.products.length===packIds.length&&p.products.every(id=>packIds.includes(id)));
   const filters=['all','Santé','Récupération','Hydratation','Performance','Compétition','Junior','Adultes uniquement'];
   const list=NUTRITION_PRODUCTS.filter(p=>p.isActive!==false).filter(p=>{
+    if(packIds&&!packIds.includes(p.id)) return false;
     const okFilter=filter==='all'||p.category===filter||(filter==='Junior'&&!p.adultOnly&&/junior|jeune|adolescent/i.test([p.juniorStatus,p.tags?.join(' ')].join(' ')))||(filter==='Adultes uniquement'&&p.adultOnly);
     const hay=norm([p.name,p.category,p.subCategory,p.summary,p.targetAudience,p.timing,p.priority,p.tags?.join(' ')].join(' '));
     return okFilter&&(!q||hay.includes(q));
   });
-  return `<div class="card"><div class="card-title">CATALOGUE PRODUITS</div><div class="g2"><div class="form-group"><label class="form-label">RECHERCHE</label><input class="form-input" value="${esc(UI.nutritionSearch||'')}" placeholder="Ex: magnésium, tournoi, junior..." oninput="setUI({nutritionSearch:this.value})"></div><div class="form-group"><label class="form-label">FILTRE</label><select class="form-select" onchange="setUI({nutritionFilter:this.value})">${filters.map(f=>`<option value="${esc(f)}" ${filter===f?'selected':''}>${f==='all'?'Tous':esc(f)}</option>`).join('')}</select></div></div></div><div class="g3">${list.map(nutritionProductCard).join('')||'<div class="card"><div class="muted-help">Aucun produit dans ce filtre.</div></div>'}</div>`;
+  return `<div class="card"><div class="card-title">CATALOGUE PRODUITS</div>${packIds?`<div style="background:var(--bronze-dim);border:1px solid var(--bronze-dim2);border-radius:8px;padding:12px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div style="font-size:10px;color:var(--bronze);letter-spacing:1.4px;font-weight:800">KIT SÉLECTIONNÉ</div><div style="font-size:16px;font-weight:900;margin-top:3px">${esc(pack?.title||'Pack nutrition')}</div></div><button class="btn btn-ghost btn-sm" onclick="setUI({nutritionPackFilter:null,nutritionSearch:'',nutritionFilter:'all'})">TOUS LES PRODUITS</button></div>`:''}<div class="g2"><div class="form-group"><label class="form-label">RECHERCHE</label><input class="form-input" value="${esc(UI.nutritionSearch||'')}" placeholder="Ex: magnésium, tournoi, junior..." oninput="setUI({nutritionSearch:this.value,nutritionPackFilter:null})"></div><div class="form-group"><label class="form-label">FILTRE</label><select class="form-select" onchange="setUI({nutritionFilter:this.value,nutritionPackFilter:null})">${filters.map(f=>`<option value="${esc(f)}" ${filter===f?'selected':''}>${f==='all'?'Tous':esc(f)}</option>`).join('')}</select></div></div></div><div class="g3">${list.map(nutritionProductCard).join('')||'<div class="card"><div class="muted-help">Aucun produit dans ce filtre.</div></div>'}</div>`;
 }
 function nutritionPacksHtml(){
   const miniProduct=p=>`<div style="display:grid;grid-template-columns:64px 1fr;gap:10px;align-items:center;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:8px;min-height:82px">
@@ -5559,7 +5562,7 @@ function nutritionPacksHtml(){
           <div style="font-size:28px;font-weight:900;line-height:1.02;margin-bottom:8px">${esc(pack.title)}</div>
           <div class="muted-help"><b>Objectif:</b> ${esc(pack.goal)}<br><b>Public:</b> ${esc(pack.target)}</div>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="setUI({nutritionTab:'products',nutritionFilter:'all',nutritionSearch:'${esc(pack.title.replace('HWBT ','').split(' ')[0])}'})">VOIR LES PRODUITS</button>
+        <button class="btn btn-primary btn-sm" onclick='setUI({nutritionTab:"products",nutritionFilter:"all",nutritionSearch:"",nutritionPackFilter:${JSON.stringify(pack.products)}})'>VOIR LES PRODUITS</button>
       </div>
       <div class="g3" style="margin-bottom:14px">${(pack.benefits||[]).map((b,i)=>`<div style="background:linear-gradient(135deg,var(--bronze-dim),var(--bg4));border:1px solid var(--bronze-dim2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--bronze);letter-spacing:1px">BÉNÉFICE 0${i+1}</div><div style="font-size:14px;font-weight:900;color:var(--offwhite);margin-top:4px">${esc(b)}</div></div>`).join('')}</div>
       <div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.65;margin-bottom:12px">${esc(pack.text)}</div>
