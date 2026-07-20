@@ -369,7 +369,7 @@ body{min-width:0}
       <div class="nav-label">ACADEMY</div>
       <div class="nav-item" data-page="dashboard" onclick="setUI({page:'dashboard'})" style="display: flex;"><span class="nav-icon">◈</span>DASHBOARD</div>
       <div class="nav-item active" data-page="players" onclick="setUI({page:'players',selectedPlayerId:null,subpage:'profil'})" style="display: flex;"><span class="nav-icon">◉</span>PLAYERS</div>
-      <div class="nav-item" data-page="sessions" onclick="setUI({page:'sessions'})" style="display: flex;"><span class="nav-icon">▦</span>SESSIONS</div>
+      <div class="nav-item" data-page="sessions" onclick="setUI({page:'sessions',sessionView:'agenda'})" style="display: flex;"><span class="nav-icon">▦</span>SESSIONS</div>
       <div class="nav-item" data-page="commandCenter" onclick="setUI({page:'commandCenter',commandTab:'brief'})" style="display: flex;"><span class="nav-icon">◆</span>COMMAND CENTER</div>
       <div class="nav-item" data-page="contentStudio" onclick="setUI({page:'contentStudio',contentTab:'dashboard'})" style="display: flex;"><span class="nav-icon">▣</span>CONTENT STUDIO</div>
       <div class="nav-item" data-page="shop" onclick="setUI({page:'shop'})" style="display: flex;"><span class="nav-icon">◫</span>SHOP</div>
@@ -4019,14 +4019,14 @@ function pageSessionsList(){
   const filtered=active==='all'?visible:visible.filter(s=>sessionFilterKey(s)===active);
   const sorted=filtered.slice().sort((a,b)=>`${b.date||''} ${b.time||''}`.localeCompare(`${a.date||''} ${a.time||''}`));
   const filters=['all','prep','ready','today','open','feedback','done'];
-  const view=UI.sessionView||'list';
+  const view=UI.sessionView||'agenda';
   return `<div class="content">
     ${quoteBand()}
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:18px">
       <div><div style="font-size:30px;font-weight:800;letter-spacing:1px;line-height:1">Sessions</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-top:6px">Scan rapide: thème, joueurs, statut, piliers et actions utiles.</div></div>
       ${STATE.role==='coach'?`<button class="btn btn-primary" onclick="openModal('newSession')">+ NOUVELLE SÉANCE</button>`:''}
     </div>
-    <div class="tabs"><button class="tab ${view==='list'?'active':''}" onclick="setUI({sessionView:'list'})">LISTE</button><button class="tab ${view==='agenda'?'active':''}" onclick="setUI({sessionView:'agenda'})">AGENDA</button></div>
+    <div class="tabs"><button class="tab ${view==='agenda'?'active':''}" onclick="setUI({sessionView:'agenda'})">AGENDA</button><button class="tab ${view==='list'?'active':''}" onclick="setUI({sessionView:'list'})">LISTE</button></div>
     ${view==='agenda'?sessionsAgendaMonthHtml(visible):`
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">${filters.map(f=>`<button class="tab ${active===f?'active':''}" onclick="setUI({sessionFilter:'${f}'})">${sessionFilterLabel(f)} <span style="opacity:.65">${counts[f]||0}</span></button>`).join('')}</div>
     <div class="g2">
