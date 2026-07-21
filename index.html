@@ -2485,7 +2485,14 @@ function ensureBlockPrep(block,isCooling=false){
   return block.prep;
 }
 function prepTextArea(sessionId,idx,key,label,value,rows=3){
-  return `<div class="form-group" style="margin-bottom:10px"><label class="form-label">${label}</label><textarea class="form-input" rows="${rows}" oninput="updateSessionBlock(${sessionId},${idx},'prep.${key}',this.value)">${esc(value||'')}</textarea></div>`;
+  const id=`prep_${sessionId}_${idx}_${key}`;
+  return `<div class="form-group" style="margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px">
+      <label class="form-label" style="margin:0">${label}</label>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="rewritePrepField(${sessionId},${idx},'${key}')">CORRIGER</button>
+    </div>
+    <textarea class="form-input" id="${id}" rows="${rows}" oninput="updateSessionBlock(${sessionId},${idx},'prep.${key}',this.value)">${esc(value||'')}</textarea>
+  </div>`;
 }
 function sessionPrepEditorHtml(s,idx,b,isCooling){
   const prep=ensureBlockPrep(b,isCooling);
@@ -2537,8 +2544,8 @@ function sessionWorkBlocksHtml(s){
     const score=measuredBlockScore(b);
     const actionButtons=isCooling
       ? `<button class="btn btn-primary btn-sm" onclick="enhanceSessionBlockAft(${s.id},${idx})">CORRIGER + COMPLÉTER LE BILAN</button>`
-      : `<button class="btn btn-primary btn-sm" onclick="openModal('sessionExercisePicker',{sessionId:${s.id},blockIdx:${idx}})">CHOISIR DANS LE CARNET</button>${aft?`<button class="btn btn-primary btn-sm" onclick="enhanceSessionBlockAft(${s.id},${idx})">CORRIGER + COMPLÉTER</button>${isApplication?`<button class="btn btn-ghost btn-sm" onclick="copyStartGameToApplication(${s.id})">COPIER FACE THE GAME</button>`:''}`:''}<button class="btn btn-ghost btn-sm" onclick="diagramToText(${s.id},${idx})">SCHÉMA → TEXTE</button><button class="btn btn-ghost btn-sm" onclick="diagramFromText(${s.id},${idx})">TEXTE → SCHÉMA</button><button class="btn btn-ghost btn-sm" onclick="saveBlockExerciseToLibrary(${s.id},${idx})">ENREGISTRER EN BIBLIOTHÈQUE</button>`;
-    const prepBlock=canEdit?(aft?`${sessionPrepEditorHtml(s,idx,b,isCooling)}<div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${actionButtons}</div>`:`<div class="form-group"><label class="form-label">EXERCICE / CONSIGNE</label><textarea class="form-input" rows="2" oninput="updateSessionBlock(${s.id},${idx},'exercise',this.value)">${esc(b.exercise||'')}</textarea><div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${actionButtons}</div></div>`):(aft?sessionPrepReadOnlyHtml(b,isCooling):`${b.exercise?`<div class="exercise-card"><div style="font-size:8px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:5px">${isCooling?'BILAN DONNÉ':'EXERCICE DONNÉ'}</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.5;white-space:pre-wrap">${esc(b.exercise)}</div></div>`:''}`);
+      : `<button class="btn btn-primary btn-sm" onclick="openModal('sessionExercisePicker',{sessionId:${s.id},blockIdx:${idx}})">CHOISIR DANS LE CARNET</button>${aft?`<button class="btn btn-primary btn-sm" onclick="enhanceSessionBlockAft(${s.id},${idx})">REFORMULER TOUT</button>${isApplication?`<button class="btn btn-ghost btn-sm" onclick="copyStartGameToApplication(${s.id})">COPIER FACE THE GAME</button>`:''}`:''}<button class="btn btn-ghost btn-sm" onclick="saveBlockExerciseToLibrary(${s.id},${idx})">ENREGISTRER EN BIBLIOTHÈQUE</button>`;
+    const prepBlock=canEdit?(aft?`${sessionPrepEditorHtml(s,idx,b,isCooling)}<div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap">${actionButtons}</div>`:`<div class="form-group"><label class="form-label">EXERCICE / CONSIGNE</label><textarea class="form-input" id="plain_ex_${s.id}_${idx}" rows="2" oninput="updateSessionBlock(${s.id},${idx},'exercise',this.value)">${esc(b.exercise||'')}</textarea><div style="display:flex;justify-content:flex-end;margin-top:8px;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="rewritePlainExercise(${s.id},${idx})">CORRIGER</button>${actionButtons}</div></div>`):(aft?sessionPrepReadOnlyHtml(b,isCooling):`${b.exercise?`<div class="exercise-card"><div style="font-size:8px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:5px">${isCooling?'BILAN DONNÉ':'EXERCICE DONNÉ'}</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.5;white-space:pre-wrap">${esc(b.exercise)}</div></div>`:''}`);
     const diagramBlock=isCooling?`<div style="background:var(--bg4);border-left:3px solid var(--bronze);border-radius:0 8px 8px 0;padding:12px;font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.65"><b style="color:var(--offwhite)">Pas de schéma terrain pour cette étape.</b><br>Le cooling down sert à revenir au calme, vérifier ce que les joueurs retiennent et fermer la séance avec un feedback sandwich.</div>`:diagramHtml(s,idx,canEdit);
     const body=aft&&!isCooling
       ? `<div class="aft-prep-grid"><div style="min-width:0">${prepBlock}</div><div class="aft-prep-diagram" style="min-width:0">${diagramBlock}</div></div>`
@@ -2567,7 +2574,8 @@ const DIAGRAM_TOOLS=[
   {id:'run',label:'Course',name:'Ligne de course',color:'#ffffff',type:'run'},
   {id:'shot',label:'Balle droite',name:'Ligne de balle droite',color:'#f4d35e',type:'shot'},
   {id:'lob',label:'Lob courbe',name:'Trajectoire de lob courbe',color:'#f4d35e',type:'lob'},
-  {id:'feed',label:'Lancer',name:'Ligne lanceur',color:'#f39c12',type:'feed'}
+  {id:'feed',label:'Lancer',name:'Ligne lanceur',color:'#f39c12',type:'feed'},
+  {id:'delete',label:'SUPPRIMER',name:'Supprimer un élément du schéma',color:'#e74c3c',type:'delete'}
 ];
 function diagramTool(){
   return UI.diagramTool||'p1';
@@ -2610,6 +2618,30 @@ function diagramItemSvg(it){
   if(it.type==='coach'||it.type==='feeder') return `<g><rect x="${x-6}" y="${y-5}" width="12" height="10" rx="2" fill="${esc(it.color||'#fff')}" stroke="#111" stroke-width=".8"></rect><text x="${x}" y="${y+1.8}" text-anchor="middle" fill="${it.type==='coach'?'#111':'#fff'}" font-size="4.5" font-weight="700">${esc(it.label||'CO')}</text></g>`;
   return `<g><circle cx="${x}" cy="${y}" r="5.2" fill="${esc(it.color||'#c0392b')}" stroke="#fff" stroke-width=".8"></circle><text x="${x}" y="${y+1.8}" text-anchor="middle" fill="#fff" font-size="5" font-weight="700">${esc(it.label||'J')}</text></g>`;
 }
+function diagramItemDistance(it,x,y){
+  const x1=Number(it.x)||50, y1=Number(it.y)||100;
+  const x2=Number.isFinite(Number(it.x2))?Number(it.x2):x1, y2=Number.isFinite(Number(it.y2))?Number(it.y2):y1;
+  if(['run','shot','lob','feed'].includes(it.type)){
+    const a=x-x1,b=y-y1,c=x2-x1,d=y2-y1;
+    const dot=a*c+b*d, len=c*c+d*d;
+    const t=len?Math.max(0,Math.min(1,dot/len)):0;
+    const px=x1+t*c, py=y1+t*d;
+    return Math.hypot(x-px,y-py);
+  }
+  if(it.type==='zone'){
+    const w=Number(it.w)||20,h=Number(it.h)||16;
+    const cx=Math.max(x1,Math.min(x,x1+w)), cy=Math.max(y1,Math.min(y,y1+h));
+    return Math.hypot(x-cx,y-cy);
+  }
+  return Math.hypot(x-x1,y-y1);
+}
+function removeNearestDiagramItem(items,x,y){
+  if(!Array.isArray(items)||!items.length) return false;
+  let best=-1, dist=Infinity;
+  items.forEach((it,i)=>{const d=diagramItemDistance(it,x,y); if(d<dist){dist=d;best=i;}});
+  if(best>=0&&dist<=10){items.splice(best,1);return true;}
+  return false;
+}
 function diagramHtml(s,blockIdx,editable=false){
   const b=(s.blocks||[])[blockIdx]||{};
   const items=b.diagramItems||[];
@@ -2626,7 +2658,7 @@ function diagramHtml(s,blockIdx,editable=false){
   return `<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:10px">
     <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
       <div><div style="font-size:9px;letter-spacing:1.5px;color:var(--bronze)">SCHÉMA TERRAIN</div><div style="font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.45">${editable?'Joueur/coach/panier = 1 clic. Course/balle/lancer/zone = 2 clics: départ puis arrivée/taille.':'Déroulement visuel de l’exercice.'}${pending?`<br><b style="color:var(--bronze)">Clique maintenant l’arrivée / la taille.</b>`:''}</div></div>
-      ${editable?`<div style="display:flex;gap:6px;flex-wrap:wrap">${tools}<button type="button" class="status-choice" onclick="diagramFromText(${s.id},${blockIdx})">TEXTE → SCHÉMA</button><button type="button" class="status-choice" onclick="diagramToText(${s.id},${blockIdx})">SCHÉMA → TEXTE</button><button type="button" class="status-choice" onclick="addDiagramTemplate(${s.id},${blockIdx})">MODÈLE</button><button type="button" class="status-choice" onclick="undoDiagramItem(${s.id},${blockIdx})">UNDO</button><button type="button" class="status-choice" onclick="clearDiagram(${s.id},${blockIdx})">VIDER</button></div>`:''}
+      ${editable?`<div style="display:flex;gap:6px;flex-wrap:wrap">${tools}<button type="button" class="status-choice" onclick="addDiagramTemplate(${s.id},${blockIdx})">MODÈLE</button><button type="button" class="status-choice" onclick="undoDiagramItem(${s.id},${blockIdx})">UNDO</button><button type="button" class="status-choice" onclick="clearDiagram(${s.id},${blockIdx})">VIDER</button></div>`:''}
     </div>
     ${courtBaseSvg(body,editable,s.id,blockIdx)}
     ${editable?legend:''}
@@ -2651,7 +2683,7 @@ function exerciseDiagramCanvasHtml(id,editable=false){
 }
 function exerciseDiagramToolsHtml(id){
   const tools=DIAGRAM_TOOLS.map(t=>`<button type="button" title="${esc(t.name)}" class="status-choice ${diagramTool()===t.id?'sel':''}" onclick="selectExerciseDiagramTool('${t.id}',this)">${esc(t.label)}</button>`).join('');
-  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${tools}<button type="button" class="status-choice" onclick="exerciseDiagramFromText('${id}')">TEXTE → SCHÉMA</button><button type="button" class="status-choice" onclick="exerciseDiagramToText('${id}')">SCHÉMA → TEXTE</button><button type="button" class="status-choice" onclick="addExerciseDiagramTemplate('${id}')">MODÈLE</button><button type="button" class="status-choice" onclick="undoExerciseDiagramItem('${id}')">UNDO</button><button type="button" class="status-choice" onclick="clearExerciseDiagram('${id}')">VIDER</button></div>`;
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${tools}<button type="button" class="status-choice" onclick="addExerciseDiagramTemplate('${id}')">MODÈLE</button><button type="button" class="status-choice" onclick="undoExerciseDiagramItem('${id}')">UNDO</button><button type="button" class="status-choice" onclick="clearExerciseDiagram('${id}')">VIDER</button></div>`;
 }
 function selectExerciseDiagramTool(toolId,btn){
   UI.diagramTool=toolId;
@@ -2669,6 +2701,12 @@ function exerciseDiagramCourtClick(evt,id){
   const x=Math.max(8,Math.min(92,((evt.clientX-r.left)/r.width)*100));
   const y=Math.max(8,Math.min(192,((evt.clientY-r.top)/r.height)*200));
   const tool=diagramToolData();
+  if(tool.type==='delete'){
+    ex.diagramItems=Array.isArray(ex.diagramItems)?ex.diagramItems:[];
+    if(removeNearestDiagramItem(ex.diagramItems,x,y)){saveState();refreshExerciseDiagram(id);showNotif('Élément supprimé du schéma');}
+    else showNotif('Aucun élément proche à supprimer');
+    return;
+  }
   const twoClick=['run','shot','lob','feed','zone'].includes(tool.type);
   const pending=UI.exerciseDiagramPending;
   if(twoClick&&(!pending||pending.exerciseId!==id||pending.tool!==tool.type)){
@@ -6799,12 +6837,72 @@ function ensureSessionBlock(s,blockIdx){
   return s.blocks[blockIdx];
 }
 function updateSessionBlock(sessionId,blockIdx,field,value){const s=STATE.sessions.find(s=>s.id===sessionId);const b=ensureSessionBlock(s,blockIdx);if(!b)return;if(field==='exercise'){b.exercise=value;b.prep=null;}else if(field==='aspect')b.aspect=value;else if(field==='exerciseName')b.exerciseName=value;else if(field.startsWith('prep.')){const key=field.split('.')[1];b.prep=b.prep&&typeof b.prep==='object'?b.prep:{};b.prep[key]=value;b.exercise=prepToExerciseText(b.prep);}saveState();}
+function cleanWritingText(text){
+  return String(text||'')
+    .replace(/\s+/g,' ')
+    .replace(/\s+([,.;:!?])/g,'$1')
+    .replace(/\bexcer?cice\b/gi,'exercice')
+    .replace(/\bderoulement\b/gi,'déroulement')
+    .replace(/\bregle\b/gi,'règle')
+    .replace(/\bmateriaux\b/gi,'matériel')
+    .replace(/\bjoueur qui\b/gi,'joueur qui')
+    .replace(/\bcoach\b/gi,'coach')
+    .trim();
+}
+function splitSmartBullets(text){
+  const raw=cleanWritingText(text);
+  if(!raw) return [];
+  const lines=raw.split(/\n+/).flatMap(line=>line.split(/(?:\s*[-•]\s+|;\s+|\. (?=[A-ZÉÈÀÂÊÎÔÛÇ]))/)).map(x=>x.replace(/^[-•]\s*/,'').trim()).filter(Boolean);
+  return [...new Set(lines)].slice(0,8);
+}
+function rewriteBullets(text,key='flow'){
+  const fallback={
+    objective:['Faire comprendre le thème par le jeu.','Donner un repère simple que le joueur peut réutiliser en match.'],
+    setup:['Placer les joueurs rapidement.','Prévoir raquettes, balles et zones visibles.','Limiter l’attente entre les passages.'],
+    flow:['Lancer le jeu avec une consigne courte.','Observer quelques points avant de corriger.','Faire un arrêt rapide avec une question.','Relancer avec un bonus ou une contrainte.'],
+    rule:['Le point compte si l’intention demandée est visible.','Ajouter un bonus quand le bon choix est fait.'],
+    coach:['Observer avant de parler.','Corriger un seul repère à la fois.','Valoriser une action réussie puis guider la suivante.'],
+    questions:['Qu’est-ce qui vous a aidés à réussir ?','Quel choix était le plus simple ?','Où deviez-vous vous placer ?'],
+    benefits:['Le joueur comprend mieux la situation.','Le geste est relié à une décision de jeu.','Le repère devient plus facile à refaire en match.'],
+    exercise:['Définir une consigne simple.','Donner un critère de réussite visible.','Faire évoluer la difficulté si le joueur réussit trop vite.']
+  };
+  const starters=fallback[key]||fallback.flow;
+  const lines=splitSmartBullets(text);
+  const merged=[...lines,...starters].filter(Boolean).slice(0,key==='flow'?6:4);
+  return merged.map(x=>`- ${x.replace(/[. ]+$/,'')}.`).join('\n');
+}
+function rewritePrepField(sessionId,idx,key){
+  const s=STATE.sessions.find(s=>s.id===sessionId);
+  const b=ensureSessionBlock(s,idx);
+  const el=document.getElementById(`prep_${sessionId}_${idx}_${key}`);
+  if(!s||!b||!el) return;
+  const next=rewriteBullets(el.value,key);
+  el.value=next;
+  updateSessionBlock(sessionId,idx,`prep.${key}`,next);
+  showNotif('Texte corrigé et reformulé');
+}
+function rewritePlainExercise(sessionId,idx){
+  const s=STATE.sessions.find(s=>s.id===sessionId);
+  const b=ensureSessionBlock(s,idx);
+  const el=document.getElementById(`plain_ex_${sessionId}_${idx}`);
+  if(!s||!b||!el) return;
+  const next=rewriteBullets(el.value||b.exercise,'exercise');
+  el.value=next;
+  updateSessionBlock(sessionId,idx,'exercise',next);
+  showNotif('Consigne corrigée et reformulée');
+}
 function diagramCourtClick(evt,sessionId,blockIdx){
   const s=STATE.sessions.find(s=>s.id===sessionId); const b=ensureSessionBlock(s,blockIdx); if(!b) return;
   const svg=evt.currentTarget, r=svg.getBoundingClientRect();
   const x=Math.max(8,Math.min(92,((evt.clientX-r.left)/r.width)*100));
   const y=Math.max(8,Math.min(192,((evt.clientY-r.top)/r.height)*200));
   const tool=diagramToolData();
+  if(tool.type==='delete'){
+    b.diagramItems=Array.isArray(b.diagramItems)?b.diagramItems:[];
+    if(removeNearestDiagramItem(b.diagramItems,x,y)){saveState();render();showNotif('Élément supprimé du schéma');}
+    else showNotif('Aucun élément proche à supprimer');
+    return;
+  }
   const twoClick=['run','shot','lob','feed','zone'].includes(tool.type);
   const pending=UI.diagramPending;
   if(twoClick&&(!pending||pending.sessionId!==sessionId||pending.blockIdx!==blockIdx||pending.tool!==tool.type)){
