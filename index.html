@@ -1568,6 +1568,47 @@ const HWBT_COURSE_90_BLOCKS = [
   {num:'06',name:'PROVE IT',time:'15 MIN',desc:'Transfert match: jeu global qui mélange les deux thèmes et récompense les bons choix en point réel.',focus:'Transfert match',pillar:'TA'},
   {num:'07',name:'RESET',time:'5 MIN',desc:'Retour au calme: bilan sandwich, ressenti joueur, message clé et point à reprendre.',focus:'Retour au calme',pillar:'M'},
 ];
+const HWBT_STEP_LIBRARY = [
+  {key:'get_ready',name:'GET READY',time:'10 MIN',desc:'Échauffement: mettre le corps en route, installer l’attention et faire entrer le thème sans longue explication.',focus:'Échauffement',pillar:'P'},
+  {key:'face_the_game',name:'FACE THE GAME',time:'15 MIN',desc:'Situation révélatrice: un défi de départ qui montre le problème à résoudre et donne envie d’apprendre.',focus:'Situation révélatrice',pillar:'TA'},
+  {key:'build_the_answer',name:'BUILD THE ANSWER',time:'15 MIN',desc:'Atelier guidé: construire les repères techniques et tactiques avec une situation plus claire, plus répétable.',focus:'Atelier guidé',pillar:'T'},
+  {key:'build_the_game',name:'BUILD THE GAME',time:'15 MIN',desc:'Jeu construit: remettre les joueurs dans une situation proche du match avec une règle qui force le bon comportement.',focus:'Jeu construit',pillar:'TA'},
+  {key:'prove_it',name:'PROVE IT',time:'15 MIN',desc:'Transfert match: vérifier si le joueur garde le bon choix en point réel, sous score ou sous pression.',focus:'Transfert match',pillar:'TA'},
+  {key:'reset',name:'RESET',time:'5 MIN',desc:'Retour au calme: bilan sandwich, ressenti joueur, message clé et point à reprendre.',focus:'Retour au calme',pillar:'M'}
+];
+function stripStepSuffix(name){
+  return String(name||'').trim().replace(/\s+\d+$/,'').trim();
+}
+function isResetStep(stepOrName){
+  const name=typeof stepOrName==='string'?stepOrName:stepOrName?.name;
+  return /reset|cooling|retour au calme/i.test(String(name||''));
+}
+function stepTemplateFromName(name){
+  const clean=stripStepSuffix(name).toLowerCase();
+  if(/get ready|échauffement|echauffement/.test(clean)) return HWBT_STEP_LIBRARY[0];
+  if(/face the game|jeu de départ|jeu de depart|révélatrice|revelatrice/.test(clean)) return HWBT_STEP_LIBRARY[1];
+  if(/build the answer|apprentissage|atelier/.test(clean)) return HWBT_STEP_LIBRARY[2];
+  if(/build the game|jeu construit/.test(clean)) return HWBT_STEP_LIBRARY[3];
+  if(/prove it|application|transfert/.test(clean)) return HWBT_STEP_LIBRARY[4];
+  if(/reset|cooling|bilan|retour/.test(clean)) return HWBT_STEP_LIBRARY[5];
+  return HWBT_STEP_LIBRARY[2];
+}
+function stepTemplateByKey(key){
+  return HWBT_STEP_LIBRARY.find(st=>st.key===key)||stepTemplateFromName(key);
+}
+function stepFromSessionBlock(block,idx,fallback){
+  const template=stepTemplateFromName(block?.sessionPart||fallback?.name||'');
+  const customName=block?.sessionPart||fallback?.name||template.name;
+  return {
+    ...template,
+    num:String(idx+1).padStart(2,'0'),
+    name:customName,
+    time:block?.stepTime||fallback?.time||template.time,
+    desc:block?.stepDesc||fallback?.desc||template.desc,
+    focus:block?.stepFocus||fallback?.focus||template.focus,
+    pillar:block?.pillar||fallback?.pillar||template.pillar
+  };
+}
 function isCourseSession(s){
   const type=typeof s==='string'?s:s?.sessionType;
   return ['aft','hwbt60','hwbt90','hwbt_course'].includes(type)||!!s?.sessionDuration;
@@ -1582,6 +1623,10 @@ function sessionTypeLabel(type, duration){
   return 'HWBT';
 }
 function sessionStructure(s){
+  if(s&&typeof s==='object'&&isCourseSession(s)&&Array.isArray(s.blocks)&&s.blocks.length){
+    const fallback=sessionDuration(s)==='90'?HWBT_COURSE_90_BLOCKS:HWBT_COURSE_60_BLOCKS;
+    return s.blocks.map((b,idx)=>stepFromSessionBlock(b,idx,fallback[idx]));
+  }
   if(isCourseSession(s)) return sessionDuration(s)==='90'?HWBT_COURSE_90_BLOCKS:HWBT_COURSE_60_BLOCKS;
   return SESSION_BLOCKS;
 }
@@ -2523,6 +2568,29 @@ function sessionPrepReadOnlyHtml(b,isCooling){
   const item=(label,text)=>`<div class="exercise-card"><div style="font-size:8px;color:var(--bronze);letter-spacing:1.5px;margin-bottom:5px">${label}</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.5;white-space:pre-wrap">${esc(text||'—')}</div></div>`;
   return `<div class="g3">${item('OBJECTIF',prep.objective)}${item('ORGANISATION (MISE EN PLACE)',prep.setup)}${item('DÉROULEMENT',prep.flow)}${item('COMPTAGE',prep.rule)}${item('CONSIGNES',prep.coach)}${item('QUESTION D’INDUCTION',prep.questions)}${item('MESSAGE CLÉ',prep.benefits)}</div>`;
 }
+function sessionBlockTypeSelect(sessionId,idx,value){
+  return `<select class="form-input" style="min-width:170px;max-width:230px" onchange="changeSessionBlockPart(${sessionId},${idx},this.value)">
+    ${HWBT_STEP_LIBRARY.map(st=>`<option value="${st.key}" ${stripStepSuffix(value)===st.name?'selected':''}>${st.name}</option>`).join('')}
+  </select>`;
+}
+function sessionStructureManagerHtml(s){
+  const count=(s.blocks||[]).length;
+  return `<div style="background:var(--bg4);border:1px solid var(--border);border-left:3px solid var(--bronze);border-radius:0 8px 8px 0;padding:12px;margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+      <div>
+        <div style="font-size:10px;color:var(--bronze);letter-spacing:1.8px;margin-bottom:5px">STRUCTURE RÉELLE DU COURS</div>
+        <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55">Tu peux adapter ce que tu as vraiment donné: ajouter un bloc, retirer une partie, changer son rôle ou bouger l’ordre.</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select class="form-input" id="add_block_type_${s.id}" style="min-width:170px">${HWBT_STEP_LIBRARY.map(st=>`<option value="${st.key}">${st.name}</option>`).join('')}</select>
+        <button class="btn btn-primary btn-sm" onclick="addSessionBlock(${s.id})">AJOUTER BLOC</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+      ${(s.blocks||[]).map((b,i)=>`<span style="border:1px solid var(--border);background:var(--bg2);border-radius:6px;padding:6px 8px;font-size:10px;color:var(--offwhite);letter-spacing:.8px">${String(i+1).padStart(2,'0')} · ${esc(b.sessionPart||'BLOC')}</span>`).join('')||'<span style="font-size:11px;color:var(--gray)">Aucun bloc préparé.</span>'}
+    </div>
+  </div>`;
+}
 function sessionWorkBlocksHtml(s){
   const aft=isCourseSession(s);
   const steps=sessionStructure(s);
@@ -2533,7 +2601,7 @@ function sessionWorkBlocksHtml(s){
   const note=aft?'Ici tu prépares le vrai déroulement du cours après la création: objectif, organisation, déroulement, comptage, consignes, question d’induction et message clé. Les aspects HWBT restent utilisés plus bas pour évaluer les stats.':'Ici tu prépares les exercices par pilier HWBT.';
   const cards=(aft?steps:PILLARS).map((item,idx)=>{
     const b=blocks[idx]||{};
-    const isCooling=aft&&idx===steps.length-1;
+    const isCooling=aft&&isResetStep(item);
     const pl=aft?(PILLARS.find(p=>p.id===b.pillar)||PILLARS[idx]||PILLARS[0]):item;
     const step=aft?item:null;
     const label=aft?step.name:pl.name;
@@ -2551,13 +2619,13 @@ function sessionWorkBlocksHtml(s){
       ? `<div class="aft-prep-grid"><div style="min-width:0">${prepBlock}</div><div class="aft-prep-diagram" style="min-width:0">${diagramBlock}</div></div>`
       : `${prepBlock}${diagramBlock}`;
     return `<div class="aspect-input-block">
-      <div class="aib-header" style="align-items:flex-end;flex-wrap:wrap"><span class="aib-pillar" style="background:var(--bronze-dim);color:var(--bronze)">${String(idx+1).padStart(2,'0')}</span><span class="aib-name">${esc(label)}</span>${canEdit?`<div style="flex:1;min-width:220px"><label class="form-label" style="margin-bottom:4px">NOM DE L’EXERCICE</label><input class="form-input" value="${esc(exerciseName)}" oninput="updateSessionBlock(${s.id},${idx},'exerciseName',this.value)" placeholder="Ex: Jeu de départ - lobs avant vitre"></div>`:`<span style="font-size:12px;color:var(--offwhite);font-family:var(--font-body)">— ${esc(exerciseName)}</span>`}${!aft&&closed&&b.coachState?`<span style="margin-left:auto;font-size:10px;color:${pl.color};font-weight:700">${ASPECT_STATE_LABEL[b.coachState]} · ${score}/20</span>`:''}</div>
+      <div class="aib-header" style="align-items:flex-end;flex-wrap:wrap"><span class="aib-pillar" style="background:var(--bronze-dim);color:var(--bronze)">${String(idx+1).padStart(2,'0')}</span><span class="aib-name">${esc(label)}</span>${canEdit&&aft?`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto">${sessionBlockTypeSelect(s.id,idx,label)}<button class="btn btn-ghost btn-sm" onclick="moveSessionBlock(${s.id},${idx},-1)" ${idx===0?'disabled':''}>↑</button><button class="btn btn-ghost btn-sm" onclick="moveSessionBlock(${s.id},${idx},1)" ${idx>=blocks.length-1?'disabled':''}>↓</button><button class="btn btn-danger btn-sm" onclick="removeSessionBlock(${s.id},${idx})">RETIRER</button></div>`:''}${canEdit?`<div style="flex:1;min-width:220px"><label class="form-label" style="margin-bottom:4px">NOM DE L’EXERCICE</label><input class="form-input" value="${esc(exerciseName)}" oninput="updateSessionBlock(${s.id},${idx},'exerciseName',this.value)" placeholder="Ex: Jeu de départ - lobs avant vitre"></div>`:`<span style="font-size:12px;color:var(--offwhite);font-family:var(--font-body)">— ${esc(exerciseName)}</span>`}${!aft&&closed&&b.coachState?`<span style="margin-left:auto;font-size:10px;color:${pl.color};font-weight:700">${ASPECT_STATE_LABEL[b.coachState]} · ${score}/20</span>`:''}</div>
       <div style="font-size:10px;color:var(--bronze);letter-spacing:1.4px;margin-bottom:8px">${esc(sub)}</div>
       <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:10px">${esc(desc)}</div>
       ${body}
     </div>`;
   }).join('');
-  return `<div class="card"><div class="card-title">${title}</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-bottom:12px">${note}</div>${cards}</div>`;
+  return `<div class="card"><div class="card-title">${title}</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-bottom:12px">${note}</div>${aft&&canEdit?sessionStructureManagerHtml(s):''}${cards}</div>`;
 }
 const DIAGRAM_TOOLS=[
   {id:'p1',label:'J1',name:'Joueur 1',color:'#c0392b',type:'player'},
@@ -2848,7 +2916,7 @@ function professionalPrepHtml(s){
   const blockRows=blocks.map((b,i)=>{
     const pl=PILLARS.find(p=>p.id===b.pillar);
     const st=aft?steps[Math.min(i,steps.length-1)]:steps[i];
-    const isCooling=aft&&i===steps.length-1;
+    const isCooling=aft&&isResetStep(st);
     const exerciseText=b.exercise||'';
     const prep=ensureBlockPrep(b,isCooling);
     const objective=pdfTextLines(prep.objective).length?pdfTextLines(prep.objective):pdfBulletsFrom(exerciseText,['OBJECTIF','INTENTION PÉDAGOGIQUE','INTENTION PEDAGOGIQUE'],['ORGANISATION','MISE EN PLACE','DÉROULEMENT','DEROULEMENT'],['Objectif à préciser.'],3);
@@ -4288,11 +4356,11 @@ function pageFieldMode(s){
   const maxStep=aft?structure.length:blocks.length;
   const activeIdx=Math.max(0,Math.min(maxStep,Number.isNaN(rawIdx)?0:rawIdx));
   const isEvaluationStep=activeIdx>=maxStep;
-  const isAftCooling=aft&&activeIdx===structure.length-1&&!isEvaluationStep;
+  const activeStep=structure[activeIdx]||null;
+  const isAftCooling=aft&&!isEvaluationStep&&isResetStep(activeStep);
   const blockIdx=aft?Math.min(activeIdx,Math.max(0,blocks.length-1)):activeIdx;
   const b=isAftCooling?{}:(blocks[blockIdx]||blocks[0]||{});
   const pl=PILLARS.find(p=>p.id===b.pillar)||PILLARS[blockIdx]||PILLARS[0];
-  const activeStep=structure[activeIdx]||null;
   const prList=players.map(p=>({player:p,profile:PROFILES.find(pr=>pr.id===p.profileId)}));
   const stepTabs=aft
     ? `${structure.map((st,i)=>`<button class="tab ${i===activeIdx&&!isEvaluationStep?'active':''}" style="${i===activeIdx&&!isEvaluationStep?'background:var(--bronze);border-color:var(--bronze);color:#000':''}" onclick="setUI({fieldBlock:${i}})">${i+1}. ${esc(st.name)}</button>`).join('')}<button class="tab ${isEvaluationStep?'active':''}" style="${isEvaluationStep?'background:var(--bronze);border-color:var(--bronze);color:#000':''}" onclick="setUI({fieldBlock:${structure.length}})">ÉVAL HWBT</button>`
@@ -6248,7 +6316,7 @@ function modalAftPrepHtml(){
       <button type="button" class="btn btn-primary btn-sm" onclick="enhanceAllModalAftSteps()">REMPLIR / CORRIGER</button>
     </div>
     ${steps.map((st,idx)=>{
-      const isCooling=idx===steps.length-1;
+      const isCooling=isResetStep(st);
       const isApplication=/application/i.test(st.name||'');
       return `<div class="aspect-input-block">
         <div class="aib-header" style="align-items:flex-end;flex-wrap:wrap"><span class="aib-pillar" style="background:var(--bronze-dim);color:var(--bronze)">${String(idx+1).padStart(2,'0')}</span><span class="aib-name">${esc(st.name)}</span><div style="flex:1;min-width:220px"><label class="form-label" style="margin-bottom:4px">NOM DE L’EXERCICE</label><input class="form-input" id="m_aft_ex_name_${idx}" value="${esc(defaultExerciseName(st,idx))}" placeholder="Ex: Lob avant vitre, jeu des zones..."></div>${isApplication?`<button type="button" class="btn btn-ghost btn-sm" onclick="copyModalStartGameToApplication()">COPIER FACE THE GAME</button>`:''}</div>
@@ -6652,7 +6720,7 @@ function enhanceSessionBlockAft(sessionId,idx){
   const theme=aftThemeByKey(s.aftMeta?.themeKey)||AFT_THEMES[0];
   const steps=sessionStructure(s);
   b.exercise=enhanceAftText(b.exercise,{idx,step:steps[idx],theme,level:s.aftMeta?.level||'Débutant',technicalAspect:s.aftMeta?.technical||theme.technical,mentalAspect:s.aftMeta?.mental||theme.mental,teacherGoal:s.aftMeta?.teacherGoal||s.goal||'',constraint:s.aftMeta?.constraint||''});
-  b.prep=sessionPrepFromText(b.exercise,idx===steps.length-1);
+  b.prep=sessionPrepFromText(b.exercise,isResetStep(steps[idx]));
   saveState();render();showNotif('Bloc séance corrigé et complété');
 }
 function detailedAftExerciseText(stepTitle,theme,level,technicalAspect,mentalAspect,teacherGoal,constraint,baseText,focus){
@@ -6803,7 +6871,7 @@ function createSession(mode='prepare'){
   const blocks=steps.map((st,idx)=>{
     const pillar=st.pillar||defaultPillarFlow[idx]||'M';
     const aspect=selectedAspects[pillar]||st.name;
-    const isCooling=idx===steps.length-1;
+    const isCooling=isResetStep(st);
     const modalPrep=sessionPrepFromText('',isCooling);
     const exercise=prepToExerciseText(modalPrep);
     return {
@@ -6815,7 +6883,10 @@ function createSession(mode='prepare'){
     subAspects:{},
     scores:{},
     coachState:'',
-    sessionPart:st.name
+    sessionPart:st.name,
+    stepTime:st.time,
+    stepDesc:st.desc,
+    stepFocus:st.focus
   }}).map((b,idx)=>({...b,sessionPart:steps[idx]?.name||b.sessionPart}));
   const id=Math.max(0,...STATE.sessions.map(s=>s.id))+1;
   STATE.sessions.push({id,playerId:playerIds[0],playerIds,date,time,location,status:'planned',prepared:false,sessionType,sessionDuration:sessionDurationValue,aftMeta,goal:document.getElementById('m_session_goal')?.value.trim()||'',playerWishes,blocks,futureAspects:[],coachFeedback:{},playerFeedback:{}});
@@ -6837,6 +6908,77 @@ function ensureSessionBlock(s,blockIdx){
   return s.blocks[blockIdx];
 }
 function updateSessionBlock(sessionId,blockIdx,field,value){const s=STATE.sessions.find(s=>s.id===sessionId);const b=ensureSessionBlock(s,blockIdx);if(!b)return;if(field==='exercise'){b.exercise=value;b.prep=null;}else if(field==='aspect')b.aspect=value;else if(field==='exerciseName')b.exerciseName=value;else if(field.startsWith('prep.')){const key=field.split('.')[1];b.prep=b.prep&&typeof b.prep==='object'?b.prep:{};b.prep[key]=value;b.exercise=prepToExerciseText(b.prep);}saveState();}
+function applyStepTemplateToBlock(block,keyOrName,keepText=true){
+  const st=stepTemplateByKey(keyOrName);
+  block.sessionPart=st.name;
+  block.stepTime=st.time;
+  block.stepDesc=st.desc;
+  block.stepFocus=st.focus;
+  block.pillar=st.pillar;
+  if(!block.aspect||!keepText) block.aspect=st.focus||st.name;
+  if(!block.exerciseName||!keepText) block.exerciseName=defaultExerciseName(st,0);
+  if(!block.prep||!keepText){
+    const prep=sessionPrepFromText('',isResetStep(st));
+    block.prep=prep;
+    block.exercise=prepToExerciseText(prep);
+  }
+  return block;
+}
+function createSessionBlockFromTemplate(keyOrName){
+  const st=stepTemplateByKey(keyOrName);
+  const prep=sessionPrepFromText('',isResetStep(st));
+  return {
+    pillar:st.pillar,
+    aspect:st.focus||st.name,
+    exerciseName:defaultExerciseName(st,0),
+    exercise:prepToExerciseText(prep),
+    prep,
+    subAspects:{},
+    scores:{},
+    coachState:'',
+    sessionPart:st.name,
+    stepTime:st.time,
+    stepDesc:st.desc,
+    stepFocus:st.focus
+  };
+}
+function moveSessionBlock(sessionId,idx,delta){
+  const s=STATE.sessions.find(s=>s.id===sessionId);
+  if(!s||!Array.isArray(s.blocks)) return;
+  const next=idx+delta;
+  if(next<0||next>=s.blocks.length) return;
+  const tmp=s.blocks[idx];
+  s.blocks[idx]=s.blocks[next];
+  s.blocks[next]=tmp;
+  saveState();render();showNotif('Ordre du cours modifié');
+}
+function removeSessionBlock(sessionId,idx){
+  const s=STATE.sessions.find(s=>s.id===sessionId);
+  if(!s||!Array.isArray(s.blocks)) return;
+  if(s.blocks.length<=1){showNotif('Garde au moins un bloc dans la séance');return;}
+  if(!confirm('Retirer ce bloc du déroulé réel de la séance ?')) return;
+  s.blocks.splice(idx,1);
+  if(Number(UI.fieldBlock)>=s.blocks.length) UI.fieldBlock=Math.max(0,s.blocks.length-1);
+  saveState();render();showNotif('Bloc retiré de la séance');
+}
+function addSessionBlock(sessionId){
+  const s=STATE.sessions.find(s=>s.id===sessionId);
+  if(!s) return;
+  if(!Array.isArray(s.blocks)) s.blocks=[];
+  const key=document.getElementById(`add_block_type_${sessionId}`)?.value||'build_the_answer';
+  const block=createSessionBlockFromTemplate(key);
+  const resetIdx=s.blocks.findIndex(b=>isResetStep(b.sessionPart));
+  if(resetIdx>=0&&!isResetStep(block.sessionPart)) s.blocks.splice(resetIdx,0,block);
+  else s.blocks.push(block);
+  saveState();render();showNotif('Bloc ajouté au déroulé');
+}
+function changeSessionBlockPart(sessionId,idx,key){
+  const s=STATE.sessions.find(s=>s.id===sessionId);
+  const b=ensureSessionBlock(s,idx);
+  if(!b) return;
+  applyStepTemplateToBlock(b,key,true);
+  saveState();render();showNotif('Type de bloc modifié');
+}
 function cleanWritingText(text){
   return String(text||'')
     .replace(/\s+/g,' ')
@@ -6984,8 +7126,8 @@ function copyStartGameToApplication(sessionId){
   const s=STATE.sessions.find(s=>s.id===sessionId);
   if(!s) return;
   const steps=sessionStructure(s);
-  const fromIdx=steps.findIndex(st=>/départ|depart|révélatrice|revelatrice/i.test(st.name||''));
-  const toIdx=steps.findIndex(st=>/application|transfert/i.test(st.name||''));
+  const fromIdx=steps.findIndex(st=>/face the game|départ|depart|révélatrice|revelatrice/i.test(st.name||''));
+  const toIdx=steps.findIndex(st=>/prove it|application|transfert/i.test(st.name||''));
   if(fromIdx<0||toIdx<0){showNotif('Situation révélatrice ou transfert match introuvable');return;}
   const from=ensureSessionBlock(s,fromIdx);
   const to=ensureSessionBlock(s,toIdx);
