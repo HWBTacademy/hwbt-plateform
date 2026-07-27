@@ -530,7 +530,17 @@ function statePayload(){
 }
 function applySavedState(saved){
   if(!saved||typeof saved!=='object') return false;
-  ['players','sessions','matches','customExercises'].forEach(k=>{if(Array.isArray(saved[k]))STATE[k]=saved[k];});
+  ['players','sessions','matches'].forEach(k=>{if(Array.isArray(saved[k]))STATE[k]=saved[k];});
+  if(Array.isArray(saved.customExercises)){
+    const existing=Array.isArray(STATE.customExercises)?STATE.customExercises:[];
+    const merged=new Map();
+    [...saved.customExercises,...existing].forEach((ex,idx)=>{
+      if(!ex||typeof ex!=='object') return;
+      const key=ex.id||`${ex.title||'exercise'}-${ex.createdAt||idx}`;
+      merged.set(key,ex);
+    });
+    STATE.customExercises=[...merged.values()].sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  }
   if(saved.testResults&&typeof saved.testResults==='object')STATE.testResults=saved.testResults;
   if(saved.commandCenter&&typeof saved.commandCenter==='object')STATE.commandCenter={briefs:[],chats:[],debriefs:[],contentIdeas:[],decisions:[],tasks:[],...saved.commandCenter};
   if(saved.contentStudio&&typeof saved.contentStudio==='object')STATE.contentStudio={posts:[],ideas:[],...saved.contentStudio};
@@ -539,11 +549,6 @@ function applySavedState(saved){
   if(!STATE.contentStudio) STATE.contentStudio={posts:[],ideas:[]};
   if(!Array.isArray(STATE.contentStudio.posts)) STATE.contentStudio.posts=[];
   if(!Array.isArray(STATE.contentStudio.ideas)) STATE.contentStudio.ideas=[];
-  if(!localStorage.getItem('hwbt_exercise_library_reset_20260710')){
-    STATE.customExercises=[];
-    saved.customExercises=[];
-    localStorage.setItem('hwbt_exercise_library_reset_20260710','1');
-  }
   return true;
 }
 function saveState(){
