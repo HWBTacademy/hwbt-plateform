@@ -751,6 +751,64 @@ function profileDeepRead(pr){
     work:`Ton axe de progression n’est donc pas de changer de personnalité. C’est d’apprendre quand ton réflexe naturel sert le point, et quand il coûte un point. Le profil devient utile seulement s’il t’aide à mieux choisir : quand accélérer, quand stabiliser, quand varier, quand analyser.`
   };
 }
+const COMMUNICATION_ENERGY_GUIDE = {
+  rouge:{
+    need:'défi clair, message court, responsabilité assumée',
+    player:['Annonce vite ce que tu prends: “j’ai”, “je finis”, “je couvre”.','Si tu sens l’urgence monter, dis ton intention avant d’accélérer.','Laisse une place claire au partenaire: “toi centre, moi diagonale”.'],
+    partner:['Sois direct et positif: “vas-y”, “continue”, “je suis derrière”.','Ne le ralentis pas avec trop d’explications pendant le point.','Après une faute, relance vite avec une action simple.'],
+    coach:['Donne un objectif qui avance: gagner une zone, prendre le filet, finir plus tôt.','Cadre l’intensité avec une limite claire: une cible, une consigne, un score.','Valorise le courage, puis ramène la précision.'],
+    avoid:['long discours avant l’exercice','phrase qui coupe l’élan','reproche sur son envie d’attaquer']
+  },
+  jaune:{
+    need:'énergie, liberté contrôlée, lien avec le partenaire',
+    player:['Crée du lien entre les points: “on repart”, “ensemble”, “bonne idée”.','Quand tu veux tenter, préviens ton partenaire pour qu’il puisse couvrir.','Transforme ton énergie en consigne simple, pas en agitation.'],
+    partner:['Réponds à son énergie, même avec peu de mots.','Laisse-lui une marge créative, mais rappelle le plan commun.','Après une erreur, garde le sourire et donne la prochaine intention.'],
+    coach:['Mets une règle de jeu vivante: bonus, défi, mission courte.','Autorise l’expression, mais dans un cadre très visible.','Utilise beaucoup de feedback positif précis.'],
+    avoid:['casser son enthousiasme','demander une régularité froide sans objectif','ignorer son besoin de connexion']
+  },
+  vert:{
+    need:'sécurité, rythme stable, confiance progressive',
+    player:['Annonce calmement pour éviter le doute: “laisse”, “moi”, “replace”.','Après une erreur, reviens à la routine plutôt qu’à l’émotion.','Aide ton partenaire à rester simple quand le match devient tendu.'],
+    partner:['Parle calmement et tôt, surtout sur les balles au centre.','Ne change pas le plan toutes les deux balles.','Valorise sa stabilité: “continue, c’est solide”.'],
+    coach:['Installe une progression R-1, R0, R+1 très lisible.','Donne des repères fixes: zone, rythme, hauteur, replacement.','Fais monter l’exigence quand la confiance est installée.'],
+    avoid:['mettre du chaos trop vite','forcer la prise de risque sans sécurité','confondre calme et manque d’envie']
+  },
+  bleu:{
+    need:'sens tactique, logique claire, raison de la consigne',
+    player:['Explique brièvement ton observation: “ils couvrent trop le centre”.','Transforme l’analyse en une décision simple pour le point suivant.','Préviens ton partenaire quand tu changes de plan.'],
+    partner:['Donne-lui une information utile, pas une émotion vague.','Demande son plan en une phrase: “zone ou tempo ?”.','Sous pression, ramène-le à une option concrète.'],
+    coach:['Explique le pourquoi avant de demander l’exécution.','Utilise des critères de réussite mesurables: zone, décision, timing.','Évite de le noyer: une analyse, une action.'],
+    avoid:['dire “improvise” sans repère','lui donner une consigne illogique','corriger sans expliquer le lien avec le jeu']
+  }
+};
+function profileCommunicationGuide(pr){
+  const primary=COMMUNICATION_ENERGY_GUIDE[pr.c1]||COMMUNICATION_ENERGY_GUIDE.rouge;
+  const secondary=COMMUNICATION_ENERGY_GUIDE[pr.c2]||COMMUNICATION_ENERGY_GUIDE.vert;
+  const deep=profileDeepRead(pr);
+  return {
+    need:`Ce profil a besoin de ${primary.need}. Sa deuxième énergie ajoute: ${secondary.need}.`,
+    why:deep.partner,
+    playerPartner:[...primary.player.slice(0,2),...secondary.player.slice(0,2)],
+    partnerToPlayer:[...primary.partner.slice(0,2),...secondary.partner.slice(0,1)],
+    coachPlayer:[...primary.coach.slice(0,2),...secondary.coach.slice(0,2)],
+    avoid:[...(primary.avoid||[]).slice(0,2),...(secondary.avoid||[]).slice(0,2),pr.commAvoid].filter(Boolean),
+    moments:[
+      {label:'AVANT LE MATCH',coach:pr.commBefore,partner:primary.player[0]},
+      {label:'APRÈS UNE ERREUR',coach:pr.commError,partner:secondary.partner[0]||primary.partner[0]},
+      {label:'SOUS PRESSION',coach:pr.commPressure,partner:primary.player[1]||pr.commPressure},
+      {label:'POUR RELANCER',coach:pr.commPositive,partner:secondary.player[0]||pr.commPositive}
+    ]
+  };
+}
+function commBulletList(items){
+  return `<div style="display:grid;gap:7px">${(items||[]).filter(Boolean).map(x=>`<div style="display:flex;gap:8px;align-items:flex-start;font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.55"><span style="color:var(--bronze);font-weight:800">•</span><span>${esc(x)}</span></div>`).join('')}</div>`;
+}
+function commMiniCard(title,items,color='var(--bronze)'){
+  return `<div style="background:var(--bg4);border:1px solid var(--border);border-left:3px solid ${color};border-radius:0 8px 8px 0;padding:12px">
+    <div style="font-size:9px;letter-spacing:1.5px;color:${color};margin-bottom:8px">${title}</div>
+    ${Array.isArray(items)?commBulletList(items):`<div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.65">${esc(items||'—')}</div>`}
+  </div>`;
+}
 
 // ══════════════════════════════════════════════════
 // ASPECTS (36 total: 14T + 8TA + 7P + 7M)
@@ -4102,20 +4160,30 @@ function pagePlayerDetail(playerId){
   }
 
   if(sub==='communication' && pr){
-    const moments=[
-      {k:'commBefore',l:'AVANT LE MATCH'},{k:'commError',l:'APRÈS UNE ERREUR'},
-      {k:'commPressure',l:'SOUS PRESSION'},{k:'commPositive',l:'⭐ PHRASE QUI RELANCE'},
-      {k:'commAvoid',l:'⛔ PHRASE À ÉVITER'}
-    ];
+    const guide=profileCommunicationGuide(pr);
     content=`<div class="g2">
       <div class="card">
         <div class="card-title">GUIDE DE COMMUNICATION — ${pr.name.toUpperCase()}</div>
-        ${moments.map(m=>`<div style="margin-bottom:14px">
-          <div style="font-size:9px;letter-spacing:1.5px;color:var(--bronze);margin-bottom:6px">${m.l}</div>
-          <div style="font-size:11px;color:var(--offwhite);line-height:1.6;background:var(--bg4);padding:10px 12px;border-radius:4px;font-family:var(--font-body)">${pr[m.k]||'—'}</div>
-        </div>`).join('')}
+        <div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.75;margin-bottom:14px">${esc(guide.need)}</div>
+        ${commMiniCard('JOUEUR ↔ PARTENAIRE · CE QUE LE JOUEUR DOIT DIRE',guide.playerPartner,c1)}
+        <div style="height:10px"></div>
+        ${commMiniCard('PARTENAIRE → JOUEUR · COMMENT L’AIDER',guide.partnerToPlayer,c2)}
+        <div style="height:10px"></div>
+        ${commMiniCard('COACH → JOUEUR / DUO · COMMENT CADRER',guide.coachPlayer,'var(--bronze)')}
+        <div style="height:10px"></div>
+        ${commMiniCard('À ÉVITER',guide.avoid,'#e74c3c')}
       </div>
       <div>
+        <div class="card">
+          <div class="card-title">PHRASES TERRAIN</div>
+          ${guide.moments.map(m=>`<div style="border-top:1px solid var(--border);padding:11px 0">
+            <div style="font-size:9px;letter-spacing:1.5px;color:var(--bronze);margin-bottom:7px">${m.label}</div>
+            <div style="display:grid;gap:7px">
+              <div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:9px"><div style="font-size:8px;color:${c1};letter-spacing:1.2px;margin-bottom:4px">COACH</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.55">${esc(m.coach||'—')}</div></div>
+              <div style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:9px"><div style="font-size:8px;color:${c2};letter-spacing:1.2px;margin-bottom:4px">PARTENAIRE</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.55">${esc(m.partner||'—')}</div></div>
+            </div>
+          </div>`).join('')}
+        </div>
         <div class="card">
           <div class="card-title">COMPATIBILITÉS PARTENAIRES</div>
           ${PROFILES.filter(p=>p.id!==player.profileId).sort((a,b)=>getCompat(player.profileId,b.id)-getCompat(player.profileId,a.id)).slice(0,6).map(p2=>{
@@ -5355,28 +5423,38 @@ function pageAspectsLibrary(){
 
 function pageCommunicationChapter(){
   const profiles=PROFILES;
+  const energyIntro=[
+    ['ROUGE','Défi, action, responsabilité. Message court, direct, orienté résultat.',ENERGY_COLORS.rouge],
+    ['JAUNE','Énergie, lien, liberté cadrée. Message vivant, positif, connecté au duo.',ENERGY_COLORS.jaune],
+    ['VERT','Sécurité, rythme, stabilité. Message calme, progressif, rassurant.',ENERGY_COLORS.vert],
+    ['BLEU','Logique, plan, compréhension. Message structuré, précis, expliqué.',ENERGY_COLORS.bleu]
+  ];
   return `<div class="content">
     ${quoteBand()}
     <div class="card">
       <div class="card-title">CHAPITRE COMMUNICATION</div>
       <div style="font-size:30px;font-weight:700;letter-spacing:1px;line-height:1.1">COMMENT PARLER AU BON JOUEUR AU BON MOMENT</div>
-      <div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.75;margin-top:10px;max-width:860px">Le but n'est pas de changer la personnalité du joueur. Le but est d'adapter le message: avant la séance, après l'erreur, sous pression et au moment de relancer l'énergie.</div>
+      <div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.75;margin-top:10px;max-width:900px">Le but n'est pas de changer la personnalité du joueur. Le but est d'adapter le message selon deux directions: comment le joueur communique avec son partenaire, et comment le coach cadre le joueur ou le duo.</div>
+    </div>
+    <div class="g4">
+      ${energyIntro.map(([label,text,color])=>`<div class="card" style="border-color:${color}55"><div style="font-size:10px;color:${color};letter-spacing:1.5px;margin-bottom:8px">${label}</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.65">${text}</div></div>`).join('')}
     </div>
     <div class="g2">
       ${profiles.map(pr=>{
         const c1=ENERGY_COLORS[pr.c1], c2=ENERGY_COLORS[pr.c2];
+        const guide=profileCommunicationGuide(pr);
         return `<div class="card" style="border-color:${c1}44">
           <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px">
             <div><div style="font-size:10px;color:${c1};letter-spacing:1.5px;margin-bottom:4px">PROFIL ${String(pr.id).padStart(2,'0')}</div><div style="font-size:24px;font-weight:700;line-height:1">${esc(pr.name)}</div><div style="font-size:12px;color:var(--gray);margin-top:4px">${esc(pr.sub||'')}</div></div>
             <div style="display:flex;gap:5px"><span style="width:10px;height:10px;border-radius:50%;background:${c1};display:block"></span><span style="width:10px;height:10px;border-radius:50%;background:${c2};display:block"></span></div>
           </div>
-          ${[
-            ['AVANT LE MATCH',pr.commBefore],
-            ['APRÈS UNE ERREUR',pr.commError],
-            ['SOUS PRESSION',pr.commPressure],
-            ['PHRASE QUI RELANCE',pr.commPositive],
-            ['À ÉVITER',pr.commAvoid]
-          ].map(([label,text])=>`<div style="border-top:1px solid var(--border);padding:10px 0"><div style="font-size:9px;letter-spacing:1.4px;color:var(--bronze);margin-bottom:5px">${label}</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.6">${esc(text||'—')}</div></div>`).join('')}
+          <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.65;margin-bottom:12px">${esc(guide.need)}</div>
+          <div class="g2">
+            ${commMiniCard('JOUEUR ↔ PARTENAIRE',guide.playerPartner.slice(0,3),c1)}
+            ${commMiniCard('COACH → JOUEUR / DUO',guide.coachPlayer.slice(0,3),c2)}
+          </div>
+          <div style="margin-top:10px">${commMiniCard('PHRASE QUI RELANCE',pr.commPositive,'var(--bronze)')}</div>
+          <div style="margin-top:10px">${commMiniCard('À ÉVITER',guide.avoid.slice(0,3),'#e74c3c')}</div>
         </div>`;
       }).join('')}
     </div>
