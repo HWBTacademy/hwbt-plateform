@@ -6065,6 +6065,7 @@ function pageProfileDetail(id){
   if(!pr) return pageProfilesList();
   const c1=ENERGY_COLORS[pr.c1], c2=ENERGY_COLORS[pr.c2];
   const deep=profileDeepRead(pr);
+  const guide=profileCommunicationGuide(pr);
   const pillarLabels={T:'TECHNIQUE',TA:'TACTIQUE',P:'PHYSIQUE',M:'MENTAL'};
   return `<div class="content">
     ${quoteBand()}
@@ -6131,19 +6132,28 @@ function pageProfileDetail(id){
           </div>
         </div>
         <div class="card" style="background:var(--bg4);margin-top:16px">
-          <div class="card-title">COMMUNICATION COACH</div>
-          <div class="g3">
-            ${[
-              ['AVANT LE MATCH',pr.commBefore],
-              ['APRÈS UNE ERREUR',pr.commError],
-              ['SOUS PRESSION',pr.commPressure],
-              ['PHRASE QUI RELANCE',pr.commPositive],
-              ['À ÉVITER',pr.commAvoid],
-              ['AVEC SON PARTENAIRE',deep.partner]
-            ].map(([label,text])=>`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px">
-              <div style="font-size:8px;letter-spacing:1.6px;color:var(--bronze);margin-bottom:7px">${label}</div>
-              <div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.65">${esc(text||'—')}</div>
+          <div class="card-title">COMMUNICATION · JOUEUR, PARTENAIRE & COACH</div>
+          <div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.8;margin-bottom:14px">
+            ${esc(guide.need)} Ce profil n’a pas seulement besoin d’une phrase “motivation”. Il a besoin d’un message qui respecte sa logique intérieure. Si le message est trop opposé à son fonctionnement naturel, il peut se fermer, se précipiter ou perdre le lien avec son partenaire. La bonne communication garde sa force principale, puis l’aide à la canaliser dans le jeu.
+          </div>
+          <div class="g2">
+            ${commMiniCard('JOUEUR ↔ PARTENAIRE · CE QU’IL DOIT APPRENDRE À DIRE',guide.playerPartner,c1)}
+            ${commMiniCard('PARTENAIRE → JOUEUR · COMMENT LE SOUTENIR',guide.partnerToPlayer,c2)}
+            ${commMiniCard('COACH → JOUEUR / DUO · COMMENT CADRER',guide.coachPlayer,'var(--bronze)')}
+            ${commMiniCard('À ÉVITER · CE QUI PEUT LE BLOQUER',guide.avoid,'#e74c3c')}
+          </div>
+          <div style="margin-top:14px" class="g2">
+            ${guide.moments.map(m=>`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px">
+              <div style="font-size:8px;letter-spacing:1.6px;color:var(--bronze);margin-bottom:8px">${m.label}</div>
+              <div style="font-size:10px;color:${c1};letter-spacing:1.2px;margin-bottom:4px">COACH</div>
+              <div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.6;margin-bottom:9px">${esc(m.coach||'—')}</div>
+              <div style="font-size:10px;color:${c2};letter-spacing:1.2px;margin-bottom:4px">PARTENAIRE</div>
+              <div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.6">${esc(m.partner||'—')}</div>
             </div>`).join('')}
+          </div>
+          <div style="margin-top:14px;background:var(--bg2);border-left:3px solid ${c1};border-radius:0 8px 8px 0;padding:14px">
+            <div style="font-size:9px;color:${c1};letter-spacing:1.6px;margin-bottom:8px">POURQUOI CETTE COMMUNICATION FONCTIONNE</div>
+            <div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.8">${esc(deep.partner)}</div>
           </div>
         </div>
         <div class="pf-quote" style="margin-top:16px">"${esc(pr.quote)}"</div>
@@ -6157,6 +6167,7 @@ function profilePrintHtml(id){
   const c1=ENERGY_COLORS[pr.c1]||'#b88935';
   const c2=ENERGY_COLORS[pr.c2]||'#d4a017';
   const deep=profileDeepRead(pr);
+  const guide=profileCommunicationGuide(pr);
   const pillarLabels={T:'TECHNIQUE',TA:'TACTIQUE',P:'PHYSIQUE',M:'MENTAL'};
   const pillarRows=Object.entries(pr.pillarProfile||{}).map(([k,v])=>{
     const pl=PILLARS.find(p=>p.id===k);
@@ -6165,12 +6176,12 @@ function profilePrintHtml(id){
   }).join('');
   const list=items=>`<ul>${(items||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
   const comm=[
-    ['AVANT LE MATCH',pr.commBefore],
-    ['APRÈS UNE ERREUR',pr.commError],
-    ['SOUS PRESSION',pr.commPressure],
-    ['PHRASE QUI RELANCE',pr.commPositive],
-    ['À ÉVITER',pr.commAvoid],
-    ['AVEC SON PARTENAIRE',deep.partner]
+    ['BESOIN DE COMMUNICATION',guide.need],
+    ['JOUEUR ↔ PARTENAIRE',guide.playerPartner.slice(0,3).join(' • ')],
+    ['PARTENAIRE → JOUEUR',guide.partnerToPlayer.slice(0,3).join(' • ')],
+    ['COACH → JOUEUR / DUO',guide.coachPlayer.slice(0,3).join(' • ')],
+    ['À ÉVITER',guide.avoid.slice(0,4).join(' • ')],
+    ['POURQUOI ÇA FONCTIONNE',deep.partner]
   ];
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(pr.name)} · Profil HWBT</title><style>
     :root{--gold:#b88935;--paper:#f7f3ea;--ink:#171717;--muted:#606060;--line:#d8cfbf}
