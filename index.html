@@ -201,6 +201,24 @@ body{min-width:0}
 .rev-opt:hover{border-color:var(--bronze);color:var(--bronze)}
 .rev-opt.sel{background:var(--bronze-dim);border-color:var(--bronze);color:var(--white)}
 
+/* PERFORMANCE LAB */
+.perf-hero{position:relative;overflow:hidden;background:radial-gradient(circle at 76% 18%,#c8a15a22,transparent 30%),linear-gradient(135deg,#070707,#111116 54%,#090909);border:1px solid var(--bronze-dim2);border-radius:12px;padding:22px;margin-bottom:18px}
+.perf-hero:after{content:"HWBT";position:absolute;right:18px;top:6px;font-size:118px;font-weight:900;letter-spacing:8px;color:#ffffff08;line-height:1;pointer-events:none}
+.perf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.perf-card{background:linear-gradient(180deg,#121218,#0d0d12);border:1px solid var(--border);border-radius:10px;padding:16px;position:relative;overflow:hidden}
+.perf-card.gold{border-color:var(--bronze-dim2);box-shadow:0 0 0 1px #000 inset}
+.perf-kicker{font-size:9px;letter-spacing:1.8px;color:var(--bronze);font-weight:800;margin-bottom:8px}
+.perf-big{font-size:34px;font-weight:900;line-height:1;color:var(--white)}
+.perf-muted{font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55}
+.perf-gauge{width:150px;height:150px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--bronze) calc(var(--score)*1%),#242432 0);position:relative;box-shadow:0 0 34px #0008}
+.perf-gauge:before{content:"";position:absolute;inset:10px;border-radius:50%;background:var(--bg2);border:1px solid var(--border)}
+.perf-gauge-inner{position:relative;text-align:center;z-index:1}
+.perf-mini-bars{display:grid;gap:8px;margin-top:12px}
+.perf-mini-row{display:grid;grid-template-columns:88px 1fr 34px;gap:8px;align-items:center;font-size:10px;color:var(--offwhite);font-family:var(--font-body)}
+.perf-track{height:5px;border-radius:10px;background:var(--border2);overflow:hidden}
+.perf-fill{height:100%;border-radius:10px;background:var(--bronze)}
+.readiness-dot{width:12px;height:12px;border-radius:50%;box-shadow:0 0 16px currentColor;display:inline-block;margin-right:7px}
+
 /* TEST PERSONALITY */
 .test-container{max-width:680px;margin:0 auto}
 .test-progress{height:3px;background:var(--border2);border-radius:2px;margin-bottom:32px}
@@ -378,6 +396,7 @@ body{min-width:0}
       <div class="nav-item" data-page="profiles" onclick="setUI({page:'profiles'})" style="display: flex;"><span class="nav-icon">⬡</span>12 PROFILES</div>
       <div class="nav-item" data-page="aspectsLibrary" onclick="setUI({page:'aspectsLibrary'})" style="display: flex;"><span class="nav-icon">▥</span>ASPECTS &amp; SCORING</div>
       <div class="nav-item" data-page="communication" onclick="setUI({page:'communication'})" style="display: flex;"><span class="nav-icon">◌</span>COMMUNICATION</div>
+      <div class="nav-item" data-page="performanceLab" onclick="setUI({page:'performanceLab',performancePlayerId:null})" style="display: flex;"><span class="nav-icon">◒</span>PERFORMANCE LAB</div>
       <div class="nav-item" data-page="test" onclick="setUI({page:'test'})" style="display: flex;"><span class="nav-icon">◎</span>PERSONALITY TEST</div>
       <div class="nav-item" data-page="nutrition" onclick="setUI({page:'nutrition',nutritionTab:'basics',nutritionFilter:'all',nutritionSearch:'',nutritionPackFilter:null})" style="display: flex;"><span class="nav-icon">◍</span>NUTRITION</div>
     </div>
@@ -518,7 +537,8 @@ let STATE = {
   customExercises: [],
   testResults: {},
   commandCenter: {briefs:[],chats:[],debriefs:[],contentIdeas:[],decisions:[],tasks:[]},
-  contentStudio: {posts:[],ideas:[]}
+  contentStudio: {posts:[],ideas:[]},
+  performanceLab: {players:{},notes:[]}
 };
 
 let UI = {page:'dashboard', subpage:'profil', pillarFilter:'T', selectedPlayerId:null, selectedSessionId:null, testState:null};
@@ -526,7 +546,7 @@ const STORAGE_KEY='hwbt_academy_v3_state';
 let REMOTE_SAVE_TIMER=null;
 let REMOTE_READY=false;
 function statePayload(){
-  return {players:STATE.players,sessions:STATE.sessions,matches:STATE.matches,customExercises:STATE.customExercises||[],testResults:STATE.testResults,commandCenter:STATE.commandCenter||{},contentStudio:STATE.contentStudio||{},updatedAt:new Date().toISOString()};
+  return {players:STATE.players,sessions:STATE.sessions,matches:STATE.matches,customExercises:STATE.customExercises||[],testResults:STATE.testResults,commandCenter:STATE.commandCenter||{},contentStudio:STATE.contentStudio||{},performanceLab:STATE.performanceLab||{},updatedAt:new Date().toISOString()};
 }
 function applySavedState(saved){
   if(!saved||typeof saved!=='object') return false;
@@ -544,11 +564,15 @@ function applySavedState(saved){
   if(saved.testResults&&typeof saved.testResults==='object')STATE.testResults=saved.testResults;
   if(saved.commandCenter&&typeof saved.commandCenter==='object')STATE.commandCenter={briefs:[],chats:[],debriefs:[],contentIdeas:[],decisions:[],tasks:[],...saved.commandCenter};
   if(saved.contentStudio&&typeof saved.contentStudio==='object')STATE.contentStudio={posts:[],ideas:[],...saved.contentStudio};
+  if(saved.performanceLab&&typeof saved.performanceLab==='object')STATE.performanceLab={players:{},notes:[],...saved.performanceLab};
   if(!Array.isArray(STATE.customExercises)) STATE.customExercises=[];
   if(!STATE.commandCenter) STATE.commandCenter={briefs:[],chats:[],debriefs:[],contentIdeas:[],decisions:[],tasks:[]};
   if(!STATE.contentStudio) STATE.contentStudio={posts:[],ideas:[]};
   if(!Array.isArray(STATE.contentStudio.posts)) STATE.contentStudio.posts=[];
   if(!Array.isArray(STATE.contentStudio.ideas)) STATE.contentStudio.ideas=[];
+  if(!STATE.performanceLab) STATE.performanceLab={players:{},notes:[]};
+  if(!STATE.performanceLab.players||typeof STATE.performanceLab.players!=='object') STATE.performanceLab.players={};
+  if(!Array.isArray(STATE.performanceLab.notes)) STATE.performanceLab.notes=[];
   return true;
 }
 function saveState(){
@@ -3193,7 +3217,7 @@ function setRole(r){
   if(r==='player'&&!STATE.activePlayerId&&!STATE.coachUnlocked){showLogin();return;}
   STATE.role=r;
   if(r==='player'&&!STATE.activePlayerId) STATE.activePlayerId=STATE.players[0]?.id||null;
-  if(r==='player'&&!['dashboard','players','sessions','profiles','communication','shop'].includes(UI.page)) UI.page='dashboard';
+  if(r==='player'&&!['dashboard','players','sessions','profiles','communication','performanceLab','nutrition','shop'].includes(UI.page)) UI.page='dashboard';
   document.getElementById('rb-coach').classList.toggle('active',r==='coach');
   document.getElementById('rb-player').classList.toggle('active',r==='player');
   document.getElementById('roleTag').textContent=tr(r==='coach'?'COACH':'JOUEUR');
@@ -3210,7 +3234,7 @@ function setLang(lang){
   render();
 }
 function updateChromeText(){
-  const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
+  const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
   document.querySelectorAll('.nav-item').forEach(n=>{
     const icon=n.querySelector('.nav-icon')?.textContent||'';
     const label=navNames[n.dataset.page]||n.dataset.page;
@@ -3251,7 +3275,7 @@ function render(){
     n.style.display=STATE.role==='player'&&(coachOnly||playerHidden)?'none':'flex';
     n.classList.toggle('active',n.dataset.page===UI.page);
   });
-  const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
+  const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
   document.getElementById('pageTitle').textContent=tr(STATE.role==='player'&&UI.page==='dashboard'?'MON CARNET JOUEUR':(titles[UI.page]||UI.page.toUpperCase()));
   const mc=document.getElementById('mainContent');
   if(UI.page==='dashboard') mc.innerHTML=STATE.role==='player'?pagePlayerPortal():pageDashboard();
@@ -3264,6 +3288,7 @@ function render(){
   else if(UI.page==='profiles') mc.innerHTML=UI.selectedProfileId?pageProfileDetail(UI.selectedProfileId):pageProfilesList();
   else if(UI.page==='aspectsLibrary') mc.innerHTML=pageAspectsLibrary();
   else if(UI.page==='communication') mc.innerHTML=pageCommunicationChapter();
+  else if(UI.page==='performanceLab') mc.innerHTML=pagePerformanceLab();
   else if(UI.page==='test') mc.innerHTML=pageTest();
   else if(UI.page==='nutrition') mc.innerHTML=pageNutrition();
   translateDom(mc);
@@ -5479,6 +5504,178 @@ function commandId(prefix){return `${prefix}_${Date.now()}_${Math.random().toStr
 function commandDateLabel(date=new Date()){
   try{return date.toLocaleDateString(STATE.lang==='en'?'en-US':'fr-BE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});}catch(e){return todayISO();}
 }
+
+// ══════════════════════════════════════════════════
+// HWBT PERFORMANCE LAB - V1 localStorage, wearable-ready
+// ══════════════════════════════════════════════════
+function performanceState(){
+  STATE.performanceLab=STATE.performanceLab||{players:{},notes:[]};
+  if(!STATE.performanceLab.players||typeof STATE.performanceLab.players!=='object') STATE.performanceLab.players={};
+  if(!Array.isArray(STATE.performanceLab.notes)) STATE.performanceLab.notes=[];
+  return STATE.performanceLab;
+}
+function playerAgeLabel(player){
+  const y=Number(player.birthYear||(player.birthDate?String(player.birthDate).slice(0,4):0));
+  if(!y) return 'Âge à définir';
+  return `${Math.max(0,new Date().getFullYear()-y)} ans`;
+}
+function perfPlayerData(player){
+  const lab=performanceState();
+  const id=String(player.id);
+  if(!lab.players[id]){
+    const measured=playerMeasuredProfile(player);
+    const base=measured.level?Math.round((measured.level/20)*100):62;
+    lab.players[id]={
+      currentGoal:player.currentGoal||'Construire une progression complète HWBT.',
+      recovery:Math.max(45,Math.min(92,base-4)),
+      sleepHours:7.4,
+      sleepQuality:Math.max(48,Math.min(90,base-2)),
+      hydration:Math.max(50,Math.min(88,base+1)),
+      nutrition:Math.max(48,Math.min(86,base-1)),
+      trainingMinutes:120,
+      sessionsWeek:2,
+      intensity:7,
+      restingHR:58,
+      avgHR:132,
+      maxHR:178,
+      trainingHR:145,
+      pain:1,
+      fatigue:4,
+      mobility:Math.max(50,Math.min(90,base)),
+      coachNotes:'Données V1 locales. À confirmer avec les prochaines séances et retours joueur.',
+      updatedAt:new Date().toISOString()
+    };
+  }
+  return lab.players[id];
+}
+function perfScore(player){
+  const m=playerMeasuredProfile(player);
+  const d=perfPlayerData(player);
+  const pillar=k=>m.scores[k]!==null?Math.round((m.scores[k]/20)*100):62;
+  const match=playerMatchPerformanceScore(player);
+  return Math.round(
+    pillar('T')*.20+
+    pillar('TA')*.15+
+    pillar('P')*.15+
+    pillar('M')*.15+
+    Number(d.recovery||60)*.10+
+    Number(d.sleepQuality||60)*.10+
+    Number(d.nutrition||60)*.10+
+    match*.05
+  );
+}
+function playerMatchPerformanceScore(player){
+  const matches=(STATE.matches||[]).filter(m=>m.playerId===player.id||m.playerIds?.includes?.(player.id));
+  if(!matches.length) return 60;
+  const wins=matches.filter(m=>m.result==='win'||m.win===true).length;
+  return Math.round(50+(wins/matches.length)*40);
+}
+function perfReadiness(player){
+  const d=perfPlayerData(player);
+  const recovery=Number(d.recovery||60);
+  const sleep=Number(d.sleepQuality||60);
+  const fatigue=Number(d.fatigue||4);
+  if(recovery>=76&&sleep>=70&&fatigue<=5) return {label:'Ready to Train',color:'var(--vert)',text:'Récupération bonne. Séance normale possible.'};
+  if(recovery>=55&&sleep>=55&&fatigue<=7) return {label:'Train Smart',color:'var(--jaune)',text:'Légère fatigue. Adapter le volume et garder de la qualité.'};
+  return {label:'Recovery First',color:'var(--rouge)',text:'Récupération basse. Priorité technique légère, mobilité et récupération.'};
+}
+function perfTrendBars(seed=60,color='var(--bronze)'){
+  const vals=[-6,-2,4,1,7,3,9].map((d,i)=>Math.max(24,Math.min(96,seed+d+(i%2?2:-1))));
+  return `<div style="display:flex;align-items:flex-end;gap:5px;height:48px;margin-top:12px">${vals.map(v=>`<div style="flex:1;height:${v}%;background:${color};border-radius:4px 4px 0 0;opacity:${.45+v/190}"></div>`).join('')}</div>`;
+}
+function perfMetricRow(label,value,max=100,color='var(--bronze)'){
+  const pct=Math.max(0,Math.min(100,(Number(value)||0)/max*100));
+  return `<div class="perf-mini-row"><span>${esc(label)}</span><div class="perf-track"><div class="perf-fill" style="width:${pct}%;background:${color}"></div></div><b>${esc(value)}</b></div>`;
+}
+function performanceAIRecommendations(player){
+  const d=perfPlayerData(player);
+  const ready=perfReadiness(player);
+  const rec=[];
+  if(ready.label==='Recovery First') rec.push('Recovery is low. Réduire la charge physique aujourd’hui et privilégier technique propre + mobilité.');
+  if(Number(d.sleepQuality||0)<62) rec.push('Sleep quality decreased. Hydratation, routine du soir et séance moins nerveuse recommandées.');
+  if(Number(d.trainingMinutes||0)>180||Number(d.intensity||0)>=8) rec.push('High training load. Garder une priorité claire et éviter d’ajouter trop d’objectifs.');
+  if(Number(d.hydration||0)<65) rec.push('Hydration à renforcer. Prévoir gourde, électrolytes si chaleur ou séance longue.');
+  if(Number(d.pain||0)>=5) rec.push('Pain scale élevée. Éviter les efforts explosifs et noter la zone à surveiller.');
+  if(!rec.length) rec.push('Profil disponible. Séance normale possible avec un objectif principal, un transfert match et un feedback court.');
+  return rec.slice(0,4);
+}
+function perfPlayerSelect(activeId){
+  return `<select class="form-select" onchange="setUI({performancePlayerId:parseInt(this.value)||null})">${STATE.players.map(p=>`<option value="${p.id}" ${p.id===activeId?'selected':''}>${esc(p.name)}</option>`).join('')}</select>`;
+}
+function setPerformanceMetric(playerId,key,value){
+  const p=STATE.players.find(p=>p.id===playerId);if(!p)return;
+  const d=perfPlayerData(p);
+  const numeric=['recovery','sleepHours','sleepQuality','hydration','nutrition','trainingMinutes','sessionsWeek','intensity','restingHR','avgHR','maxHR','trainingHR','pain','fatigue','mobility'];
+  d[key]=numeric.includes(key)?Number(value):value;
+  d.updatedAt=new Date().toISOString();
+  saveState();
+}
+function savePerformanceNote(playerId){
+  const p=STATE.players.find(p=>p.id===playerId);if(!p)return;
+  const txt=document.getElementById('perfCoachNote')?.value.trim()||'';
+  if(!txt){showNotif('Note vide');return;}
+  const lab=performanceState();
+  const d=perfPlayerData(p);
+  d.coachNotes=txt;
+  lab.notes.unshift({id:commandId('perfnote'),playerId,date:todayISO(),text:txt});
+  saveState();render();showNotif('Note performance sauvegardée');
+}
+function perfInput(playerId,key,label,min,max,step=1,suffix=''){
+  const v=perfPlayerData(STATE.players.find(p=>p.id===playerId)||{} )[key]??0;
+  return `<div class="form-group"><label class="form-label">${label} <span style="color:var(--bronze)">${esc(v)}${suffix}</span></label><input type="range" min="${min}" max="${max}" step="${step}" value="${esc(v)}" oninput="setPerformanceMetric(${playerId},'${key}',this.value);this.previousElementSibling.querySelector('span').textContent=this.value+'${suffix}'"></div>`;
+}
+function pagePerformanceLab(){
+  if(STATE.role==='player'){
+    const p=STATE.players.find(p=>p.id===STATE.activePlayerId)||STATE.players[0];
+    return p?pagePerformancePlayer(p,true):`<div class="content"><div class="card">Aucun joueur connecté.</div></div>`;
+  }
+  const activeId=UI.performancePlayerId||STATE.players[0]?.id;
+  const active=STATE.players.find(p=>p.id===activeId);
+  return `<div class="content">${quoteBand()}<div class="perf-hero"><div style="position:relative;z-index:1;display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap"><div><div class="perf-kicker">HWBT PERFORMANCE LAB</div><div style="font-size:38px;font-weight:900;line-height:.95">CENTRAL PERFORMANCE DASHBOARD</div><div class="perf-muted" style="margin-top:10px;max-width:680px">Technique, tactique, physique, mental, récupération, nutrition, sommeil, charge, matchs et prévention blessures dans une seule lecture coach.</div></div><div style="min-width:260px">${perfPlayerSelect(activeId)}</div></div></div>${performanceCoachDashboard()}${active?pagePerformancePlayer(active,false):''}</div>`;
+}
+function performanceCoachDashboard(){
+  const sort=UI.performanceSort||'performance';
+  const list=STATE.players.slice().sort((a,b)=>{
+    const da=perfPlayerData(a),db=perfPlayerData(b);
+    const keys={recovery:[da.recovery,db.recovery],performance:[perfScore(a),perfScore(b)],age:[Number(a.birthYear||9999)*-1,Number(b.birthYear||9999)*-1],ranking:[a.aftRanking||'',b.aftRanking||''],attendance:[sessionsCountForPlayer(a),sessionsCountForPlayer(b)]};
+    const pair=keys[sort]||keys.performance;
+    return typeof pair[0]==='string'?String(pair[0]).localeCompare(String(pair[1])):Number(pair[1])-Number(pair[0]);
+  });
+  return `<div class="card"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><div class="card-title">COACH DASHBOARD</div><div class="perf-muted">Trier les joueurs par disponibilité, performance, âge, ranking ou présence.</div></div><select class="form-select" style="max-width:230px" onchange="setUI({performanceSort:this.value})">${[['performance','Performance'],['recovery','Recovery'],['age','Age'],['ranking','Ranking'],['attendance','Attendance']].map(x=>`<option value="${x[0]}" ${sort===x[0]?'selected':''}>${x[1]}</option>`).join('')}</select></div><div class="perf-grid" style="margin-top:14px">${list.map(p=>{const d=perfPlayerData(p),r=perfReadiness(p),score=perfScore(p);return `<button onclick="setUI({performancePlayerId:${p.id}})" style="text-align:left;background:var(--bg4);border:1px solid ${r.color};border-radius:9px;padding:13px;color:var(--white);cursor:pointer"><div style="display:flex;justify-content:space-between;gap:10px"><b style="font-size:15px">${esc(p.name)}</b><span style="color:${r.color};font-size:10px">${r.label}</span></div><div class="perf-muted">${esc(p.aftRanking||p.afpRanking||'ranking à définir')} · ${sessionsCountForPlayer(p)} séances</div>${perfMetricRow('Score',score,100,r.color)}${perfMetricRow('Recovery',d.recovery,100,r.color)}</button>`}).join('')}</div></div>`;
+}
+function sessionsCountForPlayer(player){return STATE.sessions.filter(s=>playerInSession(s,player.id)).length;}
+function pagePerformancePlayer(player,standalone=false){
+  const d=perfPlayerData(player),score=perfScore(player),ready=perfReadiness(player),m=playerMeasuredProfile(player),pr=PROFILES.find(x=>x.id===player.profileId);
+  const photo=assetUrl(player.photo);
+  const matches=(STATE.matches||[]).filter(x=>x.playerId===player.id||x.playerIds?.includes?.(player.id));
+  const wins=matches.filter(x=>x.result==='win'||x.win===true).length;
+  const supplements=(typeof NUTRITION_PRODUCTS!=='undefined'?NUTRITION_PRODUCTS:[]).filter(p=>['electrolytes','magnesium','whey-real','omega3'].includes(p.id)).slice(0,4);
+  return `${standalone?`<div class="content">${quoteBand()}`:''}<div class="perf-hero"><div style="position:relative;z-index:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;align-items:center"><div style="display:flex;align-items:center;gap:16px;min-width:0">${photo?`<div style="width:88px;height:88px;border-radius:50%;background:url('${esc(photo)}') center/cover;border:2px solid var(--bronze);flex-shrink:0"></div>`:avatar(player.name,'av72')}<div style="min-width:0"><div class="perf-kicker">${esc(pr?.name||'PROFIL À COMPLÉTER')}</div><div style="font-size:34px;font-weight:900;line-height:1">${esc(player.name)}</div><div class="perf-muted">${playerAgeLabel(player)} · ${esc(player.aftRanking||player.afpRanking||'Ranking à définir')} · ${esc(player.hand||'Main à définir')}</div><div class="perf-muted" style="margin-top:6px"><b style="color:var(--bronze)">Objectif:</b> ${esc(d.currentGoal)}</div></div></div><div style="display:flex;justify-content:flex-end"><div class="perf-gauge" style="--score:${score}"><div class="perf-gauge-inner"><div style="font-size:34px;font-weight:900">${score}</div><div style="font-size:10px;color:var(--bronze);letter-spacing:1.5px">/100 HWBT</div></div></div></div></div></div>
+  <div class="card gold"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div class="card-title">FEU DE DISPONIBILITÉ</div><div style="font-size:24px;font-weight:900;color:${ready.color}"><span class="readiness-dot" style="color:${ready.color};background:${ready.color}"></span>${ready.label}</div><div class="perf-muted">${esc(ready.text)}</div></div><div class="perf-muted">Weekly +3 · Monthly +8 · Yearly building</div></div></div>
+  <div class="perf-grid">
+    ${perfCategoryCard('Technique','Current level',m.scores.T!==null?m.scores.T*5:62,'Coach evaluation: stabilité des gestes et qualité sous pression.',PILLARS[0].color)}
+    ${perfCategoryCard('Tactical','Decision making',m.scores.TA!==null?m.scores.TA*5:60,'Positionnement, intelligence de jeu et choix au bon moment.',PILLARS[1].color)}
+    ${perfCategoryCard('Physical','Strength · Speed · Agility',m.scores.P!==null?m.scores.P*5:64,'Endurance, mobilité, explosivité et capacité à répéter.',PILLARS[2].color)}
+    ${perfCategoryCard('Mental','Confidence · Focus',m.scores.M!==null?m.scores.M*5:63,esc(d.coachNotes),PILLARS[3].color)}
+    <div class="perf-card">${perfCardHead('Recovery')}<div class="perf-big" style="color:${ready.color}">${d.recovery}</div><div class="perf-muted">Today recovery · Weekly average ${Math.round((Number(d.recovery)+68)/2)}</div>${perfTrendBars(d.recovery,ready.color)}${STATE.role==='coach'?perfInput(player.id,'recovery','Recovery score',0,100):''}</div>
+    <div class="perf-card">${perfCardHead('Sleep')}<div class="perf-big">${d.sleepHours}h</div>${perfMetricRow('Quality',d.sleepQuality,100,'var(--bleu)')}${perfTrendBars(d.sleepQuality,'var(--bleu)')}${STATE.role==='coach'?perfInput(player.id,'sleepQuality','Sleep quality',0,100):''}</div>
+    <div class="perf-card">${perfCardHead('Heart Rate')}<div class="perf-muted">Resting ${d.restingHR} · Avg ${d.avgHR} · Max ${d.maxHR}</div>${perfMetricRow('Training HR',d.trainingHR,200,'var(--rouge)')}${perfTrendBars(Math.min(90,d.trainingHR/2),'var(--rouge)')}</div>
+    <div class="perf-card">${perfCardHead('Training Load')}<div class="perf-big">${d.trainingMinutes}</div><div class="perf-muted">minutes · ${d.sessionsWeek} séances cette semaine · intensité ${d.intensity}/10</div>${perfTrendBars(Math.min(88,d.trainingMinutes/3),'var(--jaune)')}${STATE.role==='coach'?perfInput(player.id,'intensity','Intensity',1,10):''}</div>
+    <div class="perf-card">${perfCardHead('Nutrition')} ${perfMetricRow('Hydration',d.hydration,100,'var(--bleu)')}${perfMetricRow('Recovery nutrition',d.nutrition,100,'var(--vert)')}<div class="perf-muted" style="margin-top:10px">Daily reminders: boire avant séance, collation simple, récupération après effort.</div>${supplements.map(p=>`<a class="btn btn-ghost btn-sm" style="margin:8px 6px 0 0;display:inline-block" target="_blank" href="${esc(p.affiliateUrl||p.productUrl||'#')}">SEE PRODUCT</a>`).join('')}</div>
+    <div class="perf-card">${perfCardHead('Match Performance')}<div class="perf-big">${wins}/${matches.length||0}</div><div class="perf-muted">Wins · Losses ${Math.max(0,(matches.length||0)-wins)} · Match intensity à encoder après compétition.</div>${perfTrendBars(playerMatchPerformanceScore(player),'var(--bronze)')}</div>
+    <div class="perf-card">${perfCardHead('Injury Prevention')} ${perfMetricRow('Pain scale',d.pain,10,'var(--rouge)')}${perfMetricRow('Muscle fatigue',d.fatigue,10,'var(--jaune)')}${perfMetricRow('Mobility',d.mobility,100,'var(--vert)')}<div class="perf-muted" style="margin-top:10px">Risk level: ${d.pain>=5||d.fatigue>=8?'à surveiller':'stable'}</div></div>
+    <div class="perf-card gold">${perfCardHead('AI Coach')}<div style="display:grid;gap:8px">${performanceAIRecommendations(player).map(x=>`<div style="background:var(--bg4);border:1px solid var(--border);border-left:3px solid var(--bronze);border-radius:0 7px 7px 0;padding:10px" class="perf-muted">${esc(x)}</div>`).join('')}</div></div>
+  </div>
+  <div class="g2" style="margin-top:16px"><div class="card"><div class="card-title">PERFORMANCE TRACKING</div><div style="font-size:26px;font-weight:900;margin-bottom:8px">COMING SOON</div><div class="perf-muted">Architecture prête pour Amazfit, Zepp, Apple Health, Google Fit, Garmin Connect, Polar Flow, WHOOP et Fitbit. Aucune clé API dans le frontend.</div></div><div class="card"><div class="card-title">OFFICIAL PARTNERS</div>${['Official Racket Partner','Official Clothing Partner','Official Nutrition Partner · Prozis','Official Performance Tracking Partner','Official Recovery Partner','Official Technology Partner'].map(x=>`<div class="session-group-chip" style="margin:4px 4px 4px 0">${esc(x)}</div>`).join('')}</div></div>
+  ${STATE.role==='coach'?`<div class="card"><div class="card-title">COACH NOTES</div><textarea class="form-input" id="perfCoachNote" rows="3">${esc(d.coachNotes||'')}</textarea><button class="btn btn-primary" style="margin-top:10px" onclick="savePerformanceNote(${player.id})">SAUVEGARDER NOTE</button></div>`:''}
+  <div class="card gold" style="text-align:center"><div style="font-size:26px;font-weight:900">HWBT Performance Lab</div><div class="perf-muted">Train Smarter. Recover Better. Perform Longer.<br>Powered by Data. Driven by Coaching. Built for Champions.</div></div>${standalone?'</div>':''}`;
+}
+function perfCardHead(title){return `<div class="perf-kicker">${esc(title).toUpperCase()}</div>`;}
+function perfCategoryCard(title,label,value,text,color){
+  const v=Math.round(Number(value)||0);
+  return `<div class="perf-card">${perfCardHead(title)}<div class="perf-big" style="color:${color}">${v}</div><div class="perf-muted">${esc(label)}</div>${perfMetricRow('Progress',v,100,color)}${perfTrendBars(v,color)}<div class="perf-muted" style="margin-top:10px">${text}</div></div>`;
+}
+
 function generateAIBrief(context={}){
   const players=STATE.players||[];
   const sessions=STATE.sessions||[];
