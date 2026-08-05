@@ -397,6 +397,7 @@ body{min-width:0}
       <div class="nav-item" data-page="aspectsLibrary" onclick="setUI({page:'aspectsLibrary'})" style="display: flex;"><span class="nav-icon">▥</span>ASPECTS &amp; SCORING</div>
       <div class="nav-item" data-page="communication" onclick="setUI({page:'communication'})" style="display: flex;"><span class="nav-icon">◌</span>COMMUNICATION</div>
       <div class="nav-item" data-page="performanceLab" onclick="setUI({page:'performanceLab',performancePlayerId:null})" style="display: flex;"><span class="nav-icon">◒</span>PERFORMANCE LAB</div>
+      <div class="nav-item" data-page="matchAnalyst" onclick="setUI({page:'matchAnalyst',matchAnalystTab:'coach'})" style="display: flex;"><span class="nav-icon">◇</span>MATCH ANALYST</div>
       <div class="nav-item" data-page="test" onclick="setUI({page:'test'})" style="display: flex;"><span class="nav-icon">◎</span>PERSONALITY TEST</div>
       <div class="nav-item" data-page="nutrition" onclick="setUI({page:'nutrition',nutritionTab:'basics',nutritionFilter:'all',nutritionSearch:'',nutritionPackFilter:null})" style="display: flex;"><span class="nav-icon">◍</span>NUTRITION</div>
     </div>
@@ -3234,7 +3235,7 @@ function setLang(lang){
   render();
 }
 function updateChromeText(){
-  const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
+  const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
   document.querySelectorAll('.nav-item').forEach(n=>{
     const icon=n.querySelector('.nav-icon')?.textContent||'';
     const label=navNames[n.dataset.page]||n.dataset.page;
@@ -3259,7 +3260,7 @@ function render(){
   if(STATE.role==='player'){
     if(!STATE.activePlayerId) STATE.activePlayerId=STATE.players[0]?.id||null;
     const linkedPlayerTest=UI.page==='test'&&UI.testState&&UI.testState.playerId===STATE.activePlayerId;
-    if(['exercises','aspectsLibrary','commandCenter','contentStudio'].includes(UI.page)||(UI.page==='test'&&!linkedPlayerTest)) UI.page='dashboard';
+    if(['exercises','aspectsLibrary','commandCenter','contentStudio','matchAnalyst'].includes(UI.page)||(UI.page==='test'&&!linkedPlayerTest)) UI.page='dashboard';
     if(UI.page==='players') UI.selectedPlayerId=STATE.activePlayerId;
   }
   document.getElementById('lb-fr').classList.toggle('active',STATE.lang==='fr');
@@ -3270,12 +3271,12 @@ function render(){
   document.getElementById('roleTag').textContent=tr(STATE.role==='coach'?'COACH':'JOUEUR');
   const nav=document.querySelectorAll('.nav-item');
   nav.forEach(n=>{
-    const coachOnly=['exercises','aspectsLibrary','commandCenter','contentStudio'].includes(n.dataset.page);
+    const coachOnly=['exercises','aspectsLibrary','commandCenter','contentStudio','matchAnalyst'].includes(n.dataset.page);
     const playerHidden=['test'].includes(n.dataset.page);
     n.style.display=STATE.role==='player'&&(coachOnly||playerHidden)?'none':'flex';
     n.classList.toggle('active',n.dataset.page===UI.page);
   });
-  const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
+  const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
   document.getElementById('pageTitle').textContent=tr(STATE.role==='player'&&UI.page==='dashboard'?'MON CARNET JOUEUR':(titles[UI.page]||UI.page.toUpperCase()));
   const mc=document.getElementById('mainContent');
   if(UI.page==='dashboard') mc.innerHTML=STATE.role==='player'?pagePlayerPortal():pageDashboard();
@@ -3289,6 +3290,7 @@ function render(){
   else if(UI.page==='aspectsLibrary') mc.innerHTML=pageAspectsLibrary();
   else if(UI.page==='communication') mc.innerHTML=pageCommunicationChapter();
   else if(UI.page==='performanceLab') mc.innerHTML=pagePerformanceLab();
+  else if(UI.page==='matchAnalyst') mc.innerHTML=pageMatchAnalyst();
   else if(UI.page==='test') mc.innerHTML=pageTest();
   else if(UI.page==='nutrition') mc.innerHTML=pageNutrition();
   translateDom(mc);
@@ -5570,6 +5572,183 @@ function playerMatchPerformanceScore(player){
   const wins=matches.filter(m=>m.result==='win'||m.win===true).length;
   return Math.round(50+(wins/matches.length)*40);
 }
+
+// ══════════════════════════════════════════════════
+// HWBT MATCH ANALYST - pure event-journal analysis
+// ══════════════════════════════════════════════════
+const MATCH_ORIGINS=['JOUEUR_1','JOUEUR_2','COLLECTIF','ADVERSAIRES','INDETERMINE'];
+const IMPORTANT_POINT_TYPES=['40-40','POINT_DECISIF','BALLE_DE_JEU','BALLE_DE_SET','BALLE_DE_MATCH','TIE_BREAK','SUPER_TIE_BREAK'];
+function normMatchResult(v){
+  const s=String(v||'').toUpperCase();
+  if(['GAGNE','GAGNÉ','WIN','HWBT','WON'].includes(s)) return 'GAGNE';
+  if(['PERDU','LOSE','LOSS','ADVERSAIRES','LOST'].includes(s)) return 'PERDU';
+  return '';
+}
+function normMatchOrigin(v){
+  const s=String(v||'').toUpperCase().replace(/\s+/g,'_');
+  if(['J1','JOUEUR1','JOUEUR_1','PLAYER_1','LUCAS'].includes(s)) return 'JOUEUR_1';
+  if(['J2','JOUEUR2','JOUEUR_2','PLAYER_2','ALEXANDRE'].includes(s)) return 'JOUEUR_2';
+  if(['COLLECTIF','TEAM','PAIR','DUO'].includes(s)) return 'COLLECTIF';
+  if(['ADVERSAIRE','ADVERSAIRES','OPPONENTS','OPPONENT'].includes(s)) return 'ADVERSAIRES';
+  return 'INDETERMINE';
+}
+function pointEventsFromJournal(journal){
+  return (journal||[]).filter(e=>String(e.type||e.eventType||'').toUpperCase()==='POINT'&&e.active!==false&&!e.cancelled&&!e.annule&&!e.annulé)
+    .map((e,i)=>({...e,_idx:i,id:e.id||e.pointId||`p${i+1}`,result:normMatchResult(e.result||e.outcome||e.winner),origin:normMatchOrigin(e.origin||e.origine)}));
+}
+function activeMatchDurationSeconds(journal,points=[]){
+  const events=(journal||[]).filter(e=>e.active!==false&&!e.cancelled&&!e.annule&&!e.annulé).sort((a,b)=>(Number(a.t||a.time||a.timestamp||0)-Number(b.t||b.time||b.timestamp||0)));
+  const first=events.find(e=>Number(e.t||e.time||e.timestamp)>=0);
+  const last=[...events].reverse().find(e=>Number(e.t||e.time||e.timestamp)>=0);
+  if(!first||!last) return Number(points.at(-1)?.activeTime||points.at(-1)?.timeActive||0)||0;
+  let pauseStart=null,pause=0;
+  events.forEach(e=>{
+    const type=String(e.type||e.eventType||'').toUpperCase();
+    const t=Number(e.t||e.time||e.timestamp||0);
+    if(type==='PAUSE_START') pauseStart=t;
+    if(type==='PAUSE_END'&&pauseStart!==null){pause+=Math.max(0,t-pauseStart);pauseStart=null;}
+  });
+  return Math.max(0,Number(last.t||last.time||last.timestamp||0)-Number(first.t||first.time||first.timestamp||0)-pause);
+}
+function pctX(v,total){return `${v}/${total}${total?` · ${Math.round((v/total)*100)}%`:''}`;}
+function matchPointImportantTypes(p){
+  const raw=[p.importance,p.important,p.category,p.scoreTag,...(Array.isArray(p.tags)?p.tags:[])].filter(Boolean).map(x=>String(x).toUpperCase().replace(/\s+/g,'_'));
+  const out=[];
+  if(raw.some(x=>x.includes('40')||x.includes('EGALITE'))) out.push('40-40');
+  if(raw.some(x=>x.includes('DECISIF'))) out.push('POINT_DECISIF');
+  if(raw.some(x=>x.includes('JEU')||x.includes('GAME'))) out.push('BALLE_DE_JEU');
+  if(raw.some(x=>x.includes('SET'))) out.push('BALLE_DE_SET');
+  if(raw.some(x=>x.includes('MATCH'))) out.push('BALLE_DE_MATCH');
+  if(raw.some(x=>x.includes('SUPER'))) out.push('SUPER_TIE_BREAK');
+  else if(raw.some(x=>x.includes('TIE'))) out.push('TIE_BREAK');
+  return [...new Set(out)];
+}
+function analyserMatch(journal,config={}){
+  const points=pointEventsFromJournal(journal);
+  const won=points.filter(p=>p.result==='GAGNE'), lost=points.filter(p=>p.result==='PERDU');
+  const wonKnown=won.filter(p=>p.origin!=='INDETERMINE'), lostKnown=lost.filter(p=>p.origin!=='INDETERMINE');
+  const c=(arr,origin)=>arr.filter(p=>p.origin===origin).length;
+  const importantIds=new Set(), importantByCat={};
+  IMPORTANT_POINT_TYPES.forEach(t=>importantByCat[t]=[]);
+  points.forEach(p=>matchPointImportantTypes(p).forEach(t=>{importantIds.add(p.id); importantByCat[t]?.push(p.id);}));
+  const reviewPoints=points.filter(p=>p.review||p.toReview||p.aRevoir||p.video||p.videoTimecode||p.note).map(p=>({id:p.id,score:p.score||'',origin:p.origin,result:p.result,timecode:p.videoTimecode||p.timecode||'',note:p.note||''}));
+  const duration=activeMatchDurationSeconds(journal,points);
+  let diff=0;
+  const timeline=points.map((p,i)=>{diff+=p.result==='GAGNE'?1:p.result==='PERDU'?-1:0;return {id:p.id,index:i+1,result:p.result,origin:p.origin,server:p.server||p.serveur||'',score:p.score||'',diff,important:matchPointImportantTypes(p),review:reviewPoints.some(r=>r.id===p.id),timecode:p.videoTimecode||p.timecode||''};});
+  const analysis={
+    matchSummary:{title:config.title||'Match HWBT',players:config.players||[],opponents:config.opponents||'',score:config.score||'',format:config.format||'Padel',status:config.status||'FIN_DE_MATCH_CONFIRMEE',totalPoints:points.length,won:won.length,lost:lost.length,durationActiveSeconds:duration,averagePointSeconds:points.length?Math.round(duration/points.length):0},
+    coverage:{originKnown:points.length?Math.round(((wonKnown.length+lostKnown.length)/points.length)*100):0,causeKnown:points.filter(p=>p.cause).length,phaseKnown:points.filter(p=>p.phase).length,total:points.length,warnings:[]},
+    pointStructure:{wonKnown:wonKnown.length,lostKnown:lostKnown.length,points_gagnes_origine_connue:wonKnown.length,points_perdus_origine_connue:lostKnown.length,points_indetermines_gagnes:won.length-wonKnown.length,points_indetermines_perdus:lost.length-lostKnown.length,points_construits:c(won,'JOUEUR_1')+c(won,'JOUEUR_2')+c(won,'COLLECTIF'),points_offerts:c(won,'ADVERSAIRES'),points_concedes:c(lost,'JOUEUR_1')+c(lost,'JOUEUR_2')+c(lost,'COLLECTIF'),points_subis:c(lost,'ADVERSAIRES'),wonBreakdown:{JOUEUR_1:c(wonKnown,'JOUEUR_1'),JOUEUR_2:c(wonKnown,'JOUEUR_2'),COLLECTIF:c(wonKnown,'COLLECTIF'),ADVERSAIRES:c(wonKnown,'ADVERSAIRES')},lostBreakdown:{JOUEUR_1:c(lostKnown,'JOUEUR_1'),JOUEUR_2:c(lostKnown,'JOUEUR_2'),COLLECTIF:c(lostKnown,'COLLECTIF'),ADVERSAIRES:c(lostKnown,'ADVERSAIRES')}},
+    individualContributions:{joueur1:{won:c(wonKnown,'JOUEUR_1'),lost:c(lostKnown,'JOUEUR_1')},joueur2:{won:c(wonKnown,'JOUEUR_2'),lost:c(lostKnown,'JOUEUR_2')},warning:"Convention d'encodage: gagné par joueur = coup gagnant HWBT, perdu par joueur = faute HWBT. Aucun classement entre les deux joueurs."},
+    scoreContext:{important:{unique:importantIds.size,total:points.length,byCategory:importantByCat}},
+    timeline,reviewPoints,warnings:[]
+  };
+  if(analysis.coverage.originKnown<70) analysis.warnings.push({type:'LOW_ORIGIN_COVERAGE',text:'Moins de 70% des origines sont renseignées: interprétation prudente.'});
+  if(analysis.pointStructure.points_indetermines_gagnes+analysis.pointStructure.points_indetermines_perdus) analysis.warnings.push({type:'INDETERMINATE_POINTS',text:`${analysis.pointStructure.points_indetermines_gagnes+analysis.pointStructure.points_indetermines_perdus} points indéterminés exclus des répartitions par origine.`});
+  analysis.coachNarrative=matchNarrative(analysis,'COACH');
+  analysis.playerView=matchPlayerViewModel(analysis);
+  return analysis;
+}
+const MATCH_NARRATIVE_RULES=[
+  {id:'constructed-majority',audience:'COACH',minimumSample:8,priority:10,category:'structure',condition:a=>a.pointStructure.points_construits>a.pointStructure.points_offerts,render:a=>({text:`Les points gagnés viennent davantage de la construction HWBT (${pctX(a.pointStructure.points_construits,a.pointStructure.wonKnown)}) que des fautes adverses.`,data:{points_construits:a.pointStructure.points_construits,denominator:a.pointStructure.wonKnown}})},
+  {id:'too-many-conceded',audience:'COACH',minimumSample:8,priority:20,category:'structure',condition:a=>a.pointStructure.points_concedes>a.pointStructure.points_subis,render:a=>({text:`Les points perdus viennent surtout d'actions HWBT à stabiliser (${pctX(a.pointStructure.points_concedes,a.pointStructure.lostKnown)}).`,data:{points_concedes:a.pointStructure.points_concedes,denominator:a.pointStructure.lostKnown}})},
+  {id:'low-coverage',audience:'COACH',minimumSample:1,priority:30,category:'coverage',condition:a=>a.coverage.originKnown<70,render:a=>({text:`Couverture origine limitée: ${a.coverage.originKnown}%. L'analyse doit rester factuelle.`,data:{coverage:a.coverage.originKnown}})},
+  {id:'players-positive-build',audience:'PLAYERS',minimumSample:8,priority:10,category:'positive',condition:a=>a.pointStructure.points_construits>=a.pointStructure.points_offerts,render:a=>({text:'Vous avez gagné des points en construisant le jeu.',data:{points_construits:a.pointStructure.points_construits}})}
+];
+function matchNarrative(analysis,audience='COACH'){
+  if(!analysis.matchSummary.totalPoints||analysis.coverage.originKnown===0) return null;
+  const sentences=MATCH_NARRATIVE_RULES.filter(r=>r.audience===audience&&analysis.matchSummary.totalPoints>=r.minimumSample&&r.condition(analysis)).sort((a,b)=>a.priority-b.priority).map(r=>({ruleId:r.id,category:r.category,sample:analysis.matchSummary.totalPoints,...r.render(analysis)}));
+  return {sentences,fallback:sentences.length?'':'Les données de ce match ne permettent pas de dégager de tendance fiable.'};
+}
+function matchPlayerViewModel(a){
+  const positives=[];
+  if(a.pointStructure.points_construits) positives.push('Vous avez construit des points ensemble.');
+  if(a.pointStructure.points_offerts) positives.push('Vous avez forcé des fautes adverses.');
+  if(a.scoreContext.important.unique) positives.push('Vous avez joué des points importants à revoir ensemble.');
+  const chiffre=a.pointStructure.points_construits?{label:'Points construits',value:pctX(a.pointStructure.points_construits,a.pointStructure.wonKnown)}:null;
+  let axis='Construire davantage avant d’accélérer.';
+  if(a.pointStructure.points_concedes>a.pointStructure.points_subis) axis='Stabiliser le premier choix après la montée.';
+  if(a.scoreContext.important.unique>=3) axis='Mieux sécuriser les points importants.';
+  return {result:a.matchSummary.score||`${a.matchSummary.won}-${a.matchSummary.lost}`,positives:positives.slice(0,3),matchNumber:chiffre,workAxis:axis,reviewCount:a.reviewPoints.length};
+}
+function demoMatchJournal(kind='complete'){
+  const origins=['JOUEUR_1','COLLECTIF','ADVERSAIRES','JOUEUR_2','INDETERMINE'];
+  const total=kind==='super'?46:kind==='abandon'?18:40;
+  const out=[];
+  for(let i=1;i<=total;i++){
+    const won=i%3!==0;
+    const origin=kind==='unknown'&&i%4===0?'INDETERMINE':origins[i%4];
+    out.push({type:'POINT',id:`${kind}-${i}`,t:i*54,result:won?'GAGNE':'PERDU',origin,score:i%8===0?'40-40':'',tags:i%10===0?[kind==='super'?'SUPER_TIE_BREAK':'POINT_DECISIF']:[],server:i%2?'Lucas':'Alexandre',cause:i%5?'':'',phase:i%4?'construction':'',review:i%9===0,timecode:`00:${String(i).padStart(2,'0')}:12`});
+    if(i===20) out.push({type:'PAUSE_START',t:i*54+8},{type:'PAUSE_END',t:i*54+188});
+  }
+  if(kind==='abandon') out.push({type:'ABANDON',t:1200});
+  return out;
+}
+function matchAnalystMatches(){
+  const real=(STATE.matches||[]).filter(m=>Array.isArray(m.events)||Array.isArray(m.journal)||Array.isArray(m.eventLog));
+  const demo=[
+    {id:'demo-complete',demo:true,title:'Démo · match complet',score:'6/4 6/3',status:'FIN_DE_MATCH_CONFIRMEE',events:demoMatchJournal('complete')},
+    {id:'demo-unknown',demo:true,title:'Démo · 25% indéterminé',score:'7/6 4/6 10/8',status:'FIN_DE_MATCH_CONFIRMEE',events:demoMatchJournal('unknown')},
+    {id:'demo-super',demo:true,title:'Démo · super tie-break',score:'6/3 3/6 10/7',status:'FIN_DE_MATCH_CONFIRMEE',events:demoMatchJournal('super')},
+    {id:'demo-abandon',demo:true,title:'Démo · match abandonné',score:'2/4 abandon',status:'ABANDON',events:demoMatchJournal('abandon')}
+  ];
+  return real.length?real:demo;
+}
+function selectedMatchAnalysis(){
+  const matches=matchAnalystMatches();
+  const selected=matches.find(m=>String(m.id)===String(UI.matchAnalystId))||matches[0];
+  UI.matchAnalystId=selected?.id;
+  return {match:selected,analysis:analyserMatch(selected?.events||selected?.journal||selected?.eventLog||[],selected||{})};
+}
+function matchMetricCard(label,value,help=''){
+  return `<div class="card" style="padding:16px"><div class="card-title">${esc(label)}</div><div style="font-size:34px;font-weight:900;color:var(--white);line-height:1">${esc(value)}</div>${help?`<div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.5;margin-top:6px">${esc(help)}</div>`:''}</div>`;
+}
+function matchBreakdownHtml(title,data,total,excluded){
+  return `<div class="card"><div class="card-title">${esc(title)}</div>${['JOUEUR_1','JOUEUR_2','COLLECTIF','ADVERSAIRES'].map(o=>`<div style="display:grid;grid-template-columns:94px 1fr 70px;gap:10px;align-items:center;margin:9px 0"><div style="font-size:10px;color:var(--gray)">${o.replace('_',' ')}</div><div style="height:7px;background:var(--border);border-radius:8px;overflow:hidden"><div style="height:100%;width:${total?Math.round((data[o]||0)/total*100):0}%;background:var(--bronze)"></div></div><div style="font-size:11px;color:var(--offwhite);text-align:right">${pctX(data[o]||0,total)}</div></div>`).join('')}${excluded?`<div style="font-size:11px;color:var(--bronze);margin-top:10px">${excluded} points indéterminés exclus de cette répartition.</div>`:''}</div>`;
+}
+function pageMatchAnalyst(){
+  const {match,analysis:a}=selectedMatchAnalysis();
+  const tab=UI.matchAnalystTab||'coach';
+  const matches=matchAnalystMatches();
+  const tabs=[['express','Débrief express'],['coach','Vue coach'],['player','Vue joueurs'],['timeline','Chronologie'],['review','À revoir']];
+  return `<div class="content">${quoteBand()}
+    <div class="card" style="border-color:var(--bronze-dim2)"><div style="display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap"><div><div class="card-title">HWBT MATCH ANALYST</div><div style="font-size:34px;font-weight:900;line-height:1">ANALYSE D'APRÈS-MATCH</div><div class="muted-help" style="margin-top:8px;max-width:820px">V1 connectée à un moteur pur basé uniquement sur le journal d'événements. Les matchs de démo ci-dessous ne sont pas sauvegardés dans tes vraies données.</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="printMatchCoachPdf()">PDF COACH</button><button class="btn btn-ghost btn-sm" onclick="printMatchPlayerPdf()">FICHE JOUEURS</button></div></div>
+      <div class="g2" style="margin-top:14px"><div class="form-group"><label class="form-label">MATCH</label><select class="form-select" onchange="setUI({matchAnalystId:this.value})">${matches.map(m=>`<option value="${esc(m.id)}" ${String(m.id)===String(UI.matchAnalystId)?'selected':''}>${esc(m.title||m.name||'Match')}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">SOURCE</label><div class="form-input" style="height:auto;color:${match.demo?'var(--bronze)':'var(--vert)'}">${match.demo?'Démonstration hors données réelles':'Journal réel de la plateforme'}</div></div></div>
+    </div>
+    <div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${tab===k?'active':''}" onclick="setUI({matchAnalystTab:'${k}'})">${l}</button>`).join('')}</div>
+    ${tab==='express'?matchExpressHtml(a):tab==='player'?matchPlayerHtml(a):tab==='timeline'?matchTimelineHtml(a):tab==='review'?matchReviewHtml(a):matchCoachHtml(a)}
+  </div>`;
+}
+function matchExpressHtml(a){
+  return `<div class="g4">${matchMetricCard('Score',a.matchSummary.score||'—')}${matchMetricCard('Points',`${a.matchSummary.won}/${a.matchSummary.totalPoints}`,`${a.matchSummary.lost} points adversaires`)}${matchMetricCard('Durée active',secondsLabel(a.matchSummary.durationActiveSeconds),`Moyenne ${a.matchSummary.averagePointSeconds}s / point`)}${matchMetricCard('Couverture',`${a.coverage.originKnown}%`,'Origines renseignées')}</div><div class="card"><div class="card-title">NOTE EXPRESS COACH</div><textarea class="form-input" rows="4" placeholder="Note courte après match ou transcription vocale..."></textarea><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn btn-ghost" onclick="setUI({matchAnalystTab:'review'})">ENRICHIR LE MATCH</button><button class="btn btn-primary" onclick="setUI({matchAnalystTab:'coach'})">ANALYSE COMPLÈTE</button></div></div>`;
+}
+function matchCoachHtml(a){
+  const ps=a.pointStructure;
+  return `<div class="g4">${matchMetricCard('Résultat',a.matchSummary.score||'—')}${matchMetricCard('Format',a.matchSummary.format||'Padel')}${matchMetricCard('Durée active',secondsLabel(a.matchSummary.durationActiveSeconds))}${matchMetricCard('Couverture',`${a.coverage.originKnown}%`,`${a.coverage.total-a.coverage.causeKnown} causes non renseignées`)}</div>
+  ${a.warnings.length?`<div class="card" style="border-color:var(--bronze-dim2)">${a.warnings.map(w=>`<div style="font-size:12px;color:var(--bronze);font-family:var(--font-body);line-height:1.6">${esc(w.text)}</div>`).join('')}</div>`:''}
+  <div class="g2">${matchBreakdownHtml('A · Structure des points gagnés',ps.wonBreakdown,ps.wonKnown,ps.points_indetermines_gagnes)}${matchBreakdownHtml('B · Structure des points perdus',ps.lostBreakdown,ps.lostKnown,ps.points_indetermines_perdus)}</div>
+  <div class="g4">${matchMetricCard('Points construits',pctX(ps.points_construits,ps.wonKnown))}${matchMetricCard('Points offerts',pctX(ps.points_offerts,ps.wonKnown))}${matchMetricCard('Points concédés',pctX(ps.points_concedes,ps.lostKnown))}${matchMetricCard('Points subis',pctX(ps.points_subis,ps.lostKnown))}</div>
+  <div class="g2"><div class="card"><div class="card-title">C · Contribution individuelle</div><div class="g2"><div>${matchMetricCard('Joueur 1',`${a.individualContributions.joueur1.won} gagnés / ${a.individualContributions.joueur1.lost} perdus`)}</div><div>${matchMetricCard('Joueur 2',`${a.individualContributions.joueur2.won} gagnés / ${a.individualContributions.joueur2.lost} perdus`)}</div></div><div class="muted-help">${esc(a.individualContributions.warning)}</div></div><div class="card"><div class="card-title">G · Synthèse</div>${a.coachNarrative?`${a.coachNarrative.sentences.map(s=>`<div class="strength"><span class="plus">+</span>${esc(s.text)}</div>`).join('')||`<div class="muted-help">${esc(a.coachNarrative.fallback)}</div>`}`:''}</div></div>`;
+}
+function matchPlayerHtml(a){
+  const p=a.playerView;
+  return `<div class="card" style="border-color:var(--bronze-dim2)"><div class="card-title">FICHE JOUEURS</div><div style="font-size:38px;font-weight:900;line-height:1">${esc(p.result||'Match terminé')}</div><div class="divider"></div><div class="g2"><div><div class="card-title">CE QUI A MARCHÉ</div>${p.positives.map(x=>`<div class="strength"><span class="plus">+</span>${esc(x)}</div>`).join('')||'<div class="muted-help">Pas assez de données positives fiables.</div>'}</div><div><div class="card-title">CHIFFRE DU MATCH</div>${p.matchNumber?`<div style="font-size:34px;font-weight:900">${esc(p.matchNumber.value)}</div><div class="muted-help">${esc(p.matchNumber.label)}</div>`:'<div class="muted-help">Pas de chiffre fiable à afficher.</div>'}<div class="divider"></div><div class="card-title">AXE DE TRAVAIL</div><div style="font-size:18px;color:var(--white);font-weight:800">${esc(p.workAxis)}</div></div></div><div class="divider"></div><div class="muted-help">${p.reviewCount} séquence${p.reviewCount>1?'s':''} à revoir ensemble.</div></div>`;
+}
+function matchTimelineHtml(a){
+  const max=Math.max(1,...a.timeline.map(t=>Math.abs(t.diff)));
+  return `<div class="card"><div class="card-title">CHRONOLOGIE & DIFFÉRENTIEL CUMULÉ</div><div style="overflow-x:auto;padding-bottom:8px"><div style="display:flex;align-items:flex-end;gap:3px;min-width:${Math.max(720,a.timeline.length*18)}px;height:190px;border-bottom:1px solid var(--border);padding:10px">${a.timeline.map(t=>`<div title="Point ${t.index} · ${t.result} · ${t.origin} · diff ${t.diff}" style="width:14px;height:${30+Math.abs(t.diff)/max*120}px;background:${t.result==='GAGNE'?'var(--bronze)':'#555'};border:${t.important.length?'2px solid #fff':'1px solid #222'};border-radius:6px 6px 0 0;opacity:${t.review?1:.75}"></div>`).join('')}</div></div><div class="muted-help">Chaque barre représente un point. Bronze = HWBT, gris = adversaires. Bord blanc = point important.</div></div>`;
+}
+function matchReviewHtml(a){
+  const filters=['indéterminés','à revoir','sans phase','sans cause','points importants','Lucas','Alexandre','collectif','adversaires'];
+  return `<div class="card"><div class="card-title">ENRICHIR LE MATCH</div><div class="tag-row" style="margin-bottom:14px">${filters.map(f=>`<span>${esc(f)}</span>`).join('')}</div>${a.timeline.map(t=>`<div style="display:grid;grid-template-columns:54px 1fr 92px;gap:10px;align-items:center;border-top:1px solid var(--border);padding:10px 0"><b style="color:${t.result==='GAGNE'?'var(--bronze)':'var(--gray)'}">#${t.index}</b><div><div style="font-size:12px;color:var(--white)">${esc(t.result)} · ${esc(t.origin)} ${t.important.length?'· '+esc(t.important.join(', ')):''}</div><div class="muted-help">${esc(t.score||'score non renseigné')} · serveur ${esc(t.server||'—')}</div></div><button class="btn btn-ghost btn-sm" ${t.timecode?'':'disabled'}>${t.timecode?'VIDÉO':'SANS VIDÉO'}</button></div>`).join('')}</div>`;
+}
+function secondsLabel(sec){sec=Number(sec)||0;const m=Math.floor(sec/60),s=String(sec%60).padStart(2,'0');return `${m}:${s}`;}
+function printMatchHtml(a,audience='coach'){
+  const body=audience==='player'?matchPlayerHtml(a):matchCoachHtml(a)+matchTimelineHtml(a)+matchReviewHtml(a);
+  return `<!doctype html><html><head><meta charset="utf-8"><title>HWBT Match Analyst</title><style>body{margin:0;background:#08080a;color:#fff;font-family:Arial,sans-serif}.page{padding:28px}.card{border:1px solid #3a2b16;background:#111;border-radius:10px;padding:16px;margin:12px 0}.card-title{font-size:10px;color:#b88935;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}.g2,.g4{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.g4{grid-template-columns:repeat(4,1fr)}.strength{font-size:12px;margin:7px 0}.plus{color:#b88935;margin-right:8px}.muted-help{font-size:11px;color:#aaa}.divider{height:1px;background:#333;margin:12px 0}.tag-row{display:flex;gap:6px;flex-wrap:wrap}.tag-row span{border:1px solid #3a2b16;border-radius:6px;padding:5px 7px;color:#b88935;font-size:10px}@page{size:A4 portrait;margin:10mm}@media print{body{background:white;color:#111}.card{background:white;color:#111;border-color:#ddd}.g4{grid-template-columns:repeat(2,1fr)}button{display:none}}</style></head><body><div class="page"><h1>HWBT MATCH ANALYST</h1>${body}</div><script>setTimeout(()=>window.print(),300)<\/script></body></html>`;
+}
+function printMatchCoachPdf(){const {analysis}=selectedMatchAnalysis();const w=window.open('','_blank');if(!w)return showNotif('Autorise les popups');w.document.write(printMatchHtml(analysis,'coach'));w.document.close();}
+function printMatchPlayerPdf(){const {analysis}=selectedMatchAnalysis();const w=window.open('','_blank');if(!w)return showNotif('Autorise les popups');w.document.write(printMatchHtml(analysis,'player'));w.document.close();}
 function perfReadiness(player){
   const d=perfPlayerData(player);
   const recovery=Number(d.recovery||60);
