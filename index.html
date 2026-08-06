@@ -157,6 +157,10 @@ body{min-width:0}
 .match-action-group{border:1px solid var(--border);border-radius:9px;background:rgba(255,255,255,.025);padding:10px}
 .match-action-group-title{font-family:var(--font-title);font-size:10px;letter-spacing:1.3px;color:var(--bronze);margin-bottom:8px;text-transform:uppercase}
 .match-action-group .match-live-options{grid-template-columns:1fr 1fr}
+.match-live-advice{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:10px;margin-top:14px}
+.match-live-advice-box{border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.025);padding:12px}
+.match-live-advice-box b{display:block;font-family:var(--font-title);font-size:10px;letter-spacing:1.3px;color:var(--bronze);margin-bottom:7px;text-transform:uppercase}
+.match-live-advice-box span{display:block;font-size:13px;line-height:1.45;color:var(--offwhite)}
 .match-live-mini{min-height:48px;border-radius:7px;border:1px solid var(--border2);background:var(--bg4);color:var(--offwhite);font-family:var(--font-title);font-size:11px;letter-spacing:.8px;font-weight:700;cursor:pointer;padding:9px 8px;transition:all .15s}
 .match-live-mini.won{border-color:var(--bronze-dim2);color:var(--white)}
 .match-live-mini.lost{color:var(--gray);background:transparent}
@@ -394,6 +398,9 @@ body{min-width:0}
   .match-live-main b{font-size:13px;margin-top:6px}
   .match-action-groups{grid-template-columns:1fr;gap:8px}
   .match-action-group{padding:8px}
+  .match-live-advice{grid-template-columns:1fr;gap:8px}
+  .match-live-advice-box{padding:10px}
+  .match-live-advice-box span{font-size:12px}
   .match-live-options{grid-template-columns:repeat(2,1fr);gap:7px}
   .match-live-mini{min-height:38px;font-size:9px;padding:7px 6px}
   .match-scoreboard{grid-template-columns:1fr auto 1fr;padding:11px;gap:6px}
@@ -6124,6 +6131,43 @@ function matchClosedHtml(){
     }).join('')}</div>
   </div>`;
 }
+function liveMatchCoachTopo(match,a){
+  const total=a.matchSummary?.totalPoints||0;
+  const won=a.matchSummary?.won||0;
+  const lost=a.matchSummary?.lost||0;
+  const players=a.playerDetails||[];
+  const bestPlayer=players.slice().sort((x,y)=>(y.won-y.lost)-(x.won-x.lost))[0];
+  const fragilePlayer=players.slice().sort((x,y)=>(y.lost-y.won)-(x.lost-x.won))[0];
+  const pair=a.pairAnalysis||{};
+  const advLeft=a.adversarySideLost?.ADV_GAUCHE||0;
+  const advRight=a.adversarySideLost?.ADV_DROITE||0;
+  const sufferedSide=advLeft>advRight?'ADV gauche':advRight>advLeft?'ADV droite':'adversaires';
+  const topWon=players.flatMap(p=>(p.topWonCauses||[]).map(x=>({player:p.label,...x}))).sort((x,y)=>y.value-x.value)[0];
+  const topLost=players.flatMap(p=>(p.topLostCauses||[]).map(x=>({player:p.label,...x}))).sort((x,y)=>y.value-x.value)[0];
+  const score=ensureMatchScore(match);
+  const scorePressure=(score.hwbtGames||0)<(score.advGames||0)||won<lost;
+  if(total<3){
+    return {
+      status:'Début d’observation',
+      strength:'Encode quelques points pour voir une vraie tendance.',
+      weakness:'Ne corrige pas encore trop vite: regarde service, retour et première erreur.',
+      advice:'Message simple: jouer clair, annoncer qui prend le centre, construire avant d’accélérer.'
+    };
+  }
+  const strength=topWon?`${topWon.player} gagne surtout via ${topWon.label}. À valoriser maintenant.`:pair.built?`La paire marque quand elle construit ensemble. Garde cette intention.`:'Les points gagnés commencent à se dessiner.';
+  const weakness=topLost?`${topLost.player} donne des points sur ${topLost.label}. Simplifier ce choix.`:pair.sufferedWinners?`${sufferedSide} trouve trop facilement le winner. Fermer la zone avant d’attaquer.`:'Le point faible n’est pas encore assez clair.';
+  let advice='Prochaine consigne: balle simple, replacement rapide, puis accélérer seulement sur balle favorable.';
+  if(pair.sufferedWinners>pair.forcedErrors) advice=`Prochaine consigne: fermer ${sufferedSide}, jouer plus profond, et éviter la balle courte qui donne le winner.`;
+  else if(pair.built>=Math.max(2,pair.pairErrors)) advice='Prochaine consigne: continuer à construire à deux, garder le filet ensemble, finir seulement quand la balle est vraiment ouverte.';
+  else if(scorePressure) advice='Prochaine consigne: réduire le risque pendant 3 points, viser centre/profondeur, récupérer le contrôle du jeu.';
+  else if(fragilePlayer?.lost>fragilePlayer?.won) advice=`Prochaine consigne pour ${fragilePlayer.label}: choix plus simple sur la première balle difficile, sans chercher le point parfait.`;
+  return {
+    status:`Live: ${won}-${lost} sur ${total} points`,
+    strength,
+    weakness,
+    advice
+  };
+}
 function matchEncoderHtml(match,a){
   const m=currentMatchForEncoding();
   if(!m) return `<div class="card" style="text-align:center;padding:38px;border-color:var(--bronze-dim2)"><div class="card-title">ENCODAGE MATCH</div><div style="font-size:28px;font-weight:900;margin-bottom:10px">Commence par créer un vrai match</div><div class="muted-help" style="margin-bottom:18px">Les démos servent juste à montrer le résultat. Pour travailler, crée ton match et encode les points.</div><button class="btn btn-primary" onclick="createMatchAnalystMatch()">+ NOUVEAU MATCH</button></div>`;
@@ -6172,6 +6216,7 @@ function matchEncoderHtml(match,a){
   ];
   const groupedActions=(pending==='GAGNE'?optionsWon:optionsLost).reduce((acc,item)=>{const group=item[4]||'Actions';(acc[group]||(acc[group]=[])).push(item);return acc;},{});
   const shotButtons=Object.entries(groupedActions).map(([group,items])=>`<div class="match-action-group"><div class="match-action-group-title">${esc(group)}</div><div class="match-live-options">${items.map(([origin,cause,phase,label])=>`<button class="match-live-mini ${pending==='GAGNE'?'won':'lost'}" onclick="addMatchPoint('${pending}','${origin}','${jsStr(cause)}','${jsStr(phase)}')">${esc(label)}</button>`).join('')}</div></div>`).join('');
+  const topo=liveMatchCoachTopo(m,a);
   return `<div>
     <div class="card" style="border-color:var(--bronze-dim2)">
       <div style="display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap">
@@ -6189,6 +6234,11 @@ function matchEncoderHtml(match,a){
         <div class="form-group"><label class="form-label">ÉQUIPE AU SERVICE</label><select class="form-select" id="matchServingTeamInput"><option value="HWBT" ${scoreState.servingTeam==='HWBT'?'selected':''}>HWBT sert</option><option value="ADV" ${scoreState.servingTeam==='ADV'?'selected':''}>Adversaire sert</option></select></div>
         <button class="btn btn-ghost" onclick="setMatchCurrentScore()">METTRE À JOUR LE SCORE</button>
       </div>
+      <div class="match-live-advice">
+        <div class="match-live-advice-box"><b>${esc(topo.status)}</b><span>${esc(topo.advice)}</span></div>
+        <div class="match-live-advice-box"><b>Point fort vu</b><span>${esc(topo.strength)}</span></div>
+        <div class="match-live-advice-box"><b>Point faible vu</b><span>${esc(topo.weakness)}</span></div>
+      </div>
     </div>
     <div class="match-live-grid">
       <button class="match-live-main won ${pending==='GAGNE'?'active':''}" onclick="setMatchPointResult('GAGNE')"><span>POINT GAGNÉ HWBT</span><b>1er clic</b></button>
@@ -6196,14 +6246,7 @@ function matchEncoderHtml(match,a){
     </div>
     ${pending?`<div class="card" style="border-color:${pending==='GAGNE'?'var(--bronze-dim2)':'var(--border2)'}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px"><div><div class="card-title">2E CLIC · ${pending==='GAGNE'?'COMMENT LE POINT EST GAGNÉ ?':'COMMENT LE POINT EST PERDU ?'}</div><div class="muted-help">${matchPointStateLabel(pending)}. Clique le coup ou l’origine, puis le score central se met à jour.</div></div><button class="btn btn-ghost btn-sm" onclick="setMatchPointResult(null)">ANNULER CHOIX</button></div><div class="match-action-groups">${shotButtons}</div></div>`:''}
     <div class="card" style="padding:14px">
-      <div class="card-title">MARQUEURS OPTIONNELS AVANT LE 2E CLIC</div>
-      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px">
-        ${['40-40','POINT_DECISIF','BALLE_DE_JEU','BALLE_DE_SET','BALLE_DE_MATCH','TIE_BREAK','SUPER_TIE_BREAK'].map(t=>`<label style="display:flex;gap:6px;align-items:center;background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:9px 10px;font-size:10px;color:var(--offwhite)"><input type="checkbox" data-match-tag value="${t}">${t.replaceAll('_',' ')}</label>`).join('')}
-      </div>
-      <div class="g2">
-        <div class="form-group"><label class="form-label">COMMENT OPTIONNEL</label><select class="form-select" id="matchPointCause"><option value="">Automatique via le bouton</option><option>winner</option><option>faute directe</option><option>faute provoquée</option><option>choix tactique</option><option>placement</option><option>retour</option><option>lob</option><option>volée</option></select></div>
-        <div class="form-group"><label class="form-label">PHASE OPTIONNELLE</label><select class="form-select" id="matchPointPhase"><option value="">Automatique via le bouton</option><option>service</option><option>retour</option><option>fond</option><option>construction</option><option>transition</option><option>filet</option><option>défense</option></select></div>
-      </div>
+      <div class="card-title">OUTILS MATCH</div>
       <input type="hidden" id="matchPointScore" value="">
       <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:10px">
         <button class="btn btn-ghost" onclick="undoLastMatchPoint()">ANNULER DERNIER POINT</button>
