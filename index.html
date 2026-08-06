@@ -5728,11 +5728,16 @@ function matchRealList(){
 }
 function createMatchAnalystMatch(){
   const today=new Date().toISOString().slice(0,10);
-  const title=(prompt('Nom du match ?','HWBT vs adversaires')||'Match HWBT').trim();
+  const roster=(STATE.players||[]).map((p,i)=>`${i+1}. ${p.name||`${p.firstName||''} ${p.lastName||''}`.trim()||p.code||'Joueur'}`).join('\n');
+  const selectedRaw=prompt(`Quels joueurs HWBT jouent le match ?\n\n${roster||'Aucun joueur dans la plateforme'}\n\nMets les numéros séparés par une virgule.`,STATE.players.length>1?'1,2':'1')||'';
+  let playerIds=selectedRaw.split(/[,\s;]+/).map(x=>Number(x.trim())-1).filter(i=>i>=0&&STATE.players[i]).map(i=>STATE.players[i].id);
+  if(!playerIds.length) playerIds=STATE.players.slice(0,2).map(p=>p.id);
+  playerIds=playerIds.slice(0,2);
+  const defaultTitle=`${playerIds.map(id=>matchPlayerNameById(id)).filter(Boolean).join(' + ')||'HWBT'} vs adversaires`;
+  const title=(prompt('Nom du match ?',defaultTitle)||defaultTitle).trim();
   const score=(prompt('Score de départ des jeux ? Mets 0-0 si tu commences au début du match.','0-0')||'0-0').trim();
   const servingTeam=(prompt('Qui commence à servir ? Mets HWBT ou ADV.','HWBT')||'HWBT').trim().toUpperCase().startsWith('A')?'ADV':'HWBT';
   const id=Date.now();
-  const playerIds=STATE.players.slice(0,2).map(p=>p.id);
   const match={id,title,date:today,score,currentScore:score,status:'EN_COURS',format:'Padel',playerIds,events:[],matchScore:{hwbtGames:0,advGames:0,hwbtPoints:0,advPoints:0,pointScore:'0-0',servingTeam},createdAt:new Date().toISOString()};
   const gameMatch=score.match(/(\d+)\s*[-/]\s*(\d+)/);
   if(gameMatch){match.matchScore.hwbtGames=Number(gameMatch[1])||0;match.matchScore.advGames=Number(gameMatch[2])||0;}
@@ -5746,6 +5751,28 @@ function createMatchAnalystMatch(){
 function currentMatchForEncoding(){
   const real=matchRealList();
   return real.find(m=>String(m.id)===String(UI.matchAnalystId))||real[0]||null;
+}
+function matchPlayerNameById(id){
+  const p=STATE.players.find(x=>String(x.id)===String(id));
+  return p?.name||`${p?.firstName||''} ${p?.lastName||''}`.trim()||p?.code||'';
+}
+function shortMatchName(name,fallback){
+  const clean=String(name||'').trim();
+  return clean?clean.split(/\s+/)[0]:fallback;
+}
+function matchPlayerSlots(m){
+  const ids=Array.isArray(m?.playerIds)?m.playerIds:[m?.playerId].filter(Boolean);
+  const p1=shortMatchName(matchPlayerNameById(ids[0]),'Joueur 1');
+  const p2=shortMatchName(matchPlayerNameById(ids[1]),ids[0]?'Partenaire':'Joueur 2');
+  return {p1,p2,full1:matchPlayerNameById(ids[0])||p1,full2:matchPlayerNameById(ids[1])||p2};
+}
+function matchOriginLabel(m,origin){
+  const slots=matchPlayerSlots(m);
+  if(origin==='JOUEUR_1') return slots.p1;
+  if(origin==='JOUEUR_2') return slots.p2;
+  if(origin==='COLLECTIF') return 'Duo HWBT';
+  if(origin==='ADVERSAIRES') return 'Adversaire';
+  return 'À préciser';
 }
 function setMatchCurrentScore(){
   const m=currentMatchForEncoding();
@@ -5931,31 +5958,40 @@ function matchEncoderHtml(match,a){
   const events=(m.events||[]).filter(e=>String(e.type).toUpperCase()==='POINT'&&e.active!==false&&!e.cancelled);
   const last=events.slice(-8).reverse();
   const pending=UI.matchPointResult||null;
+  const slots=matchPlayerSlots(m);
+  const p1=slots.p1;
+  const p2=slots.p2;
   const optionsWon=[
-    ['JOUEUR_1','winner vibora','attaque','J1 · Vibora'],
-    ['JOUEUR_1','winner smash','attaque','J1 · Smash'],
-    ['JOUEUR_1','winner volée','filet','J1 · Volée'],
-    ['JOUEUR_1','winner lob','construction','J1 · Lob'],
-    ['JOUEUR_2','winner vibora','attaque','J2 · Vibora'],
-    ['JOUEUR_2','winner smash','attaque','J2 · Smash'],
-    ['JOUEUR_2','winner volée','filet','J2 · Volée'],
-    ['JOUEUR_2','winner lob','construction','J2 · Lob'],
-    ['COLLECTIF','point construit','construction','Collectif'],
-    ['ADVERSAIRES','faute adverse','pression','Faute adverse'],
-    ['INDETERMINE','','','Je ne sais pas']
+    ['JOUEUR_1','winner vibora / bandeja','attaque',`${p1} · Vibora`],
+    ['JOUEUR_1','winner smash','finition',`${p1} · Smash`],
+    ['JOUEUR_1','volée gagnante','filet',`${p1} · Volée`],
+    ['JOUEUR_1','lob gagnant','défense',`${p1} · Lob`],
+    ['JOUEUR_1','retour gagnant','retour',`${p1} · Retour`],
+    ['JOUEUR_2','winner vibora / bandeja','attaque',`${p2} · Vibora`],
+    ['JOUEUR_2','winner smash','finition',`${p2} · Smash`],
+    ['JOUEUR_2','volée gagnante','filet',`${p2} · Volée`],
+    ['JOUEUR_2','lob gagnant','défense',`${p2} · Lob`],
+    ['JOUEUR_2','retour gagnant','retour',`${p2} · Retour`],
+    ['COLLECTIF','point construit vers filet','construction','Duo · Construction'],
+    ['COLLECTIF','bonne transition défense attaque','transition','Duo · Transition'],
+    ['ADVERSAIRES','faute adverse provoquée','pression','Faute provoquée'],
+    ['INDETERMINE','','','À préciser']
   ];
   const optionsLost=[
-    ['JOUEUR_1','faute vibora','attaque','J1 · Vibora'],
-    ['JOUEUR_1','faute smash','attaque','J1 · Smash'],
-    ['JOUEUR_1','faute volée','filet','J1 · Volée'],
-    ['JOUEUR_1','faute lob','défense','J1 · Lob'],
-    ['JOUEUR_2','faute vibora','attaque','J2 · Vibora'],
-    ['JOUEUR_2','faute smash','attaque','J2 · Smash'],
-    ['JOUEUR_2','faute volée','filet','J2 · Volée'],
-    ['JOUEUR_2','faute lob','défense','J2 · Lob'],
-    ['COLLECTIF','erreur collective','organisation','Collectif'],
-    ['ADVERSAIRES','winner adverse','défense','Point adverse'],
-    ['INDETERMINE','','','Je ne sais pas']
+    ['JOUEUR_1','faute retour','retour',`${p1} · Retour`],
+    ['JOUEUR_1','faute volée','filet',`${p1} · Volée`],
+    ['JOUEUR_1','lob trop court','défense',`${p1} · Lob court`],
+    ['JOUEUR_1','faute vibora / bandeja','attaque',`${p1} · Vibora`],
+    ['JOUEUR_1','mauvais choix tactique','décision',`${p1} · Choix`],
+    ['JOUEUR_2','faute retour','retour',`${p2} · Retour`],
+    ['JOUEUR_2','faute volée','filet',`${p2} · Volée`],
+    ['JOUEUR_2','lob trop court','défense',`${p2} · Lob court`],
+    ['JOUEUR_2','faute vibora / bandeja','attaque',`${p2} · Vibora`],
+    ['JOUEUR_2','mauvais choix tactique','décision',`${p2} · Choix`],
+    ['COLLECTIF','zone libre non couverte','placement','Duo · Placement'],
+    ['COLLECTIF','communication tardive','communication','Duo · Communication'],
+    ['ADVERSAIRES','winner adverse','défense','Winner adverse'],
+    ['INDETERMINE','','','À préciser']
   ];
   const shotButtons=(pending==='GAGNE'?optionsWon:optionsLost).map(([origin,cause,phase,label])=>`<button class="match-live-mini ${pending==='GAGNE'?'won':'lost'}" onclick="addMatchPoint('${pending}','${origin}','${jsStr(cause)}','${jsStr(phase)}')">${esc(label)}</button>`).join('');
   return `<div>
@@ -5998,7 +6034,7 @@ function matchEncoderHtml(match,a){
     </div>
     <div class="g2">
       <div class="g2">${matchMetricCard('Score suivi',m.currentScore||m.score||'0-0')}${matchMetricCard('Bilan live',`${a.matchSummary.won}-${a.matchSummary.lost}`,`${a.matchSummary.totalPoints} points encodés`)}</div>
-      <div class="card"><div class="card-title">DERNIERS POINTS</div>${last.length?last.map((e,i)=>`<div style="display:grid;grid-template-columns:42px 1fr 72px;gap:8px;border-top:1px solid var(--border);padding:9px 0;align-items:center"><b style="color:${e.result==='GAGNE'?'var(--bronze)':'var(--gray)'}">#${events.length-i}</b><div><div style="font-size:12px;color:var(--white)">${esc(e.result)} · ${esc(e.origin.replace('_',' '))}${e.gameWon?` · Jeu ${esc(e.gameWon)}`:''}</div><div class="muted-help">${esc(e.score||m.currentScore||'score ?')} · service ${esc(e.server||'—')} · ${esc(e.cause||'cause ?')}</div></div><div style="font-size:9px;color:var(--gray);text-align:right">${secondsLabel(e.t||0)}</div></div>`).join(''):'<div class="muted-help">Aucun point encodé.</div>'}</div>
+      <div class="card"><div class="card-title">DERNIERS POINTS</div>${last.length?last.map((e,i)=>`<div style="display:grid;grid-template-columns:42px 1fr 72px;gap:8px;border-top:1px solid var(--border);padding:9px 0;align-items:center"><b style="color:${e.result==='GAGNE'?'var(--bronze)':'var(--gray)'}">#${events.length-i}</b><div><div style="font-size:12px;color:var(--white)">${esc(e.result)} · ${esc(matchOriginLabel(m,e.origin))}${e.gameWon?` · Jeu ${esc(e.gameWon)}`:''}</div><div class="muted-help">${esc(e.score||m.currentScore||'score ?')} · service ${esc(e.server||'—')} · ${esc(e.cause||'cause ?')}</div></div><div style="font-size:9px;color:var(--gray);text-align:right">${secondsLabel(e.t||0)}</div></div>`).join(''):'<div class="muted-help">Aucun point encodé.</div>'}</div>
     </div>
   </div>`;
 }
