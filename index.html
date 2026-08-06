@@ -5700,10 +5700,10 @@ function matchRealList(){
 function createMatchAnalystMatch(){
   const today=new Date().toISOString().slice(0,10);
   const title=(prompt('Nom du match ?','HWBT vs adversaires')||'Match HWBT').trim();
-  const score=(prompt('Score final ou provisoire ?','')||'').trim();
+  const score=(prompt('Score de départ ? Mets 0-0 si tu commences au début du match.','0-0')||'0-0').trim();
   const id=Date.now();
   const playerIds=STATE.players.slice(0,2).map(p=>p.id);
-  const match={id,title,date:today,score,status:'EN_COURS',format:'Padel',playerIds,events:[],createdAt:new Date().toISOString()};
+  const match={id,title,date:today,score,currentScore:score,status:'EN_COURS',format:'Padel',playerIds,events:[],createdAt:new Date().toISOString()};
   STATE.matches.push(match);
   saveState();
   showNotif('Match créé · tu peux encoder les points');
@@ -5713,7 +5713,17 @@ function currentMatchForEncoding(){
   const real=matchRealList();
   return real.find(m=>String(m.id)===String(UI.matchAnalystId))||real[0]||null;
 }
-function addMatchPoint(result,origin){
+function setMatchCurrentScore(){
+  const m=currentMatchForEncoding();
+  if(!m)return;
+  const score=(document.getElementById('matchCurrentScoreInput')?.value||'').trim();
+  m.currentScore=score||'0-0';
+  m.score=m.currentScore;
+  saveState();
+  render();
+  showNotif('Score de départ mis à jour');
+}
+function addMatchPoint(result,origin,causePreset='',phasePreset=''){
   const m=currentMatchForEncoding();
   if(!m){showNotif('Crée d’abord un vrai match');return;}
   const events=m.events||m.journal||m.eventLog||[];
@@ -5721,13 +5731,15 @@ function addMatchPoint(result,origin){
   const now=Date.now();
   const start=m.startedAtMs||(m.startedAtMs=now);
   const pointNumber=events.filter(e=>String(e.type).toUpperCase()==='POINT'&&e.active!==false&&!e.cancelled).length+1;
-  const score=document.getElementById('matchPointScore')?.value||'';
-  const phase=document.getElementById('matchPointPhase')?.value||'';
-  const cause=document.getElementById('matchPointCause')?.value||'';
+  const score=document.getElementById('matchPointScore')?.value||m.currentScore||m.score||'';
+  const phase=phasePreset||document.getElementById('matchPointPhase')?.value||'';
+  const cause=causePreset||document.getElementById('matchPointCause')?.value||'';
   const server=document.getElementById('matchPointServer')?.value||'';
   const tags=[...document.querySelectorAll('[data-match-tag]:checked')].map(x=>x.value);
   events.push({type:'POINT',id:`m${m.id}-p${pointNumber}`,t:Math.round((now-start)/1000),result,origin,score,phase,cause,server,tags,createdAt:new Date().toISOString()});
-  if(score) document.getElementById('matchPointScore').value='';
+  m.currentScore=score||m.currentScore||m.score||'0-0';
+  m.score=m.currentScore;
+  if(document.getElementById('matchPointScore')) document.getElementById('matchPointScore').value='';
   document.querySelectorAll('[data-match-tag]:checked').forEach(x=>x.checked=false);
   saveState();
   render();
@@ -5796,35 +5808,59 @@ function matchEncoderHtml(match,a){
   if(!m) return `<div class="card" style="text-align:center;padding:38px;border-color:var(--bronze-dim2)"><div class="card-title">ENCODAGE MATCH</div><div style="font-size:28px;font-weight:900;margin-bottom:10px">Commence par créer un vrai match</div><div class="muted-help" style="margin-bottom:18px">Les démos servent juste à montrer le résultat. Pour travailler, crée ton match et encode les points.</div><button class="btn btn-primary" onclick="createMatchAnalystMatch()">+ NOUVEAU MATCH</button></div>`;
   const events=(m.events||[]).filter(e=>String(e.type).toUpperCase()==='POINT'&&e.active!==false&&!e.cancelled);
   const last=events.slice(-8).reverse();
-  const origins=[['JOUEUR_1','Joueur 1'],['JOUEUR_2','Joueur 2'],['COLLECTIF','Collectif'],['ADVERSAIRES','Adversaires'],['INDETERMINE','Indéterminé']];
-  return `<div class="g2">
-    <div>
+  const quickBtn=(result,origin,cause,phase,label,sub,style='primary')=>`<button class="btn ${style==='primary'?'btn-primary':'btn-ghost'}" style="min-height:72px;text-align:left;display:block;width:100%;padding:13px 14px" onclick="addMatchPoint('${result}','${origin}','${jsStr(cause)}','${jsStr(phase)}')"><b style="display:block;font-size:14px">${esc(label)}</b><span style="display:block;font-size:10px;color:${style==='primary'?'#111':'var(--gray)'};font-family:var(--font-body);line-height:1.35;margin-top:4px">${esc(sub)}</span></button>`;
+  return `<div>
+    <div class="card" style="border-color:var(--bronze-dim2)">
+      <div style="display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap">
+        <div><div class="card-title">MODE TERRAIN · LIVE SCORING</div><div style="font-size:28px;font-weight:900;line-height:1">${esc(m.title||'Match HWBT')}</div><div class="muted-help" style="margin-top:6px">Tu démarres à 0-0. Si tu as raté des points, mets simplement le score actuel avant d’encoder.</div></div>
+        <div style="text-align:right"><div style="font-size:54px;font-weight:900;line-height:1;color:var(--bronze)">${events.length}</div><div class="card-title">POINTS ENCODÉS</div></div>
+      </div>
+      <div class="g3" style="margin-top:16px;align-items:end">
+        <div class="form-group"><label class="form-label">SCORE ACTUEL / DÉPART</label><input class="form-input" id="matchCurrentScoreInput" value="${esc(m.currentScore||m.score||'0-0')}" placeholder="0-0, 3-2, 30-30..."></div>
+        <div class="form-group"><label class="form-label">SERVEUR OPTIONNEL</label><input class="form-input" id="matchPointServer" placeholder="Lucas, partenaire, adversaire..."></div>
+        <button class="btn btn-ghost" onclick="setMatchCurrentScore()">METTRE À JOUR LE SCORE</button>
+      </div>
+    </div>
+    <div class="g2">
       <div class="card" style="border-color:var(--bronze-dim2)">
-        <div class="card-title">ENCODER LE POINT</div>
-        <div style="font-size:24px;font-weight:900;line-height:1.05;margin-bottom:12px">${esc(m.title||'Match HWBT')}</div>
-        <div class="g2">
-          <div class="form-group"><label class="form-label">SCORE DU MOMENT</label><input class="form-input" id="matchPointScore" placeholder="Ex: 30-30, 40-40, jeu 4-3"></div>
-          <div class="form-group"><label class="form-label">SERVEUR</label><input class="form-input" id="matchPointServer" placeholder="Ex: Lucas, Alexandre, adversaire"></div>
-          <div class="form-group"><label class="form-label">PHASE</label><select class="form-select" id="matchPointPhase"><option value="">— Non renseigné —</option><option>service</option><option>retour</option><option>construction</option><option>transition</option><option>filet</option><option>défense</option></select></div>
-          <div class="form-group"><label class="form-label">CAUSE</label><select class="form-select" id="matchPointCause"><option value="">— Non renseigné —</option><option>winner</option><option>faute directe</option><option>faute provoquée</option><option>choix tactique</option><option>placement</option></select></div>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px">
-          ${['40-40','POINT_DECISIF','BALLE_DE_JEU','BALLE_DE_SET','BALLE_DE_MATCH','TIE_BREAK','SUPER_TIE_BREAK'].map(t=>`<label style="display:flex;gap:6px;align-items:center;background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-size:10px;color:var(--offwhite)"><input type="checkbox" data-match-tag value="${t}">${t.replaceAll('_',' ')}</label>`).join('')}
-        </div>
         <div class="card-title">POINT GAGNÉ PAR HWBT</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">${origins.map(([v,l])=>`<button class="btn btn-primary btn-sm" onclick="addMatchPoint('GAGNE','${v}')">${l}</button>`).join('')}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
+          ${quickBtn('GAGNE','JOUEUR_1','winner','attaque','Joueur 1 gagnant','Il gagne le point avec son coup.')}
+          ${quickBtn('GAGNE','JOUEUR_2','winner','attaque','Joueur 2 gagnant','Il gagne le point avec son coup.')}
+          ${quickBtn('GAGNE','COLLECTIF','construction collective','construction','Point construit','Le duo construit et finit ensemble.')}
+          ${quickBtn('GAGNE','ADVERSAIRES','faute adverse','pression','Faute adverse','L’adversaire donne le point.')}
+          ${quickBtn('GAGNE','INDETERMINE','','','Je ne sais pas','Point gagné, origine à compléter plus tard.')}
+        </div>
+      </div>
+      <div class="card">
         <div class="card-title">POINT PERDU PAR HWBT</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">${origins.map(([v,l])=>`<button class="btn btn-ghost btn-sm" onclick="addMatchPoint('PERDU','${v}')">${l}</button>`).join('')}</div>
-        <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:18px">
-          <button class="btn btn-ghost" onclick="undoLastMatchPoint()">ANNULER DERNIER POINT</button>
-          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost" onclick="deleteMatchAnalystMatch('${m.id}')">SUPPRIMER MATCH</button><button class="btn btn-primary" onclick="finishMatchAnalystMatch()">CLÔTURER LE MATCH</button></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
+          ${quickBtn('PERDU','JOUEUR_1','faute directe','stabilité','Faute joueur 1','Erreur ou mauvais choix du joueur 1.','ghost')}
+          ${quickBtn('PERDU','JOUEUR_2','faute directe','stabilité','Faute joueur 2','Erreur ou mauvais choix du joueur 2.','ghost')}
+          ${quickBtn('PERDU','COLLECTIF','erreur collective','organisation','Erreur collective','Mauvaise coordination ou zone mal couverte.','ghost')}
+          ${quickBtn('PERDU','ADVERSAIRES','winner adverse','défense','Point adverse','L’adversaire gagne le point.','ghost')}
+          ${quickBtn('PERDU','INDETERMINE','','','Je ne sais pas','Point perdu, origine à compléter plus tard.','ghost')}
         </div>
       </div>
     </div>
-    <div>
-      <div class="g2">${matchMetricCard('Points encodés',events.length)}${matchMetricCard('Score',m.score||'En cours')}</div>
-      <div class="card"><div class="card-title">DERNIERS POINTS</div>${last.length?last.map((e,i)=>`<div style="display:grid;grid-template-columns:42px 1fr 72px;gap:8px;border-top:1px solid var(--border);padding:9px 0;align-items:center"><b style="color:${e.result==='GAGNE'?'var(--bronze)':'var(--gray)'}">#${events.length-i}</b><div><div style="font-size:12px;color:var(--white)">${esc(e.result)} · ${esc(e.origin.replace('_',' '))}</div><div class="muted-help">${esc(e.score||'score ?')} · ${esc(e.phase||'phase ?')} · ${esc(e.cause||'cause ?')}</div></div><div style="font-size:9px;color:var(--gray);text-align:right">${secondsLabel(e.t||0)}</div></div>`).join(''):'<div class="muted-help">Aucun point encodé.</div>'}</div>
-      <div class="card"><div class="card-title">ANALYSE LIVE</div><div class="muted-help">Les cartes coach/joueur se mettent à jour à chaque point encodé.</div>${matchCoachHtml(a)}</div>
+    <div class="card">
+      <div class="card-title">MARQUEURS RAPIDES POUR LE PROCHAIN POINT</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        ${['40-40','POINT_DECISIF','BALLE_DE_JEU','BALLE_DE_SET','BALLE_DE_MATCH','TIE_BREAK','SUPER_TIE_BREAK'].map(t=>`<label style="display:flex;gap:6px;align-items:center;background:var(--bg4);border:1px solid var(--border);border-radius:7px;padding:9px 10px;font-size:10px;color:var(--offwhite)"><input type="checkbox" data-match-tag value="${t}">${t.replaceAll('_',' ')}</label>`).join('')}
+      </div>
+      <div class="g2">
+        <div class="form-group"><label class="form-label">COMMENT OPTIONNEL</label><select class="form-select" id="matchPointCause"><option value="">Automatique via le bouton</option><option>winner</option><option>faute directe</option><option>faute provoquée</option><option>choix tactique</option><option>placement</option><option>retour</option><option>lob</option><option>volée</option></select></div>
+        <div class="form-group"><label class="form-label">PHASE OPTIONNELLE</label><select class="form-select" id="matchPointPhase"><option value="">Automatique via le bouton</option><option>service</option><option>retour</option><option>construction</option><option>transition</option><option>filet</option><option>défense</option></select></div>
+      </div>
+      <input type="hidden" id="matchPointScore" value="">
+      <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:10px">
+        <button class="btn btn-ghost" onclick="undoLastMatchPoint()">ANNULER DERNIER POINT</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost" onclick="deleteMatchAnalystMatch('${m.id}')">SUPPRIMER MATCH</button><button class="btn btn-primary" onclick="finishMatchAnalystMatch()">CLÔTURER LE MATCH</button></div>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="g2">${matchMetricCard('Score suivi',m.currentScore||m.score||'0-0')}${matchMetricCard('Bilan live',`${a.matchSummary.won}-${a.matchSummary.lost}`,`${a.matchSummary.totalPoints} points encodés`)}</div>
+      <div class="card"><div class="card-title">DERNIERS POINTS</div>${last.length?last.map((e,i)=>`<div style="display:grid;grid-template-columns:42px 1fr 72px;gap:8px;border-top:1px solid var(--border);padding:9px 0;align-items:center"><b style="color:${e.result==='GAGNE'?'var(--bronze)':'var(--gray)'}">#${events.length-i}</b><div><div style="font-size:12px;color:var(--white)">${esc(e.result)} · ${esc(e.origin.replace('_',' '))}</div><div class="muted-help">${esc(e.score||m.currentScore||'score ?')} · ${esc(e.phase||'phase ?')} · ${esc(e.cause||'cause ?')}</div></div><div style="font-size:9px;color:var(--gray);text-align:right">${secondsLabel(e.t||0)}</div></div>`).join(''):'<div class="muted-help">Aucun point encodé.</div>'}</div>
     </div>
   </div>`;
 }
