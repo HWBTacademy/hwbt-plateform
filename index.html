@@ -153,6 +153,10 @@ body{min-width:0}
 .match-live-main.lost{background:linear-gradient(135deg,#ffffff08,var(--bg2))}
 .match-live-main.active{box-shadow:0 0 0 2px var(--bronze);border-color:var(--bronze)}
 .match-live-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
+.match-action-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.match-action-group{border:1px solid var(--border);border-radius:9px;background:rgba(255,255,255,.025);padding:10px}
+.match-action-group-title{font-family:var(--font-title);font-size:10px;letter-spacing:1.3px;color:var(--bronze);margin-bottom:8px;text-transform:uppercase}
+.match-action-group .match-live-options{grid-template-columns:1fr 1fr}
 .match-live-mini{min-height:48px;border-radius:7px;border:1px solid var(--border2);background:var(--bg4);color:var(--offwhite);font-family:var(--font-title);font-size:11px;letter-spacing:.8px;font-weight:700;cursor:pointer;padding:9px 8px;transition:all .15s}
 .match-live-mini.won{border-color:var(--bronze-dim2);color:var(--white)}
 .match-live-mini.lost{color:var(--gray);background:transparent}
@@ -388,6 +392,8 @@ body{min-width:0}
   .match-live-main{min-height:72px;padding:11px 10px;border-radius:8px}
   .match-live-main span{font-size:12px;letter-spacing:.8px}
   .match-live-main b{font-size:13px;margin-top:6px}
+  .match-action-groups{grid-template-columns:1fr;gap:8px}
+  .match-action-group{padding:8px}
   .match-live-options{grid-template-columns:repeat(2,1fr);gap:7px}
   .match-live-mini{min-height:38px;font-size:9px;padding:7px 6px}
   .match-scoreboard{grid-template-columns:1fr auto 1fr;padding:11px;gap:6px}
@@ -6129,40 +6135,43 @@ function matchEncoderHtml(match,a){
   const p1=slots.p1;
   const p2=slots.p2;
   const optionsWon=[
-    ['JOUEUR_1','winner vibora / bandeja','attaque',`${p1} · Vibora`],
-    ['JOUEUR_1','winner smash','finition',`${p1} · Smash`],
-    ['JOUEUR_1','volée gagnante','filet',`${p1} · Volée`],
-    ['JOUEUR_1','lob gagnant','défense',`${p1} · Lob`],
-    ['JOUEUR_1','retour qui met sous pression','retour',`${p1} · Retour`],
-    ['JOUEUR_2','winner vibora / bandeja','attaque',`${p2} · Vibora`],
-    ['JOUEUR_2','winner smash','finition',`${p2} · Smash`],
-    ['JOUEUR_2','volée gagnante','filet',`${p2} · Volée`],
-    ['JOUEUR_2','lob gagnant','défense',`${p2} · Lob`],
-    ['JOUEUR_2','retour qui met sous pression','retour',`${p2} · Retour`],
-    ['COLLECTIF','montée au filet réussie','transition','Duo · Montée filet'],
-    ['COLLECTIF','point construit par patience','construction','Duo · Patience'],
-    ['COLLECTIF','zone libre trouvée','placement','Duo · Zone libre'],
-    ['ADVERSAIRES','faute adverse provoquée','pression','Faute provoquée'],
-    ['INDETERMINE','','','À préciser']
+    ['JOUEUR_1','service gagnant ou service qui donne avantage','service',`${p1} · Service`,p1],
+    ['JOUEUR_1','retour agressif ou retour qui met sous pression','retour',`${p1} · Retour`,p1],
+    ['JOUEUR_1','winner fond de terrain','fond',`${p1} · Fond`,p1],
+    ['JOUEUR_1','volée gagnante','filet',`${p1} · Volée`,p1],
+    ['JOUEUR_1','winner haut tête vibora bandeja smash','attaque',`${p1} · Haut tête`,p1],
+    ['JOUEUR_2','service gagnant ou service qui donne avantage','service',`${p2} · Service`,p2],
+    ['JOUEUR_2','retour agressif ou retour qui met sous pression','retour',`${p2} · Retour`,p2],
+    ['JOUEUR_2','winner fond de terrain','fond',`${p2} · Fond`,p2],
+    ['JOUEUR_2','volée gagnante','filet',`${p2} · Volée`,p2],
+    ['JOUEUR_2','winner haut tête vibora bandeja smash','attaque',`${p2} · Haut tête`,p2],
+    ['COLLECTIF','point construit par patience','construction','Duo · Patience','Duo HWBT'],
+    ['COLLECTIF','montée au filet réussie','transition','Duo · Montée filet','Duo HWBT'],
+    ['COLLECTIF','zone libre trouvée','placement','Duo · Zone libre','Duo HWBT'],
+    ['ADVERSAIRES','faute adverse provoquée','pression','Faute provoquée','Duo HWBT']
   ];
   const optionsLost=[
-    ['JOUEUR_1','faute retour','retour',`${p1} · Retour`],
-    ['JOUEUR_1','faute volée','filet',`${p1} · Volée`],
-    ['JOUEUR_1','lob trop court','défense',`${p1} · Lob court`],
-    ['JOUEUR_1','faute vibora / bandeja','attaque',`${p1} · Vibora`],
-    ['JOUEUR_1','mauvais choix tactique','décision',`${p1} · Mauvais choix`],
-    ['JOUEUR_2','faute retour','retour',`${p2} · Retour`],
-    ['JOUEUR_2','faute volée','filet',`${p2} · Volée`],
-    ['JOUEUR_2','lob trop court','défense',`${p2} · Lob court`],
-    ['JOUEUR_2','faute vibora / bandeja','attaque',`${p2} · Vibora`],
-    ['JOUEUR_2','mauvais choix tactique','décision',`${p2} · Mauvais choix`],
-    ['ADVERSAIRES','adv gauche winner volée','filet','ADV G · Volée'],
-    ['ADVERSAIRES','adv droite winner volée','filet','ADV D · Volée'],
-    ['ADVERSAIRES','adv gauche winner haut tête','défense','ADV G · Haut tête'],
-    ['ADVERSAIRES','adv droite winner lob','défense','ADV D · Lob'],
-    ['INDETERMINE','','','À préciser']
+    ['JOUEUR_1','faute service','service',`${p1} · Service`,p1],
+    ['JOUEUR_1','faute retour','retour',`${p1} · Retour`,p1],
+    ['JOUEUR_1','faute fond de terrain','fond',`${p1} · Fond`,p1],
+    ['JOUEUR_1','faute volée','filet',`${p1} · Volée`,p1],
+    ['JOUEUR_1','faute haut tête vibora bandeja smash','attaque',`${p1} · Haut tête`,p1],
+    ['JOUEUR_1','mauvais choix tactique','décision',`${p1} · Choix`,p1],
+    ['JOUEUR_2','faute service','service',`${p2} · Service`,p2],
+    ['JOUEUR_2','faute retour','retour',`${p2} · Retour`,p2],
+    ['JOUEUR_2','faute fond de terrain','fond',`${p2} · Fond`,p2],
+    ['JOUEUR_2','faute volée','filet',`${p2} · Volée`,p2],
+    ['JOUEUR_2','faute haut tête vibora bandeja smash','attaque',`${p2} · Haut tête`,p2],
+    ['JOUEUR_2','mauvais choix tactique','décision',`${p2} · Choix`,p2],
+    ['ADVERSAIRES','adv gauche winner volée','filet','ADV G · Volée','ADV gauche'],
+    ['ADVERSAIRES','adv gauche winner haut tête','attaque','ADV G · Haut tête','ADV gauche'],
+    ['ADVERSAIRES','adv gauche winner fond de terrain','fond','ADV G · Fond','ADV gauche'],
+    ['ADVERSAIRES','adv droite winner volée','filet','ADV D · Volée','ADV droite'],
+    ['ADVERSAIRES','adv droite winner haut tête','attaque','ADV D · Haut tête','ADV droite'],
+    ['ADVERSAIRES','adv droite winner fond de terrain','fond','ADV D · Fond','ADV droite']
   ];
-  const shotButtons=(pending==='GAGNE'?optionsWon:optionsLost).map(([origin,cause,phase,label])=>`<button class="match-live-mini ${pending==='GAGNE'?'won':'lost'}" onclick="addMatchPoint('${pending}','${origin}','${jsStr(cause)}','${jsStr(phase)}')">${esc(label)}</button>`).join('');
+  const groupedActions=(pending==='GAGNE'?optionsWon:optionsLost).reduce((acc,item)=>{const group=item[4]||'Actions';(acc[group]||(acc[group]=[])).push(item);return acc;},{});
+  const shotButtons=Object.entries(groupedActions).map(([group,items])=>`<div class="match-action-group"><div class="match-action-group-title">${esc(group)}</div><div class="match-live-options">${items.map(([origin,cause,phase,label])=>`<button class="match-live-mini ${pending==='GAGNE'?'won':'lost'}" onclick="addMatchPoint('${pending}','${origin}','${jsStr(cause)}','${jsStr(phase)}')">${esc(label)}</button>`).join('')}</div></div>`).join('');
   return `<div>
     <div class="card" style="border-color:var(--bronze-dim2)">
       <div style="display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap">
@@ -6185,7 +6194,7 @@ function matchEncoderHtml(match,a){
       <button class="match-live-main won ${pending==='GAGNE'?'active':''}" onclick="setMatchPointResult('GAGNE')"><span>POINT GAGNÉ HWBT</span><b>1er clic</b></button>
       <button class="match-live-main lost ${pending==='PERDU'?'active':''}" onclick="setMatchPointResult('PERDU')"><span>POINT PERDU HWBT</span><b>1er clic</b></button>
     </div>
-    ${pending?`<div class="card" style="border-color:${pending==='GAGNE'?'var(--bronze-dim2)':'var(--border2)'}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px"><div><div class="card-title">2E CLIC · ${pending==='GAGNE'?'COMMENT LE POINT EST GAGNÉ ?':'COMMENT LE POINT EST PERDU ?'}</div><div class="muted-help">${matchPointStateLabel(pending)}. Clique le coup ou l’origine, puis le score central se met à jour.</div></div><button class="btn btn-ghost btn-sm" onclick="setMatchPointResult(null)">ANNULER CHOIX</button></div><div class="match-live-options">${shotButtons}</div></div>`:''}
+    ${pending?`<div class="card" style="border-color:${pending==='GAGNE'?'var(--bronze-dim2)':'var(--border2)'}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px"><div><div class="card-title">2E CLIC · ${pending==='GAGNE'?'COMMENT LE POINT EST GAGNÉ ?':'COMMENT LE POINT EST PERDU ?'}</div><div class="muted-help">${matchPointStateLabel(pending)}. Clique le coup ou l’origine, puis le score central se met à jour.</div></div><button class="btn btn-ghost btn-sm" onclick="setMatchPointResult(null)">ANNULER CHOIX</button></div><div class="match-action-groups">${shotButtons}</div></div>`:''}
     <div class="card" style="padding:14px">
       <div class="card-title">MARQUEURS OPTIONNELS AVANT LE 2E CLIC</div>
       <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px">
@@ -6193,7 +6202,7 @@ function matchEncoderHtml(match,a){
       </div>
       <div class="g2">
         <div class="form-group"><label class="form-label">COMMENT OPTIONNEL</label><select class="form-select" id="matchPointCause"><option value="">Automatique via le bouton</option><option>winner</option><option>faute directe</option><option>faute provoquée</option><option>choix tactique</option><option>placement</option><option>retour</option><option>lob</option><option>volée</option></select></div>
-        <div class="form-group"><label class="form-label">PHASE OPTIONNELLE</label><select class="form-select" id="matchPointPhase"><option value="">Automatique via le bouton</option><option>service</option><option>retour</option><option>construction</option><option>transition</option><option>filet</option><option>défense</option></select></div>
+        <div class="form-group"><label class="form-label">PHASE OPTIONNELLE</label><select class="form-select" id="matchPointPhase"><option value="">Automatique via le bouton</option><option>service</option><option>retour</option><option>fond</option><option>construction</option><option>transition</option><option>filet</option><option>défense</option></select></div>
       </div>
       <input type="hidden" id="matchPointScore" value="">
       <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:10px">
