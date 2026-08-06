@@ -4275,9 +4275,11 @@ function pagePlayerDetail(playerId){
         <div style="font-size:18px;font-weight:900;line-height:1.1;margin-bottom:8px">${esc(ma.title)}</div>
         <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6">${esc(ma.workAxis||'Axe à reprendre au prochain entraînement.')}</div>
         ${ma.positives?.length?`<div style="margin-top:10px">${ma.positives.map(x=>`<div class="strength"><span class="plus">+</span>${esc(x)}</div>`).join('')}</div>`:''}
+        ${ma.players?.length?`<div style="margin-top:10px;display:grid;gap:7px">${ma.players.map(pd=>`<div style="background:#050507;border:1px solid var(--border);border-radius:6px;padding:9px"><div style="display:flex;justify-content:space-between;gap:8px"><b style="font-size:11px;color:var(--white)">${esc(pd.label)}</b><span style="font-size:10px;color:${pd.impact>=20?'var(--vert)':pd.impact<=-20?'var(--rouge)':'var(--bronze)'}">${pd.impact>0?'+':''}${pd.impact}</span></div><div class="muted-help">${esc(pd.won)} gagnés · ${esc(pd.lost)} perdus · priorité: ${esc(pd.priority||'à observer')}</div></div>`).join('')}</div>`:''}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
           <span class="future-chip">Points ${esc(`${ma.won||0}-${ma.lost||0}`)}</span>
           <span class="future-chip">Couverture ${esc(ma.coverage||0)}%</span>
+          ${ma.pair?.nextFocus?`<span class="future-chip">Paire: ${esc(ma.pair.nextFocus)}</span>`:''}
           ${ma.keyNumber?`<span class="future-chip">${esc(ma.keyNumber.label)} ${esc(ma.keyNumber.value)}</span>`:''}
         </div>
       </div>`).join('')}</div></div>`:''}
@@ -5654,6 +5656,20 @@ function activeMatchDurationSeconds(journal,points=[]){
   return Math.max(0,Number(last.t||last.time||last.timestamp||0)-Number(first.t||first.time||first.timestamp||0)-pause);
 }
 function pctX(v,total){return `${v}/${total}${total?` · ${Math.round((v/total)*100)}%`:''}`;}
+function matchCountBy(arr,key){
+  return (arr||[]).reduce((acc,p)=>{const v=String(p[key]||'non renseigné').trim()||'non renseigné';acc[v]=(acc[v]||0)+1;return acc;},{});
+}
+function matchTopEntries(obj,limit=3){
+  return Object.entries(obj||{}).sort((a,b)=>b[1]-a[1]).slice(0,limit).map(([label,value])=>({label,value}));
+}
+function matchPercent(v,total){return total?Math.round((v/total)*100):0;}
+function matchInsightSentence(label,won,lost,total){
+  const balance=won-lost;
+  if(total<2) return `${label}: pas encore assez de données pour conclure.`;
+  if(balance>=2) return `${label}: impact positif, il apporte plus de points qu'il n'en coûte.`;
+  if(balance<=-2) return `${label}: axe prioritaire, les points perdus dépassent les points gagnés.`;
+  return `${label}: équilibre fragile, à observer sur plus de points.`;
+}
 function matchPointImportantTypes(p){
   const raw=[p.importance,p.important,p.category,p.scoreTag,...(Array.isArray(p.tags)?p.tags:[])].filter(Boolean).map(x=>String(x).toUpperCase().replace(/\s+/g,'_'));
   const out=[];
@@ -5671,6 +5687,55 @@ function analyserMatch(journal,config={}){
   const won=points.filter(p=>p.result==='GAGNE'), lost=points.filter(p=>p.result==='PERDU');
   const wonKnown=won.filter(p=>p.origin!=='INDETERMINE'), lostKnown=lost.filter(p=>p.origin!=='INDETERMINE');
   const c=(arr,origin)=>arr.filter(p=>p.origin===origin).length;
+  const playerIds=Array.isArray(config.playerIds)?config.playerIds:(config.playerId?[config.playerId]:[]);
+  const playerLabels={
+    JOUEUR_1:shortMatchName(matchPlayerNameById(playerIds[0]),'Joueur 1'),
+    JOUEUR_2:shortMatchName(matchPlayerNameById(playerIds[1]),playerIds[0]?'Partenaire':'Joueur 2')
+  };
+  const playerDetails=['JOUEUR_1','JOUEUR_2'].map(origin=>{
+    const pWon=won.filter(p=>p.origin===origin);
+    const pLost=lost.filter(p=>p.origin===origin);
+    const pAll=points.filter(p=>p.origin===origin);
+    const topWonCauses=matchTopEntries(matchCountBy(pWon,'cause'),3);
+    const topLostCauses=matchTopEntries(matchCountBy(pLost,'cause'),3);
+    const topLostPhases=matchTopEntries(matchCountBy(pLost,'phase'),3);
+    const total=pWon.length+pLost.length;
+    return {
+      origin,
+      label:playerLabels[origin],
+      won:pWon.length,
+      lost:pLost.length,
+      total,
+      impact:total?Math.round(((pWon.length-pLost.length)/total)*100):0,
+      wonRate:matchPercent(pWon.length,total),
+      topWonCauses,
+      topLostCauses,
+      topLostPhases,
+      message:matchInsightSentence(playerLabels[origin],pWon.length,pLost.length,total),
+      priority:topLostCauses[0]?.label||topLostPhases[0]?.label||'à observer',
+      sample:pAll.slice(-5).map(p=>({result:p.result,cause:p.cause||'',phase:p.phase||'',score:p.score||''}))
+    };
+  });
+  const pairWon=won.filter(p=>p.origin==='COLLECTIF');
+  const pairLost=lost.filter(p=>p.origin==='COLLECTIF');
+  const adversaryWon=lost.filter(p=>p.origin==='ADVERSAIRES');
+  const adversaryLost=won.filter(p=>p.origin==='ADVERSAIRES');
+  const pairTotal=pairWon.length+pairLost.length;
+  const pairAnalysis={
+    built:pairWon.length,
+    pairErrors:pairLost.length,
+    forcedErrors:adversaryLost.length,
+    sufferedWinners:adversaryWon.length,
+    pairBalance:pairWon.length-pairLost.length,
+    constructionRate:matchPercent(pairWon.length,wonKnown.length),
+    pressureRate:matchPercent(adversaryLost.length,wonKnown.length),
+    sufferedRate:matchPercent(adversaryWon.length,lostKnown.length),
+    topPairWins:matchTopEntries(matchCountBy(pairWon,'cause'),3),
+    topPairLosses:matchTopEntries(matchCountBy(pairLost,'cause'),3),
+    topSuffered:matchTopEntries(matchCountBy(adversaryWon,'cause'),3),
+    message:pairTotal>=2?matchInsightSentence('La paire',pairWon.length,pairLost.length,pairTotal):'La paire: ajoute plus de points collectifs pour lire la dynamique duo.',
+    nextFocus:pairLost.length>pairWon.length?'Communication et couverture des zones libres':adversaryWon.length>adversaryLost.length?'Mieux défendre les winners adverses':pairWon.length?'Continuer à construire avant de finir':'Identifier plus clairement les points de paire'
+  };
   const importantIds=new Set(), importantByCat={};
   IMPORTANT_POINT_TYPES.forEach(t=>importantByCat[t]=[]);
   points.forEach(p=>matchPointImportantTypes(p).forEach(t=>{importantIds.add(p.id); importantByCat[t]?.push(p.id);}));
@@ -5683,6 +5748,8 @@ function analyserMatch(journal,config={}){
     coverage:{originKnown:points.length?Math.round(((wonKnown.length+lostKnown.length)/points.length)*100):0,causeKnown:points.filter(p=>p.cause).length,phaseKnown:points.filter(p=>p.phase).length,total:points.length,warnings:[]},
     pointStructure:{wonKnown:wonKnown.length,lostKnown:lostKnown.length,points_gagnes_origine_connue:wonKnown.length,points_perdus_origine_connue:lostKnown.length,points_indetermines_gagnes:won.length-wonKnown.length,points_indetermines_perdus:lost.length-lostKnown.length,points_construits:c(won,'JOUEUR_1')+c(won,'JOUEUR_2')+c(won,'COLLECTIF'),points_offerts:c(won,'ADVERSAIRES'),points_concedes:c(lost,'JOUEUR_1')+c(lost,'JOUEUR_2')+c(lost,'COLLECTIF'),points_subis:c(lost,'ADVERSAIRES'),wonBreakdown:{JOUEUR_1:c(wonKnown,'JOUEUR_1'),JOUEUR_2:c(wonKnown,'JOUEUR_2'),COLLECTIF:c(wonKnown,'COLLECTIF'),ADVERSAIRES:c(wonKnown,'ADVERSAIRES')},lostBreakdown:{JOUEUR_1:c(lostKnown,'JOUEUR_1'),JOUEUR_2:c(lostKnown,'JOUEUR_2'),COLLECTIF:c(lostKnown,'COLLECTIF'),ADVERSAIRES:c(lostKnown,'ADVERSAIRES')}},
     individualContributions:{joueur1:{won:c(wonKnown,'JOUEUR_1'),lost:c(lostKnown,'JOUEUR_1')},joueur2:{won:c(wonKnown,'JOUEUR_2'),lost:c(lostKnown,'JOUEUR_2')},warning:"Convention d'encodage: gagné par joueur = coup gagnant HWBT, perdu par joueur = faute HWBT. Aucun classement entre les deux joueurs."},
+    playerDetails,
+    pairAnalysis,
     scoreContext:{important:{unique:importantIds.size,total:points.length,byCategory:importantByCat}},
     timeline,reviewPoints,warnings:[]
   };
@@ -5708,11 +5775,15 @@ function matchPlayerViewModel(a){
   if(a.pointStructure.points_construits) positives.push('Vous avez construit des points ensemble.');
   if(a.pointStructure.points_offerts) positives.push('Vous avez forcé des fautes adverses.');
   if(a.scoreContext.important.unique) positives.push('Vous avez joué des points importants à revoir ensemble.');
+  (a.playerDetails||[]).forEach(pd=>{
+    if(pd.won>pd.lost) positives.push(`${pd.label} a créé un impact positif sur ses points identifiés.`);
+  });
   const chiffre=a.pointStructure.points_construits?{label:'Points construits',value:pctX(a.pointStructure.points_construits,a.pointStructure.wonKnown)}:null;
   let axis='Construire davantage avant d’accélérer.';
   if(a.pointStructure.points_concedes>a.pointStructure.points_subis) axis='Stabiliser le premier choix après la montée.';
   if(a.scoreContext.important.unique>=3) axis='Mieux sécuriser les points importants.';
-  return {result:a.matchSummary.score||`${a.matchSummary.won}-${a.matchSummary.lost}`,positives:positives.slice(0,3),matchNumber:chiffre,workAxis:axis,reviewCount:a.reviewPoints.length};
+  if(a.pairAnalysis?.nextFocus) axis=a.pairAnalysis.nextFocus;
+  return {result:a.matchSummary.score||`${a.matchSummary.won}-${a.matchSummary.lost}`,positives:positives.slice(0,4),matchNumber:chiffre,workAxis:axis,reviewCount:a.reviewPoints.length,players:a.playerDetails||[],pair:a.pairAnalysis||{}};
 }
 function demoMatchJournal(kind='complete'){
   const origins=['JOUEUR_1','COLLECTIF','ADVERSAIRES','JOUEUR_2','INDETERMINE'];
@@ -5962,6 +6033,8 @@ function compactMatchAnalysis(match){
     score:match.score||match.currentScore||'',
     pushedAt:new Date().toISOString(),
     positives:p.positives||[],
+    players:p.players||[],
+    pair:p.pair||{},
     keyNumber:p.matchNumber||null,
     workAxis:p.workAxis||'Construire davantage avant d’accélérer.',
     reviewCount:p.reviewCount||0,
@@ -6133,11 +6206,41 @@ function matchExpressHtml(a){
 }
 function matchCoachHtml(a){
   const ps=a.pointStructure;
+  const playerCards=(a.playerDetails||[]).map(pd=>`<div class="card" style="border-color:${pd.impact>=20?'var(--vert)':pd.impact<=-20?'var(--rouge)':'var(--border)'}">
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+      <div><div class="card-title">JOUEUR · ${esc(pd.label).toUpperCase()}</div><div style="font-size:24px;font-weight:900;line-height:1">${esc(pd.won)} / ${esc(pd.lost)}</div><div class="muted-help">points gagnés / points perdus</div></div>
+      <div style="text-align:right"><div style="font-size:26px;font-weight:900;color:${pd.impact>=20?'var(--vert)':pd.impact<=-20?'var(--rouge)':'var(--bronze)'}">${pd.impact>0?'+':''}${pd.impact}</div><div class="card-title">IMPACT</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.65;margin-top:12px;background:var(--bg4);border-left:3px solid var(--bronze);padding:10px;border-radius:0 6px 6px 0">${esc(pd.message)}</div>
+    <div class="g2" style="margin-top:12px">
+      <div><div class="card-title">CE QUI RAPPORTE</div>${pd.topWonCauses.length?pd.topWonCauses.map(x=>`<div class="strength"><span class="plus">+</span>${esc(x.label)} · ${x.value}</div>`).join(''):'<div class="muted-help">Pas assez de points gagnés identifiés.</div>'}</div>
+      <div><div class="card-title">À STABILISER</div>${pd.topLostCauses.length?pd.topLostCauses.map(x=>`<div class="strength"><span style="color:#e74c3c;font-weight:700">→</span>${esc(x.label)} · ${x.value}</div>`).join(''):'<div class="muted-help">Pas assez de pertes identifiées.</div>'}</div>
+    </div>
+    <div class="divider"></div><div class="card-title">PRIORITÉ PROCHAIN MATCH</div><div style="font-size:13px;font-weight:800;color:var(--white)">${esc(pd.priority)}</div>
+  </div>`).join('');
+  const pair=a.pairAnalysis||{};
   return `<div class="g4">${matchMetricCard('Résultat',a.matchSummary.score||'—')}${matchMetricCard('Format',a.matchSummary.format||'Padel')}${matchMetricCard('Durée active',secondsLabel(a.matchSummary.durationActiveSeconds))}${matchMetricCard('Couverture',`${a.coverage.originKnown}%`,`${a.coverage.total-a.coverage.causeKnown} causes non renseignées`)}</div>
   ${a.warnings.length?`<div class="card" style="border-color:var(--bronze-dim2)">${a.warnings.map(w=>`<div style="font-size:12px;color:var(--bronze);font-family:var(--font-body);line-height:1.6">${esc(w.text)}</div>`).join('')}</div>`:''}
   <div class="g2">${matchBreakdownHtml('A · Structure des points gagnés',ps.wonBreakdown,ps.wonKnown,ps.points_indetermines_gagnes)}${matchBreakdownHtml('B · Structure des points perdus',ps.lostBreakdown,ps.lostKnown,ps.points_indetermines_perdus)}</div>
   <div class="g4">${matchMetricCard('Points construits',pctX(ps.points_construits,ps.wonKnown))}${matchMetricCard('Points offerts',pctX(ps.points_offerts,ps.wonKnown))}${matchMetricCard('Points concédés',pctX(ps.points_concedes,ps.lostKnown))}${matchMetricCard('Points subis',pctX(ps.points_subis,ps.lostKnown))}</div>
-  <div class="g2"><div class="card"><div class="card-title">C · Contribution individuelle</div><div class="g2"><div>${matchMetricCard('Joueur 1',`${a.individualContributions.joueur1.won} gagnés / ${a.individualContributions.joueur1.lost} perdus`)}</div><div>${matchMetricCard('Joueur 2',`${a.individualContributions.joueur2.won} gagnés / ${a.individualContributions.joueur2.lost} perdus`)}</div></div><div class="muted-help">${esc(a.individualContributions.warning)}</div></div><div class="card"><div class="card-title">G · Synthèse</div>${a.coachNarrative?`${a.coachNarrative.sentences.map(s=>`<div class="strength"><span class="plus">+</span>${esc(s.text)}</div>`).join('')||`<div class="muted-help">${esc(a.coachNarrative.fallback)}</div>`}`:''}</div></div>`;
+  <div class="g2">${playerCards}</div>
+  <div class="card" style="border-color:var(--bronze-dim2)">
+    <div class="card-title">LECTURE DE LA PAIRE</div>
+    <div class="g4">
+      ${matchMetricCard('Construction duo',`${pair.built||0}`,`${pair.constructionRate||0}% des points gagnés connus`)}
+      ${matchMetricCard('Fautes provoquées',`${pair.forcedErrors||0}`,`${pair.pressureRate||0}% des points gagnés connus`)}
+      ${matchMetricCard('Erreurs duo',`${pair.pairErrors||0}`,'placement, communication, zone libre')}
+      ${matchMetricCard('Winners subis',`${pair.sufferedWinners||0}`,`${pair.sufferedRate||0}% des points perdus connus`)}
+    </div>
+    <div style="font-size:13px;color:var(--offwhite);font-family:var(--font-body);line-height:1.65;margin-top:12px">${esc(pair.message||'Ajoute plus de points collectifs pour lire la paire.')}</div>
+    <div class="divider"></div>
+    <div class="g3">
+      <div><div class="card-title">POINTS DUO GAGNÉS</div>${pair.topPairWins?.length?pair.topPairWins.map(x=>`<div class="strength"><span class="plus">+</span>${esc(x.label)} · ${x.value}</div>`).join(''):'<div class="muted-help">Aucun point duo clair.</div>'}</div>
+      <div><div class="card-title">POINTS DUO PERDUS</div>${pair.topPairLosses?.length?pair.topPairLosses.map(x=>`<div class="strength"><span style="color:#e74c3c;font-weight:700">→</span>${esc(x.label)} · ${x.value}</div>`).join(''):'<div class="muted-help">Aucune erreur duo claire.</div>'}</div>
+      <div><div class="card-title">PROCHAIN FOCUS</div><div style="font-size:14px;font-weight:900;color:var(--white);line-height:1.4">${esc(pair.nextFocus||'Identifier la dynamique principale du duo.')}</div></div>
+    </div>
+  </div>
+  <div class="card"><div class="card-title">G · Synthèse</div>${a.coachNarrative?`${a.coachNarrative.sentences.map(s=>`<div class="strength"><span class="plus">+</span>${esc(s.text)}</div>`).join('')||`<div class="muted-help">${esc(a.coachNarrative.fallback)}</div>`}`:''}</div>`;
 }
 function matchPlayerHtml(a){
   const p=a.playerView;
