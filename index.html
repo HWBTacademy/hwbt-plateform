@@ -5720,6 +5720,11 @@ function analyserMatch(journal,config={}){
   const pairLost=lost.filter(p=>p.origin==='COLLECTIF');
   const adversaryWon=lost.filter(p=>p.origin==='ADVERSAIRES');
   const adversaryLost=won.filter(p=>p.origin==='ADVERSAIRES');
+  const advSideLost={
+    ADV_GAUCHE:adversaryWon.filter(p=>/gauche|adv g/i.test(String(p.cause||''))).length,
+    ADV_DROITE:adversaryWon.filter(p=>/droite|adv d/i.test(String(p.cause||''))).length
+  };
+  advSideLost.ADV_INCONNU=Math.max(0,adversaryWon.length-advSideLost.ADV_GAUCHE-advSideLost.ADV_DROITE);
   const pairTotal=pairWon.length+pairLost.length;
   const pairAnalysis={
     built:pairWon.length,
@@ -5747,6 +5752,7 @@ function analyserMatch(journal,config={}){
     matchSummary:{title:config.title||'Match HWBT',players:config.players||[],opponents:config.opponents||'',score:config.score||'',format:config.format||'Padel',status:config.status||'FIN_DE_MATCH_CONFIRMEE',totalPoints:points.length,won:won.length,lost:lost.length,durationActiveSeconds:duration,averagePointSeconds:points.length?Math.round(duration/points.length):0},
     coverage:{originKnown:points.length?Math.round(((wonKnown.length+lostKnown.length)/points.length)*100):0,causeKnown:points.filter(p=>p.cause).length,phaseKnown:points.filter(p=>p.phase).length,total:points.length,warnings:[]},
     pointStructure:{wonKnown:wonKnown.length,lostKnown:lostKnown.length,points_gagnes_origine_connue:wonKnown.length,points_perdus_origine_connue:lostKnown.length,points_indetermines_gagnes:won.length-wonKnown.length,points_indetermines_perdus:lost.length-lostKnown.length,points_construits:c(won,'JOUEUR_1')+c(won,'JOUEUR_2')+c(won,'COLLECTIF'),points_offerts:c(won,'ADVERSAIRES'),points_concedes:c(lost,'JOUEUR_1')+c(lost,'JOUEUR_2')+c(lost,'COLLECTIF'),points_subis:c(lost,'ADVERSAIRES'),wonBreakdown:{JOUEUR_1:c(wonKnown,'JOUEUR_1'),JOUEUR_2:c(wonKnown,'JOUEUR_2'),COLLECTIF:c(wonKnown,'COLLECTIF'),ADVERSAIRES:c(wonKnown,'ADVERSAIRES')},lostBreakdown:{JOUEUR_1:c(lostKnown,'JOUEUR_1'),JOUEUR_2:c(lostKnown,'JOUEUR_2'),COLLECTIF:c(lostKnown,'COLLECTIF'),ADVERSAIRES:c(lostKnown,'ADVERSAIRES')}},
+    adversarySideLost:advSideLost,
     individualContributions:{joueur1:{won:c(wonKnown,'JOUEUR_1'),lost:c(lostKnown,'JOUEUR_1')},joueur2:{won:c(wonKnown,'JOUEUR_2'),lost:c(lostKnown,'JOUEUR_2')},warning:"Convention d'encodage: gagné par joueur = coup gagnant HWBT, perdu par joueur = faute HWBT. Aucun classement entre les deux joueurs."},
     playerDetails,
     pairAnalysis,
@@ -6067,8 +6073,8 @@ function pushMatchAnalysisToPlayers(matchId){
 function matchMetricCard(label,value,help=''){
   return `<div class="card" style="padding:16px"><div class="card-title">${esc(label)}</div><div style="font-size:34px;font-weight:900;color:var(--white);line-height:1">${esc(value)}</div>${help?`<div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.5;margin-top:6px">${esc(help)}</div>`:''}</div>`;
 }
-function matchBreakdownHtml(title,data,total,excluded){
-  return `<div class="card"><div class="card-title">${esc(title)}</div>${['JOUEUR_1','JOUEUR_2','COLLECTIF','ADVERSAIRES'].map(o=>`<div style="display:grid;grid-template-columns:94px 1fr 70px;gap:10px;align-items:center;margin:9px 0"><div style="font-size:10px;color:var(--gray)">${o.replace('_',' ')}</div><div style="height:7px;background:var(--border);border-radius:8px;overflow:hidden"><div style="height:100%;width:${total?Math.round((data[o]||0)/total*100):0}%;background:var(--bronze)"></div></div><div style="font-size:11px;color:var(--offwhite);text-align:right">${pctX(data[o]||0,total)}</div></div>`).join('')}${excluded?`<div style="font-size:11px;color:var(--bronze);margin-top:10px">${excluded} points indéterminés exclus de cette répartition.</div>`:''}</div>`;
+function matchBreakdownHtml(title,data,total,excluded,labels={},order=['JOUEUR_1','JOUEUR_2','COLLECTIF','ADVERSAIRES']){
+  return `<div class="card"><div class="card-title">${esc(title)}</div>${order.map(o=>`<div style="display:grid;grid-template-columns:104px 1fr 70px;gap:10px;align-items:center;margin:9px 0"><div style="font-size:10px;color:var(--gray)">${esc(labels[o]||o.replace('_',' '))}</div><div style="height:7px;background:var(--border);border-radius:8px;overflow:hidden"><div style="height:100%;width:${total?Math.round((data[o]||0)/total*100):0}%;background:var(--bronze)"></div></div><div style="font-size:11px;color:var(--offwhite);text-align:right">${pctX(data[o]||0,total)}</div></div>`).join('')}${excluded?`<div style="font-size:11px;color:var(--bronze);margin-top:10px">${excluded} points indéterminés exclus de cette répartition.</div>`:''}</div>`;
 }
 function pageMatchAnalyst(){
   const {match,analysis:a}=selectedMatchAnalysis();
@@ -6150,10 +6156,10 @@ function matchEncoderHtml(match,a){
     ['JOUEUR_2','lob trop court','défense',`${p2} · Lob court`],
     ['JOUEUR_2','faute vibora / bandeja','attaque',`${p2} · Vibora`],
     ['JOUEUR_2','mauvais choix tactique','décision',`${p2} · Mauvais choix`],
-    ['ADVERSAIRES','winner adverse volée','filet','ADV · Volée'],
-    ['ADVERSAIRES','winner adverse au-dessus de la tête','défense','ADV · Haut tête'],
-    ['ADVERSAIRES','winner adverse lob','défense','ADV · Lob'],
-    ['ADVERSAIRES','winner adverse balle au corps','pression','ADV · Corps'],
+    ['ADVERSAIRES','adv gauche winner volée','filet','ADV G · Volée'],
+    ['ADVERSAIRES','adv droite winner volée','filet','ADV D · Volée'],
+    ['ADVERSAIRES','adv gauche winner haut tête','défense','ADV G · Haut tête'],
+    ['ADVERSAIRES','adv droite winner lob','défense','ADV D · Lob'],
     ['INDETERMINE','','','À préciser']
   ];
   const shotButtons=(pending==='GAGNE'?optionsWon:optionsLost).map(([origin,cause,phase,label])=>`<button class="match-live-mini ${pending==='GAGNE'?'won':'lost'}" onclick="addMatchPoint('${pending}','${origin}','${jsStr(cause)}','${jsStr(phase)}')">${esc(label)}</button>`).join('');
@@ -6206,6 +6212,21 @@ function matchExpressHtml(a){
 }
 function matchCoachHtml(a){
   const ps=a.pointStructure;
+  const nameLabels={
+    JOUEUR_1:a.playerDetails?.[0]?.label||'Joueur 1',
+    JOUEUR_2:a.playerDetails?.[1]?.label||'Joueur 2',
+    COLLECTIF:'Duo HWBT',
+    ADVERSAIRES:'Adversaires'
+  };
+  const lostData={
+    JOUEUR_1:ps.lostBreakdown.JOUEUR_1||0,
+    JOUEUR_2:ps.lostBreakdown.JOUEUR_2||0,
+    COLLECTIF:ps.lostBreakdown.COLLECTIF||0,
+    ADV_GAUCHE:a.adversarySideLost?.ADV_GAUCHE||0,
+    ADV_DROITE:a.adversarySideLost?.ADV_DROITE||0,
+    ADV_INCONNU:a.adversarySideLost?.ADV_INCONNU||0
+  };
+  const lostLabels={...nameLabels,ADV_GAUCHE:'ADV gauche',ADV_DROITE:'ADV droite',ADV_INCONNU:'ADV non précisé'};
   const playerCards=(a.playerDetails||[]).map(pd=>`<div class="card" style="border-color:${pd.impact>=20?'var(--vert)':pd.impact<=-20?'var(--rouge)':'var(--border)'}">
     <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
       <div><div class="card-title">JOUEUR · ${esc(pd.label).toUpperCase()}</div><div style="font-size:24px;font-weight:900;line-height:1">${esc(pd.won)} / ${esc(pd.lost)}</div><div class="muted-help">points gagnés / points perdus</div></div>
@@ -6221,7 +6242,7 @@ function matchCoachHtml(a){
   const pair=a.pairAnalysis||{};
   return `<div class="g4">${matchMetricCard('Résultat',a.matchSummary.score||'—')}${matchMetricCard('Format',a.matchSummary.format||'Padel')}${matchMetricCard('Durée active',secondsLabel(a.matchSummary.durationActiveSeconds))}${matchMetricCard('Couverture',`${a.coverage.originKnown}%`,`${a.coverage.total-a.coverage.causeKnown} causes non renseignées`)}</div>
   ${a.warnings.length?`<div class="card" style="border-color:var(--bronze-dim2)">${a.warnings.map(w=>`<div style="font-size:12px;color:var(--bronze);font-family:var(--font-body);line-height:1.6">${esc(w.text)}</div>`).join('')}</div>`:''}
-  <div class="g2">${matchBreakdownHtml('A · Structure des points gagnés',ps.wonBreakdown,ps.wonKnown,ps.points_indetermines_gagnes)}${matchBreakdownHtml('B · Structure des points perdus',ps.lostBreakdown,ps.lostKnown,ps.points_indetermines_perdus)}</div>
+  <div class="g2">${matchBreakdownHtml('A · Structure des points gagnés',ps.wonBreakdown,ps.wonKnown,ps.points_indetermines_gagnes,nameLabels)}${matchBreakdownHtml('B · Structure des points perdus',lostData,ps.lostKnown,ps.points_indetermines_perdus,lostLabels,['JOUEUR_1','JOUEUR_2','COLLECTIF','ADV_GAUCHE','ADV_DROITE','ADV_INCONNU'])}</div>
   <div class="g4">${matchMetricCard('Points construits',pctX(ps.points_construits,ps.wonKnown))}${matchMetricCard('Points offerts',pctX(ps.points_offerts,ps.wonKnown))}${matchMetricCard('Points concédés',pctX(ps.points_concedes,ps.lostKnown))}${matchMetricCard('Points subis',pctX(ps.points_subis,ps.lostKnown))}</div>
   <div class="g2">${playerCards}</div>
   <div class="card" style="border-color:var(--bronze-dim2)">
