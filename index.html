@@ -148,7 +148,7 @@ body{min-width:0}
 .match-live-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
 .match-live-main{border:1px solid var(--border2);border-radius:10px;padding:18px 16px;min-height:112px;text-align:left;font-family:var(--font-title);cursor:pointer;background:var(--bg2);color:var(--white);transition:all .15s}
 .match-live-main span{display:block;font-size:18px;font-weight:800;letter-spacing:1.2px}
-.match-live-main b{display:block;font-size:34px;line-height:1;margin-top:10px;color:var(--bronze)}
+.match-live-main b{display:block;font-size:22px;line-height:1.15;margin-top:10px;color:var(--bronze)}
 .match-live-main.won{background:linear-gradient(135deg,var(--bronze-dim),var(--bg2));border-color:var(--bronze-dim2)}
 .match-live-main.lost{background:linear-gradient(135deg,#ffffff08,var(--bg2))}
 .match-live-main.active{box-shadow:0 0 0 2px var(--bronze);border-color:var(--bronze)}
@@ -157,6 +157,14 @@ body{min-width:0}
 .match-live-mini.won{border-color:var(--bronze-dim2);color:var(--white)}
 .match-live-mini.lost{color:var(--gray);background:transparent}
 .match-live-mini:hover{border-color:var(--bronze);color:var(--white)}
+.match-scoreboard{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;background:linear-gradient(135deg,#060608,#111);border:1px solid var(--bronze-dim2);border-radius:12px;padding:16px;margin-top:16px}
+.match-team-score{text-align:center}
+.match-team-score small{display:block;font-size:8px;letter-spacing:1.8px;color:var(--gray);margin-bottom:5px}
+.match-team-score b{display:block;font-size:54px;line-height:1;color:var(--white)}
+.match-point-score{text-align:center;min-width:132px}
+.match-point-score small{display:block;font-size:8px;letter-spacing:1.8px;color:var(--bronze);margin-bottom:5px}
+.match-point-score b{display:block;font-size:28px;line-height:1;color:var(--bronze)}
+.match-serving-badge{display:inline-flex;align-items:center;gap:6px;margin-top:8px;border:1px solid var(--border2);border-radius:20px;padding:6px 10px;font-size:9px;letter-spacing:1px;color:var(--offwhite)}
 
 /* PLAYER CARD VISUAL - new premium design */
 .player-hero{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;transition:all .2s;position:relative}
@@ -379,9 +387,12 @@ body{min-width:0}
   .match-live-grid{grid-template-columns:1fr 1fr;gap:8px}
   .match-live-main{min-height:72px;padding:11px 10px;border-radius:8px}
   .match-live-main span{font-size:12px;letter-spacing:.8px}
-  .match-live-main b{font-size:22px;margin-top:6px}
+  .match-live-main b{font-size:13px;margin-top:6px}
   .match-live-options{grid-template-columns:repeat(2,1fr);gap:7px}
   .match-live-mini{min-height:38px;font-size:9px;padding:7px 6px}
+  .match-scoreboard{grid-template-columns:1fr auto 1fr;padding:11px;gap:6px}
+  .match-team-score b{font-size:38px}
+  .match-point-score{min-width:92px}.match-point-score b{font-size:20px}
   .pf-header-num{font-size:52px}.result-num{font-size:78px}.result-hero{padding:34px 18px}
   .test-answer{padding:14px!important;font-size:12px!important}
   .player-pass-body{min-height:360px;padding:18px}.player-pass-name{font-size:23px;line-height:1}.pass-level{font-size:38px!important}
@@ -5718,10 +5729,15 @@ function matchRealList(){
 function createMatchAnalystMatch(){
   const today=new Date().toISOString().slice(0,10);
   const title=(prompt('Nom du match ?','HWBT vs adversaires')||'Match HWBT').trim();
-  const score=(prompt('Score de départ ? Mets 0-0 si tu commences au début du match.','0-0')||'0-0').trim();
+  const score=(prompt('Score de départ des jeux ? Mets 0-0 si tu commences au début du match.','0-0')||'0-0').trim();
+  const servingTeam=(prompt('Qui commence à servir ? Mets HWBT ou ADV.','HWBT')||'HWBT').trim().toUpperCase().startsWith('A')?'ADV':'HWBT';
   const id=Date.now();
   const playerIds=STATE.players.slice(0,2).map(p=>p.id);
-  const match={id,title,date:today,score,currentScore:score,status:'EN_COURS',format:'Padel',playerIds,events:[],createdAt:new Date().toISOString()};
+  const match={id,title,date:today,score,currentScore:score,status:'EN_COURS',format:'Padel',playerIds,events:[],matchScore:{hwbtGames:0,advGames:0,hwbtPoints:0,advPoints:0,pointScore:'0-0',servingTeam},createdAt:new Date().toISOString()};
+  const gameMatch=score.match(/(\d+)\s*[-/]\s*(\d+)/);
+  if(gameMatch){match.matchScore.hwbtGames=Number(gameMatch[1])||0;match.matchScore.advGames=Number(gameMatch[2])||0;}
+  match.currentScore=matchDisplayScore(match);
+  match.score=match.currentScore;
   STATE.matches.push(match);
   saveState();
   showNotif('Match créé · tu peux encoder les points');
@@ -5734,12 +5750,27 @@ function currentMatchForEncoding(){
 function setMatchCurrentScore(){
   const m=currentMatchForEncoding();
   if(!m)return;
-  const score=(document.getElementById('matchCurrentScoreInput')?.value||'').trim();
-  m.currentScore=score||'0-0';
+  const games=(document.getElementById('matchCurrentGamesInput')?.value||'0-0').trim();
+  const points=(document.getElementById('matchCurrentPointsInput')?.value||'0-0').trim();
+  const serving=document.getElementById('matchServingTeamInput')?.value||'HWBT';
+  const state=ensureMatchScore(m);
+  const gameMatch=games.match(/(\d+)\s*[-/]\s*(\d+)/);
+  if(gameMatch){state.hwbtGames=Number(gameMatch[1])||0;state.advGames=Number(gameMatch[2])||0;}
+  const point=parsePadelPointScore(points);
+  state.hwbtPoints=point.hwbt;
+  state.advPoints=point.adv;
+  state.pointScore=formatPadelPointScore(point.hwbt,point.adv);
+  state.servingTeam=serving;
+  m.currentScore=matchDisplayScore(m);
   m.score=m.currentScore;
   saveState();
   render();
   showNotif('Score de départ mis à jour');
+}
+function parseGameScore(score){
+  const s=String(score||'0-0').trim();
+  const m=s.match(/(\d+)\s*[-/]\s*(\d+)/);
+  return m?{hwbtGames:Number(m[1])||0,advGames:Number(m[2])||0}:{hwbtGames:0,advGames:0};
 }
 function parsePadelPointScore(score){
   const s=String(score||'0-0').trim().toLowerCase();
@@ -5767,6 +5798,46 @@ function nextPadelPointScore(score,result){
   else next.adv++;
   return formatPadelPointScore(next.hwbt,next.adv);
 }
+function ensureMatchScore(m){
+  if(!m.matchScore){
+    const game=parseGameScore(String(m.currentScore||m.score||'0-0').split('·')[0]);
+    const pointPart=String(m.currentScore||m.score||'0-0').includes('·')?String(m.currentScore||m.score).split('·')[1]:'0-0';
+    const point=parsePadelPointScore(pointPart);
+    m.matchScore={...game,hwbtPoints:point.hwbt,advPoints:point.adv,pointScore:formatPadelPointScore(point.hwbt,point.adv),servingTeam:m.servingTeam||'HWBT'};
+  }
+  if(!m.matchScore.servingTeam) m.matchScore.servingTeam='HWBT';
+  m.matchScore.pointScore=formatPadelPointScore(m.matchScore.hwbtPoints||0,m.matchScore.advPoints||0);
+  return m.matchScore;
+}
+function matchDisplayScore(m){
+  const s=ensureMatchScore(m);
+  return `${s.hwbtGames||0}-${s.advGames||0} · ${s.pointScore||'0-0'}`;
+}
+function matchPointStateLabel(result){
+  return result==='GAGNE'?'HWBT gagne le point':'HWBT perd le point';
+}
+function advanceMatchScore(m,result){
+  const s=ensureMatchScore(m);
+  const prev={...s,display:matchDisplayScore(m)};
+  if(result==='GAGNE') s.hwbtPoints=(s.hwbtPoints||0)+1;
+  else s.advPoints=(s.advPoints||0)+1;
+  const formatted=formatPadelPointScore(s.hwbtPoints,s.advPoints);
+  let gameWon='';
+  if(formatted==='Jeu HWBT'||formatted==='Jeu ADV'){
+    gameWon=formatted==='Jeu HWBT'?'HWBT':'ADV';
+    if(gameWon==='HWBT') s.hwbtGames=(s.hwbtGames||0)+1;
+    else s.advGames=(s.advGames||0)+1;
+    s.hwbtPoints=0;
+    s.advPoints=0;
+    s.pointScore='0-0';
+    s.servingTeam=s.servingTeam==='HWBT'?'ADV':'HWBT';
+  }else{
+    s.pointScore=formatted;
+  }
+  m.currentScore=matchDisplayScore(m);
+  m.score=m.currentScore;
+  return {prev,score:m.currentScore,gameWon,servingTeam:s.servingTeam,pointScore:s.pointScore,gameScore:`${s.hwbtGames||0}-${s.advGames||0}`};
+}
 function setMatchPointResult(result){
   UI.matchPointResult=result;
   render();
@@ -5779,15 +5850,12 @@ function addMatchPoint(result,origin,causePreset='',phasePreset=''){
   const now=Date.now();
   const start=m.startedAtMs||(m.startedAtMs=now);
   const pointNumber=events.filter(e=>String(e.type).toUpperCase()==='POINT'&&e.active!==false&&!e.cancelled).length+1;
-  const prevScore=m.currentScore||m.score||'0-0';
-  const score=nextPadelPointScore(prevScore,result);
+  const update=advanceMatchScore(m,result);
   const phase=phasePreset||document.getElementById('matchPointPhase')?.value||'';
   const cause=causePreset||document.getElementById('matchPointCause')?.value||'';
-  const server=document.getElementById('matchPointServer')?.value||'';
+  const server=update.prev.servingTeam||document.getElementById('matchServingTeamInput')?.value||'HWBT';
   const tags=[...document.querySelectorAll('[data-match-tag]:checked')].map(x=>x.value);
-  events.push({type:'POINT',id:`m${m.id}-p${pointNumber}`,t:Math.round((now-start)/1000),result,origin,score,prevScore,phase,cause,server,tags,createdAt:new Date().toISOString()});
-  m.currentScore=score||m.currentScore||m.score||'0-0';
-  m.score=m.currentScore;
+  events.push({type:'POINT',id:`m${m.id}-p${pointNumber}`,t:Math.round((now-start)/1000),result,origin,score:update.score,prevScore:update.prev.display,prevMatchScore:update.prev,gameWon:update.gameWon,gameScore:update.gameScore,pointScore:update.pointScore,server,tags,phase,cause,createdAt:new Date().toISOString()});
   if(document.getElementById('matchPointScore')) document.getElementById('matchPointScore').value='';
   document.querySelectorAll('[data-match-tag]:checked').forEach(x=>x.checked=false);
   UI.matchPointResult=null;
@@ -5802,7 +5870,8 @@ function undoLastMatchPoint(){
     if(String(events[i].type).toUpperCase()==='POINT'&&events[i].active!==false&&!events[i].cancelled){
       events[i].cancelled=true;
       events[i].cancelledAt=new Date().toISOString();
-      m.currentScore=events[i].prevScore||'0-0';
+      if(events[i].prevMatchScore) m.matchScore={...events[i].prevMatchScore};
+      m.currentScore=events[i].prevScore||matchDisplayScore(m);
       m.score=m.currentScore;
       saveState();render();showNotif('Dernier point annulé');return;
     }
@@ -5858,11 +5927,10 @@ function pageMatchAnalyst(){
 function matchEncoderHtml(match,a){
   const m=currentMatchForEncoding();
   if(!m) return `<div class="card" style="text-align:center;padding:38px;border-color:var(--bronze-dim2)"><div class="card-title">ENCODAGE MATCH</div><div style="font-size:28px;font-weight:900;margin-bottom:10px">Commence par créer un vrai match</div><div class="muted-help" style="margin-bottom:18px">Les démos servent juste à montrer le résultat. Pour travailler, crée ton match et encode les points.</div><button class="btn btn-primary" onclick="createMatchAnalystMatch()">+ NOUVEAU MATCH</button></div>`;
+  const scoreState=ensureMatchScore(m);
   const events=(m.events||[]).filter(e=>String(e.type).toUpperCase()==='POINT'&&e.active!==false&&!e.cancelled);
   const last=events.slice(-8).reverse();
   const pending=UI.matchPointResult||null;
-  const nextWon=nextPadelPointScore(m.currentScore||m.score||'0-0','GAGNE');
-  const nextLost=nextPadelPointScore(m.currentScore||m.score||'0-0','PERDU');
   const optionsWon=[
     ['JOUEUR_1','winner vibora','attaque','J1 · Vibora'],
     ['JOUEUR_1','winner smash','attaque','J1 · Smash'],
@@ -5893,20 +5961,26 @@ function matchEncoderHtml(match,a){
   return `<div>
     <div class="card" style="border-color:var(--bronze-dim2)">
       <div style="display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap">
-        <div><div class="card-title">MODE TERRAIN · SCOREBOARD LIVE</div><div style="font-size:28px;font-weight:900;line-height:1">${esc(m.title||'Match HWBT')}</div><div class="muted-help" style="margin-top:6px">1er clic: gagné ou perdu. 2e clic: par qui et avec quel coup. Le score avance automatiquement.</div></div>
-        <div style="text-align:right"><div style="font-size:58px;font-weight:900;line-height:1;color:var(--bronze)">${esc(m.currentScore||m.score||'0-0')}</div><div class="card-title">${events.length} POINTS ENCODÉS</div></div>
+        <div><div class="card-title">MODE TERRAIN · SCOREBOARD LIVE</div><div style="font-size:28px;font-weight:900;line-height:1">${esc(m.title||'Match HWBT')}</div><div class="muted-help" style="margin-top:6px">Un seul score officiel. Tu choisis gagné/perdu, puis le coup. Si le jeu est gagné, le score des jeux monte et les points repartent à 0-0.</div></div>
+        <div style="text-align:right"><div style="font-size:42px;font-weight:900;line-height:1;color:var(--bronze)">${events.length}</div><div class="card-title">POINTS ENCODÉS</div></div>
+      </div>
+      <div class="match-scoreboard">
+        <div class="match-team-score"><small>HWBT · JEUX</small><b>${scoreState.hwbtGames||0}</b>${scoreState.servingTeam==='HWBT'?'<span class="match-serving-badge">SERVICE</span>':''}</div>
+        <div class="match-point-score"><small>POINTS</small><b>${esc(scoreState.pointScore||'0-0')}</b><span class="match-serving-badge">${scoreState.servingTeam==='HWBT'?'HWBT sert':'ADV sert'}</span></div>
+        <div class="match-team-score"><small>ADVERSAIRE · JEUX</small><b>${scoreState.advGames||0}</b>${scoreState.servingTeam==='ADV'?'<span class="match-serving-badge">SERVICE</span>':''}</div>
       </div>
       <div class="g3" style="margin-top:16px;align-items:end">
-        <div class="form-group"><label class="form-label">SCORE ACTUEL / DÉPART</label><input class="form-input" id="matchCurrentScoreInput" value="${esc(m.currentScore||m.score||'0-0')}" placeholder="0-0, 3-2, 30-30..."></div>
-        <div class="form-group"><label class="form-label">SERVEUR OPTIONNEL</label><input class="form-input" id="matchPointServer" placeholder="Lucas, partenaire, adversaire..."></div>
+        <div class="form-group"><label class="form-label">JEUX ACTUELS</label><input class="form-input" id="matchCurrentGamesInput" value="${scoreState.hwbtGames||0}-${scoreState.advGames||0}" placeholder="0-0"></div>
+        <div class="form-group"><label class="form-label">POINTS DU JEU</label><input class="form-input" id="matchCurrentPointsInput" value="${esc(scoreState.pointScore||'0-0')}" placeholder="0-0, 15-0, 40-30..."></div>
+        <div class="form-group"><label class="form-label">ÉQUIPE AU SERVICE</label><select class="form-select" id="matchServingTeamInput"><option value="HWBT" ${scoreState.servingTeam==='HWBT'?'selected':''}>HWBT sert</option><option value="ADV" ${scoreState.servingTeam==='ADV'?'selected':''}>Adversaire sert</option></select></div>
         <button class="btn btn-ghost" onclick="setMatchCurrentScore()">METTRE À JOUR LE SCORE</button>
       </div>
     </div>
     <div class="match-live-grid">
-      <button class="match-live-main won ${pending==='GAGNE'?'active':''}" onclick="setMatchPointResult('GAGNE')"><span>POINT GAGNÉ HWBT</span><b>${esc(nextWon)}</b></button>
-      <button class="match-live-main lost ${pending==='PERDU'?'active':''}" onclick="setMatchPointResult('PERDU')"><span>POINT PERDU HWBT</span><b>${esc(nextLost)}</b></button>
+      <button class="match-live-main won ${pending==='GAGNE'?'active':''}" onclick="setMatchPointResult('GAGNE')"><span>POINT GAGNÉ HWBT</span><b>1er clic</b></button>
+      <button class="match-live-main lost ${pending==='PERDU'?'active':''}" onclick="setMatchPointResult('PERDU')"><span>POINT PERDU HWBT</span><b>1er clic</b></button>
     </div>
-    ${pending?`<div class="card" style="border-color:${pending==='GAGNE'?'var(--bronze-dim2)':'var(--border2)'}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px"><div><div class="card-title">2E CLIC · ${pending==='GAGNE'?'COMMENT LE POINT EST GAGNÉ ?':'COMMENT LE POINT EST PERDU ?'}</div><div class="muted-help">Après ton clic, le score devient ${esc(pending==='GAGNE'?nextWon:nextLost)}.</div></div><button class="btn btn-ghost btn-sm" onclick="setMatchPointResult(null)">ANNULER CHOIX</button></div><div class="match-live-options">${shotButtons}</div></div>`:''}
+    ${pending?`<div class="card" style="border-color:${pending==='GAGNE'?'var(--bronze-dim2)':'var(--border2)'}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px"><div><div class="card-title">2E CLIC · ${pending==='GAGNE'?'COMMENT LE POINT EST GAGNÉ ?':'COMMENT LE POINT EST PERDU ?'}</div><div class="muted-help">${matchPointStateLabel(pending)}. Clique le coup ou l’origine, puis le score central se met à jour.</div></div><button class="btn btn-ghost btn-sm" onclick="setMatchPointResult(null)">ANNULER CHOIX</button></div><div class="match-live-options">${shotButtons}</div></div>`:''}
     <div class="card" style="padding:14px">
       <div class="card-title">MARQUEURS OPTIONNELS AVANT LE 2E CLIC</div>
       <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px">
@@ -5924,7 +5998,7 @@ function matchEncoderHtml(match,a){
     </div>
     <div class="g2">
       <div class="g2">${matchMetricCard('Score suivi',m.currentScore||m.score||'0-0')}${matchMetricCard('Bilan live',`${a.matchSummary.won}-${a.matchSummary.lost}`,`${a.matchSummary.totalPoints} points encodés`)}</div>
-      <div class="card"><div class="card-title">DERNIERS POINTS</div>${last.length?last.map((e,i)=>`<div style="display:grid;grid-template-columns:42px 1fr 72px;gap:8px;border-top:1px solid var(--border);padding:9px 0;align-items:center"><b style="color:${e.result==='GAGNE'?'var(--bronze)':'var(--gray)'}">#${events.length-i}</b><div><div style="font-size:12px;color:var(--white)">${esc(e.result)} · ${esc(e.origin.replace('_',' '))}</div><div class="muted-help">${esc(e.score||m.currentScore||'score ?')} · ${esc(e.phase||'phase ?')} · ${esc(e.cause||'cause ?')}</div></div><div style="font-size:9px;color:var(--gray);text-align:right">${secondsLabel(e.t||0)}</div></div>`).join(''):'<div class="muted-help">Aucun point encodé.</div>'}</div>
+      <div class="card"><div class="card-title">DERNIERS POINTS</div>${last.length?last.map((e,i)=>`<div style="display:grid;grid-template-columns:42px 1fr 72px;gap:8px;border-top:1px solid var(--border);padding:9px 0;align-items:center"><b style="color:${e.result==='GAGNE'?'var(--bronze)':'var(--gray)'}">#${events.length-i}</b><div><div style="font-size:12px;color:var(--white)">${esc(e.result)} · ${esc(e.origin.replace('_',' '))}${e.gameWon?` · Jeu ${esc(e.gameWon)}`:''}</div><div class="muted-help">${esc(e.score||m.currentScore||'score ?')} · service ${esc(e.server||'—')} · ${esc(e.cause||'cause ?')}</div></div><div style="font-size:9px;color:var(--gray);text-align:right">${secondsLabel(e.t||0)}</div></div>`).join(''):'<div class="muted-help">Aucun point encodé.</div>'}</div>
     </div>
   </div>`;
 }
