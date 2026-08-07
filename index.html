@@ -5854,7 +5854,13 @@ function createMatchAnalystMatch(){
 }
 function currentMatchForEncoding(){
   const real=matchRealList();
-  return real.find(m=>String(m.id)===String(UI.matchAnalystId))||real[0]||null;
+  const isLive=m=>{
+    const status=String(m?.status||'').toUpperCase();
+    return !m?.demo&&!m?.finishedAt&&!m?.closedAt&&!status.includes('FIN')&&!status.includes('ABANDON')&&!status.includes('REGROUPE');
+  };
+  const selected=real.find(m=>String(m.id)===String(UI.matchAnalystId)&&isLive(m));
+  if(selected) return selected;
+  return real.filter(isLive).sort((a,b)=>String(b.createdAt||b.date||b.id||'').localeCompare(String(a.createdAt||a.date||a.id||'')))[0]||null;
 }
 function matchPlayerNameById(id){
   const p=STATE.players.find(x=>String(x.id)===String(id));
