@@ -5921,7 +5921,7 @@ function parsePadelPointScore(score){
 }
 function formatPadelPointScore(hwbt,adv){
   const labels=['0','15','30','40'];
-  if(hwbt>=4&&adv>=4) return '40-40';
+  if(hwbt>=3&&adv>=3&&hwbt===adv) return '40-40';
   if(hwbt>=4&&hwbt===adv+1) return 'Av HWBT';
   if(adv>=4&&adv===hwbt+1) return 'Av ADV';
   if(hwbt>=4&&hwbt>=adv+2) return 'Jeu HWBT';
@@ -5969,6 +5969,10 @@ function advanceMatchScore(m,result){
     s.pointScore='0-0';
     s.servingTeam=s.servingTeam==='HWBT'?'ADV':'HWBT';
   }else{
+    if(formatted==='40-40'&&s.hwbtPoints>=3&&s.advPoints>=3){
+      s.hwbtPoints=3;
+      s.advPoints=3;
+    }
     s.pointScore=formatted;
   }
   m.currentScore=matchDisplayScore(m);
