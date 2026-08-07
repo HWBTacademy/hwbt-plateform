@@ -4287,6 +4287,7 @@ function pagePlayerDetail(playerId){
         <div style="font-size:9px;color:var(--bronze);letter-spacing:1.4px;margin-bottom:7px">${esc(formatShortDate(ma.date)||ma.date)} · ${esc(ma.club||'Club non précisé')} · ${esc(ma.score||'score ?')}</div>
         <div style="font-size:18px;font-weight:900;line-height:1.1;margin-bottom:8px">${esc(ma.title)}</div>
         <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6">${esc(ma.workAxis||'Axe à reprendre au prochain entraînement.')}</div>
+        ${ma.padel?.headline?`<div style="margin-top:10px;background:#050507;border-left:3px solid var(--bronze);border-radius:0 6px 6px 0;padding:10px"><div style="font-size:9px;color:var(--bronze);letter-spacing:1px;margin-bottom:5px">LECTURE PADEL</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.55">${esc(ma.padel.headline)}</div>${ma.padel.plan?.length?`<div class="muted-help" style="margin-top:6px">${esc(ma.padel.plan[0])}</div>`:''}</div>`:''}
         ${ma.positives?.length?`<div style="margin-top:10px">${ma.positives.map(x=>`<div class="strength"><span class="plus">+</span>${esc(x)}</div>`).join('')}</div>`:''}
         ${ma.players?.length?`<div style="margin-top:10px;display:grid;gap:7px">${ma.players.map(pd=>`<div style="background:#050507;border:1px solid var(--border);border-radius:6px;padding:9px"><div style="display:flex;justify-content:space-between;gap:8px"><b style="font-size:11px;color:var(--white)">${esc(pd.label)}</b><span style="font-size:10px;color:${pd.impact>=20?'var(--vert)':pd.impact<=-20?'var(--rouge)':'var(--bronze)'}">${pd.impact>0?'+':''}${pd.impact}</span></div><div class="muted-help">${esc(pd.won)} gagnés · ${esc(pd.lost)} perdus · priorité: ${esc(pd.priority||'à observer')}</div></div>`).join('')}</div>`:''}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
@@ -5683,6 +5684,77 @@ function matchInsightSentence(label,won,lost,total){
   if(balance<=-2) return `${label}: axe prioritaire, les points perdus dépassent les points gagnés.`;
   return `${label}: équilibre fragile, à observer sur plus de points.`;
 }
+function matchPadelFamily(p){
+  const text=`${p.phase||''} ${p.cause||''}`.toLowerCase();
+  if(/service/.test(text)) return 'SERVICE';
+  if(/retour/.test(text)) return 'RETOUR';
+  if(/fond/.test(text)) return 'FOND';
+  if(/volée|volee|filet|montée|montee/.test(text)) return 'FILET';
+  if(/haut tête|haut tete|vibora|bandeja|smash/.test(text)) return 'HAUT_TETE';
+  if(/patience|construction/.test(text)) return 'CONSTRUCTION';
+  if(/transition|zone libre|placement/.test(text)) return 'TRANSITION';
+  if(/défense|defense|lob/.test(text)) return 'DEFENSE';
+  return 'AUTRE';
+}
+function matchPadelFamilyLabel(k){
+  return {SERVICE:'Service',RETOUR:'Retour',FOND:'Fond de terrain',FILET:'Filet / volée',HAUT_TETE:'Haut tête',CONSTRUCTION:'Construction',TRANSITION:'Transition',DEFENSE:'Défense',AUTRE:'Autre'}[k]||k;
+}
+function matchPadelAdvice(family,type='work'){
+  const work={
+    SERVICE:'Sécuriser la première intention: servir avec une zone claire, puis préparer la balle suivante.',
+    RETOUR:'Reprendre le retour simple: remettre en jeu profond, éviter le cadeau rapide, puis organiser le duo.',
+    FOND:'Stabiliser le fond: longueur, patience, moins de balle neutre courte qui donne l’attaque adverse.',
+    FILET:'Clarifier le filet: fermer le centre, jouer la première volée de contrôle avant de vouloir finir.',
+    HAUT_TETE:'Mieux gérer les balles hautes: choisir entre bandeja de contrôle, vibora agressive ou remise simple.',
+    CONSTRUCTION:'Garder le plan plus longtemps: construire le point avant d’accélérer.',
+    TRANSITION:'Travailler la montée: avancer ensemble, pas un joueur seul qui laisse une zone ouverte.',
+    DEFENSE:'Défendre plus haut et plus profond: accepter une balle de plus avant de tenter la sortie.',
+    AUTRE:'Rendre l’encodage plus précis sur les prochains matchs pour lire la tendance.'
+  };
+  const strength={
+    SERVICE:'Le service crée déjà de l’avantage: garder cette zone et préparer le coup suivant.',
+    RETOUR:'Le retour met l’adversaire sous pression: continuer à démarrer les points avec intention.',
+    FOND:'Le fond rapporte: rester patient et continuer à construire depuis la longueur.',
+    FILET:'Le filet rapporte: garder cette présence, surtout à deux joueurs sur la même ligne.',
+    HAUT_TETE:'Les coups haut tête rapportent: continuer, mais seulement quand le corps est bien placé.',
+    CONSTRUCTION:'La paire gagne quand elle construit: ne pas brûler les étapes.',
+    TRANSITION:'La transition fonctionne: continuer à monter ensemble après la balle qui pousse.',
+    DEFENSE:'La défense rapporte: utiliser cette solidité pour récupérer l’attaque.',
+    AUTRE:'Il y a une tendance positive, mais elle doit être mieux précisée à l’encodage.'
+  };
+  return (type==='strength'?strength:work)[family]||work.AUTRE;
+}
+function matchPadelDeepAnalysis(points,won,lost,playerDetails,pairAnalysis,advSideLost){
+  const families=['SERVICE','RETOUR','FOND','FILET','HAUT_TETE','CONSTRUCTION','TRANSITION','DEFENSE','AUTRE'];
+  const familyRows=families.map(f=>{
+    const w=won.filter(p=>matchPadelFamily(p)===f).length;
+    const l=lost.filter(p=>matchPadelFamily(p)===f).length;
+    return {family:f,label:matchPadelFamilyLabel(f),won:w,lost:l,total:w+l,balance:w-l};
+  }).filter(x=>x.total>0).sort((a,b)=>Math.abs(b.balance)-Math.abs(a.balance)||b.total-a.total);
+  const best=familyRows.filter(x=>x.balance>0).sort((a,b)=>b.balance-a.balance||b.total-a.total)[0]||null;
+  const work=familyRows.filter(x=>x.balance<0).sort((a,b)=>a.balance-b.balance||b.total-a.total)[0]||null;
+  const biggest=familyRows[0]||null;
+  const side=advSideLost.ADV_GAUCHE>advSideLost.ADV_DROITE?'gauche':advSideLost.ADV_DROITE>advSideLost.ADV_GAUCHE?'droite':'équilibré';
+  const sideAdvice=side==='gauche'?'Fermer davantage le côté ADV gauche: éviter la balle courte dans sa zone forte et le forcer à rejouer une balle de plus.':side==='droite'?'Fermer davantage le côté ADV droite: protéger cette diagonale et varier plus tôt avant qu’il installe son winner.':'Les winners adverses sont répartis: travailler surtout la qualité de balle et la couverture de la zone libre.';
+  const dominantPlayer=(playerDetails||[]).slice().sort((a,b)=>(b.won-b.lost)-(a.won-a.lost))[0];
+  const fragilePlayer=(playerDetails||[]).slice().sort((a,b)=>(b.lost-b.won)-(a.lost-a.won))[0];
+  const plan=[];
+  if(work) plan.push(matchPadelAdvice(work.family,'work'));
+  if(best) plan.push(matchPadelAdvice(best.family,'strength'));
+  if(pairAnalysis?.sufferedWinners) plan.push(sideAdvice);
+  if(fragilePlayer&&fragilePlayer.lost>fragilePlayer.won) plan.push(`${fragilePlayer.label}: donner une consigne courte sur son axe prioritaire (${fragilePlayer.priority}) pour éviter de le surcharger.`);
+  if(dominantPlayer&&dominantPlayer.won>dominantPlayer.lost) plan.push(`${dominantPlayer.label}: utiliser sa dynamique positive comme point d’appui du duo, sans le faire jouer seul.`);
+  return {
+    familyRows,
+    best,
+    work,
+    biggest,
+    side,
+    sideAdvice,
+    plan:[...new Set(plan)].slice(0,5),
+    headline:work?`Le chantier padel prioritaire est ${matchPadelFamilyLabel(work.family).toLowerCase()} (${work.won}-${work.lost}).`:best?`Le levier fort est ${matchPadelFamilyLabel(best.family).toLowerCase()} (${best.won}-${best.lost}).`:'Pas encore assez de familles padel identifiées.'
+  };
+}
 function matchPointImportantTypes(p){
   const raw=[p.importance,p.important,p.category,p.scoreTag,...(Array.isArray(p.tags)?p.tags:[])].filter(Boolean).map(x=>String(x).toUpperCase().replace(/\s+/g,'_'));
   const out=[];
@@ -5754,6 +5826,7 @@ function analyserMatch(journal,config={}){
     message:pairTotal>=2?matchInsightSentence('La paire',pairWon.length,pairLost.length,pairTotal):'La paire: ajoute plus de points collectifs pour lire la dynamique duo.',
     nextFocus:pairLost.length>pairWon.length?'Communication et couverture des zones libres':adversaryWon.length>adversaryLost.length?'Mieux défendre les winners adverses':pairWon.length?'Continuer à construire avant de finir':'Identifier plus clairement les points de paire'
   };
+  const padelAnalysis=matchPadelDeepAnalysis(points,won,lost,playerDetails,pairAnalysis,advSideLost);
   const importantIds=new Set(), importantByCat={};
   IMPORTANT_POINT_TYPES.forEach(t=>importantByCat[t]=[]);
   points.forEach(p=>matchPointImportantTypes(p).forEach(t=>{importantIds.add(p.id); importantByCat[t]?.push(p.id);}));
@@ -5769,6 +5842,7 @@ function analyserMatch(journal,config={}){
     individualContributions:{joueur1:{won:c(wonKnown,'JOUEUR_1'),lost:c(lostKnown,'JOUEUR_1')},joueur2:{won:c(wonKnown,'JOUEUR_2'),lost:c(lostKnown,'JOUEUR_2')},warning:"Convention d'encodage: gagné par joueur = coup gagnant HWBT, perdu par joueur = faute HWBT. Aucun classement entre les deux joueurs."},
     playerDetails,
     pairAnalysis,
+    padelAnalysis,
     scoreContext:{important:{unique:importantIds.size,total:points.length,byCategory:importantByCat}},
     timeline,reviewPoints,warnings:[]
   };
@@ -6088,6 +6162,7 @@ function compactMatchAnalysis(match){
     positives:p.positives||[],
     players:p.players||[],
     pair:p.pair||{},
+    padel:analysis.padelAnalysis||{},
     keyNumber:p.matchNumber||null,
     workAxis:p.workAxis||'Construire davantage avant d’accélérer.',
     reviewCount:p.reviewCount||0,
@@ -6328,8 +6403,34 @@ function matchCoachHtml(a){
     <div class="divider"></div><div class="card-title">PRIORITÉ PROCHAIN MATCH</div><div style="font-size:13px;font-weight:800;color:var(--white)">${esc(pd.priority)}</div>
   </div>`).join('');
   const pair=a.pairAnalysis||{};
+  const padel=a.padelAnalysis||{};
+  const padelRows=(padel.familyRows||[]).slice(0,6);
+  const padelDeepHtml=`<div class="card" style="border-color:var(--bronze-dim2)">
+    <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap">
+      <div><div class="card-title">LECTURE PADEL PROFONDE</div><div style="font-size:22px;font-weight:900;line-height:1.15">${esc(padel.headline||'Lecture à préciser')}</div></div>
+      <div style="text-align:right"><div style="font-size:10px;color:var(--bronze);letter-spacing:1px">WINNERS ADV</div><div style="font-size:17px;font-weight:900">${esc(padel.side==='équilibré'?'équilibrés':`côté ${padel.side}`)}</div></div>
+    </div>
+    <div class="g3" style="margin-top:14px">
+      <div>
+        <div class="card-title">FAMILLES DE JEU</div>
+        ${padelRows.length?padelRows.map(r=>`<div style="display:grid;grid-template-columns:96px 1fr 62px;gap:8px;align-items:center;margin:8px 0"><div style="font-size:10px;color:var(--gray)">${esc(r.label)}</div><div style="height:7px;background:var(--border);border-radius:8px;overflow:hidden"><div style="height:100%;width:${Math.min(100,Math.round((r.total/Math.max(1,a.matchSummary.totalPoints))*100*2))}%;background:${r.balance>=0?'var(--bronze)':'var(--rouge)'}"></div></div><div style="font-size:11px;color:var(--offwhite);text-align:right">${esc(`${r.won}-${r.lost}`)}</div></div>`).join(''):'<div class="muted-help">Pas assez de phases renseignées.</div>'}
+      </div>
+      <div>
+        <div class="card-title">CE QU’IL FAUT DIRE</div>
+        <div style="font-size:13px;color:var(--offwhite);font-family:var(--font-body);line-height:1.65">${esc(padel.plan?.[0]||'Garder une consigne courte: zone claire, balle simple, puis intention suivante.')}</div>
+        <div class="divider"></div>
+        <div class="card-title">ZONE À PROTÉGER</div>
+        <div class="muted-help">${esc(padel.sideAdvice||'Observer où les adversaires gagnent le plus de points.')}</div>
+      </div>
+      <div>
+        <div class="card-title">PLAN PROCHAIN MATCH</div>
+        ${(padel.plan||[]).slice(0,4).map(x=>`<div class="strength"><span class="plus">→</span>${esc(x)}</div>`).join('')||'<div class="muted-help">Ajoute plus de points pour générer un plan fiable.</div>'}
+      </div>
+    </div>
+  </div>`;
   return `<div class="card" style="border-color:var(--bronze-dim2)"><div class="card-title">CONTEXTE MATCH</div><div style="display:flex;gap:10px;flex-wrap:wrap"><span class="future-chip">${esc(formatShortDate(a.matchSummary.date)||a.matchSummary.date||'Date ?')}</span><span class="future-chip">${esc(a.matchSummary.club||'Club non précisé')}</span><span class="future-chip">${esc(a.matchSummary.title||'Match HWBT')}</span></div></div>
   <div class="g4">${matchMetricCard('Résultat',a.matchSummary.score||'—')}${matchMetricCard('Format',a.matchSummary.format||'Padel')}${matchMetricCard('Durée active',secondsLabel(a.matchSummary.durationActiveSeconds))}${matchMetricCard('Couverture',`${a.coverage.originKnown}%`,`${a.coverage.total-a.coverage.causeKnown} causes non renseignées`)}</div>
+  ${padelDeepHtml}
   ${a.warnings.length?`<div class="card" style="border-color:var(--bronze-dim2)">${a.warnings.map(w=>`<div style="font-size:12px;color:var(--bronze);font-family:var(--font-body);line-height:1.6">${esc(w.text)}</div>`).join('')}</div>`:''}
   <div class="g2">${matchBreakdownHtml('A · Structure des points gagnés',ps.wonBreakdown,ps.wonKnown,ps.points_indetermines_gagnes,nameLabels)}${matchBreakdownHtml('B · Structure des points perdus',lostData,ps.lostKnown,ps.points_indetermines_perdus,lostLabels,['JOUEUR_1','JOUEUR_2','COLLECTIF','ADV_GAUCHE','ADV_DROITE','ADV_INCONNU'])}</div>
   <div class="g4">${matchMetricCard('Points construits',pctX(ps.points_construits,ps.wonKnown))}${matchMetricCard('Points offerts',pctX(ps.points_offerts,ps.wonKnown))}${matchMetricCard('Points concédés',pctX(ps.points_concedes,ps.lostKnown))}${matchMetricCard('Points subis',pctX(ps.points_subis,ps.lostKnown))}</div>
