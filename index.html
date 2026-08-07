@@ -5828,7 +5828,7 @@ function matchAnalystMatches(){
   return real.length?real:demo;
 }
 function matchRealList(){
-  return (STATE.matches||[]).filter(m=>Array.isArray(m.events)||Array.isArray(m.journal)||Array.isArray(m.eventLog));
+  return (STATE.matches||[]).filter(m=>Array.isArray(m.events)||Array.isArray(m.journal)||Array.isArray(m.eventLog)).filter(m=>!String(m.status||'').toUpperCase().includes('REGROUPE'));
 }
 function createMatchAnalystMatch(){
   const today=new Date().toISOString().slice(0,10);
@@ -6037,7 +6037,7 @@ function deleteMatchAnalystMatch(id){
   STATE.matches=STATE.matches.filter(x=>String(x.id)!==String(id));
   saveState();
   showNotif('Match supprimé');
-  setUI({matchAnalystId:null,matchAnalystTab:'coach'});
+  setUI({matchAnalystId:null,matchAnalystTab:'closed'});
 }
 function selectedMatchAnalysis(){
   const matches=matchAnalystMatches();
@@ -6107,7 +6107,7 @@ function pageMatchAnalyst(){
   const closedCount=closedMatchList().length;
   const tabs=[['encode','Encodage match'],['closed',`Matchs clôturés${closedCount?` · ${closedCount}`:''}`],['express','Débrief express'],['coach','Vue coach'],['player','Vue joueurs'],['timeline','Chronologie'],['review','À revoir']];
   return `<div class="content">${quoteBand()}
-    <div class="card" style="border-color:var(--bronze-dim2)"><div style="display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap"><div><div class="card-title">HWBT MATCH ANALYST</div><div style="font-size:34px;font-weight:900;line-height:1">ANALYSE D'APRÈS-MATCH</div><div class="muted-help" style="margin-top:8px;max-width:820px">${realCount?`Tu as ${realCount} vrai match${realCount>1?'s':''} encodé${realCount>1?'s':''}. L'analyse utilise ces données réelles.`:`Aucun vrai match encodé pour le moment. Crée un match pour remplacer les démonstrations.`}</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="createMatchAnalystMatch()">+ NOUVEAU MATCH</button><button class="btn btn-primary btn-sm" onclick="printMatchCoachPdf()">PDF COACH</button><button class="btn btn-ghost btn-sm" onclick="printMatchPlayerPdf()">FICHE JOUEURS</button></div></div>
+    <div class="card" style="border-color:var(--bronze-dim2)"><div style="display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap"><div><div class="card-title">HWBT MATCH ANALYST</div><div style="font-size:34px;font-weight:900;line-height:1">ANALYSE D'APRÈS-MATCH</div><div class="muted-help" style="margin-top:8px;max-width:820px">${realCount?`Tu as ${realCount} vrai match${realCount>1?'s':''} encodé${realCount>1?'s':''}. L'analyse utilise ces données réelles.`:`Aucun vrai match encodé pour le moment. Crée un match pour remplacer les démonstrations.`}</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="createMatchAnalystMatch()">+ NOUVEAU MATCH</button><button class="btn btn-primary btn-sm" onclick="printMatchCoachPdf()">PDF COACH</button><button class="btn btn-ghost btn-sm" onclick="printMatchPlayerPdf()">FICHE JOUEURS</button>${match&&!match.demo?`<button class="btn btn-ghost btn-sm" onclick="deleteMatchAnalystMatch('${match.id}')">SUPPRIMER</button>`:''}</div></div>
       <div class="g2" style="margin-top:14px"><div class="form-group"><label class="form-label">MATCH</label><select class="form-select" onchange="setUI({matchAnalystId:this.value})">${matches.map(m=>`<option value="${esc(m.id)}" ${String(m.id)===String(UI.matchAnalystId)?'selected':''}>${esc(m.title||m.name||'Match')}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">SOURCE</label><div class="form-input" style="height:auto;color:${match.demo?'var(--bronze)':'var(--vert)'}">${match.demo?'Démonstration hors données réelles':'Journal réel de la plateforme'}</div></div></div>
     </div>
     <div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${tab===k?'active':''}" onclick="setUI({matchAnalystTab:'${k}'})">${l}</button>`).join('')}</div>
@@ -6135,6 +6135,7 @@ function matchClosedHtml(){
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px">
           <button class="btn btn-ghost btn-sm" onclick="setUI({matchAnalystId:'${m.id}',matchAnalystTab:'coach'})">ANALYSE</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteMatchAnalystMatch('${m.id}')">SUPPRIMER</button>
           <button class="btn btn-primary btn-sm" onclick="pushMatchAnalysisToPlayers('${m.id}')">${sent?'RENVOYER':'ENVOYER FICHES'}</button>
         </div>
       </div>`;
