@@ -4289,7 +4289,7 @@ function pagePlayerDetail(playerId){
         <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6">${esc(ma.workAxis||'Axe à reprendre au prochain entraînement.')}</div>
         ${ma.padel?.headline?`<div style="margin-top:10px;background:#050507;border-left:3px solid var(--bronze);border-radius:0 6px 6px 0;padding:10px"><div style="font-size:9px;color:var(--bronze);letter-spacing:1px;margin-bottom:5px">LECTURE PADEL</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);line-height:1.55">${esc(ma.padel.headline)}</div>${ma.padel.plan?.length?`<div class="muted-help" style="margin-top:6px">${esc(ma.padel.plan[0])}</div>`:''}</div>`:''}
         ${ma.positives?.length?`<div style="margin-top:10px">${ma.positives.map(x=>`<div class="strength"><span class="plus">+</span>${esc(x)}</div>`).join('')}</div>`:''}
-        ${ma.players?.length?`<div style="margin-top:10px;display:grid;gap:7px">${ma.players.map(pd=>`<div style="background:#050507;border:1px solid var(--border);border-radius:6px;padding:9px"><div style="display:flex;justify-content:space-between;gap:8px"><b style="font-size:11px;color:var(--white)">${esc(pd.label)}</b><span style="font-size:10px;color:${pd.impact>=20?'var(--vert)':pd.impact<=-20?'var(--rouge)':'var(--bronze)'}">${pd.impact>0?'+':''}${pd.impact}</span></div><div class="muted-help">${esc(pd.won)} gagnés · ${esc(pd.lost)} perdus · priorité: ${esc(pd.priority||'à observer')}</div></div>`).join('')}</div>`:''}
+        ${ma.players?.length?`<div style="margin-top:10px;display:grid;gap:7px">${ma.players.map(pd=>`<div style="background:#050507;border:1px solid var(--border);border-radius:6px;padding:9px"><div style="display:flex;justify-content:space-between;gap:8px"><b style="font-size:11px;color:var(--white)">${esc(pd.label)}</b><span style="font-size:10px;color:${pd.impact>=20?'var(--vert)':pd.impact<=-20?'var(--rouge)':'var(--bronze)'}">${pd.impact>0?'+':''}${pd.impact}%</span></div><div class="muted-help">${esc(pd.won)} gagnés · ${esc(pd.lost)} perdus · priorité: ${esc(pd.priority||'à observer')}</div></div>`).join('')}</div>`:''}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
           <span class="future-chip">Points ${esc(`${ma.won||0}-${ma.lost||0}`)}</span>
           <span class="future-chip">Couverture ${esc(ma.coverage||0)}%</span>
@@ -5694,10 +5694,12 @@ function matchPadelFamily(p){
   if(/patience|construction/.test(text)) return 'CONSTRUCTION';
   if(/transition|zone libre|placement/.test(text)) return 'TRANSITION';
   if(/défense|defense|lob/.test(text)) return 'DEFENSE';
+  if(/choix|décision|decision|tactique/.test(text)) return 'DECISION';
+  if(/provoquée|provoquee|pression|forcé|force/.test(text)) return 'PRESSION';
   return 'AUTRE';
 }
 function matchPadelFamilyLabel(k){
-  return {SERVICE:'Service',RETOUR:'Retour',FOND:'Fond de terrain',FILET:'Filet / volée',HAUT_TETE:'Haut tête',CONSTRUCTION:'Construction',TRANSITION:'Transition',DEFENSE:'Défense',AUTRE:'Autre'}[k]||k;
+  return {SERVICE:'Service',RETOUR:'Retour',FOND:'Fond de terrain',FILET:'Filet / volée',HAUT_TETE:'Haut tête',CONSTRUCTION:'Construction',TRANSITION:'Transition',DEFENSE:'Défense',DECISION:'Décision tactique',PRESSION:'Pression provoquée',AUTRE:'Autre'}[k]||k;
 }
 function matchPadelAdvice(family,type='work'){
   const work={
@@ -5709,6 +5711,8 @@ function matchPadelAdvice(family,type='work'){
     CONSTRUCTION:'Garder le plan plus longtemps: construire le point avant d’accélérer.',
     TRANSITION:'Travailler la montée: avancer ensemble, pas un joueur seul qui laisse une zone ouverte.',
     DEFENSE:'Défendre plus haut et plus profond: accepter une balle de plus avant de tenter la sortie.',
+    DECISION:'Réduire le mauvais choix: reconnaître balle neutre, balle d’attaque et balle de survie avant de frapper.',
+    PRESSION:'Transformer la pression en point construit: provoquer la faute sans chercher trop vite le winner.',
     AUTRE:'Rendre l’encodage plus précis sur les prochains matchs pour lire la tendance.'
   };
   const strength={
@@ -5720,19 +5724,25 @@ function matchPadelAdvice(family,type='work'){
     CONSTRUCTION:'La paire gagne quand elle construit: ne pas brûler les étapes.',
     TRANSITION:'La transition fonctionne: continuer à monter ensemble après la balle qui pousse.',
     DEFENSE:'La défense rapporte: utiliser cette solidité pour récupérer l’attaque.',
+    DECISION:'Les choix tactiques rapportent: garder cette lecture simple et la répéter dans les moments chauds.',
+    PRESSION:'La paire force des fautes: continuer à mettre l’adversaire dans une balle de plus à jouer.',
     AUTRE:'Il y a une tendance positive, mais elle doit être mieux précisée à l’encodage.'
   };
   return (type==='strength'?strength:work)[family]||work.AUTRE;
 }
 function matchPadelDeepAnalysis(points,won,lost,playerDetails,pairAnalysis,advSideLost){
-  const families=['SERVICE','RETOUR','FOND','FILET','HAUT_TETE','CONSTRUCTION','TRANSITION','DEFENSE','AUTRE'];
+  const families=['SERVICE','RETOUR','FOND','FILET','HAUT_TETE','CONSTRUCTION','TRANSITION','DEFENSE','DECISION','PRESSION','AUTRE'];
+  const isOurs=p=>p.origin==='JOUEUR_1'||p.origin==='JOUEUR_2'||p.origin==='COLLECTIF';
   const familyRows=families.map(f=>{
     const w=won.filter(p=>matchPadelFamily(p)===f).length;
-    const l=lost.filter(p=>matchPadelFamily(p)===f).length;
-    return {family:f,label:matchPadelFamilyLabel(f),won:w,lost:l,total:w+l,balance:w-l};
+    const lostFamily=lost.filter(p=>matchPadelFamily(p)===f);
+    const lOurs=lostFamily.filter(isOurs).length;
+    const lTheirs=lostFamily.filter(p=>!isOurs(p)).length;
+    return {family:f,label:matchPadelFamilyLabel(f),won:w,lost:lOurs+lTheirs,lostOurs:lOurs,lostTheirs:lTheirs,total:w+lOurs+lTheirs,balance:w-lOurs-lTheirs};
   }).filter(x=>x.total>0).sort((a,b)=>Math.abs(b.balance)-Math.abs(a.balance)||b.total-a.total);
   const best=familyRows.filter(x=>x.balance>0).sort((a,b)=>b.balance-a.balance||b.total-a.total)[0]||null;
-  const work=familyRows.filter(x=>x.balance<0).sort((a,b)=>a.balance-b.balance||b.total-a.total)[0]||null;
+  const work=familyRows.filter(x=>x.lostOurs>x.won).sort((a,b)=>(b.lostOurs-b.won)-(a.lostOurs-a.won)||b.total-a.total)[0]||null;
+  const defense=familyRows.slice().sort((a,b)=>b.lostTheirs-a.lostTheirs||b.total-a.total)[0]||null;
   const biggest=familyRows[0]||null;
   const side=advSideLost.ADV_GAUCHE>advSideLost.ADV_DROITE?'gauche':advSideLost.ADV_DROITE>advSideLost.ADV_GAUCHE?'droite':'équilibré';
   const sideAdvice=side==='gauche'?'Fermer davantage le côté ADV gauche: éviter la balle courte dans sa zone forte et le forcer à rejouer une balle de plus.':side==='droite'?'Fermer davantage le côté ADV droite: protéger cette diagonale et varier plus tôt avant qu’il installe son winner.':'Les winners adverses sont répartis: travailler surtout la qualité de balle et la couverture de la zone libre.';
@@ -5748,11 +5758,13 @@ function matchPadelDeepAnalysis(points,won,lost,playerDetails,pairAnalysis,advSi
     familyRows,
     best,
     work,
+    defense,
     biggest,
     side,
     sideAdvice,
     plan:[...new Set(plan)].slice(0,5),
-    headline:work?`Le chantier padel prioritaire est ${matchPadelFamilyLabel(work.family).toLowerCase()} (${work.won}-${work.lost}).`:best?`Le levier fort est ${matchPadelFamilyLabel(best.family).toLowerCase()} (${best.won}-${best.lost}).`:'Pas encore assez de familles padel identifiées.'
+    headline:work?`Le chantier offensif est ${matchPadelFamilyLabel(work.family).toLowerCase()}: ${work.lostOurs} points donnés par HWBT.`:best?`Le levier fort est ${matchPadelFamilyLabel(best.family).toLowerCase()} (${best.won}-${best.lost}).`:'Pas encore assez de familles padel identifiées.',
+    defensiveHeadline:defense&&defense.lostTheirs?`Le chantier défensif est ${matchPadelFamilyLabel(defense.family).toLowerCase()}: ${defense.lostTheirs} points réellement subis.`:'Le chantier défensif n’est pas encore assez marqué.'
   };
 }
 function matchPointImportantTypes(p){
@@ -5833,7 +5845,7 @@ function analyserMatch(journal,config={}){
   const reviewPoints=points.filter(p=>p.review||p.toReview||p.aRevoir||p.video||p.videoTimecode||p.note).map(p=>({id:p.id,score:p.score||'',origin:p.origin,result:p.result,timecode:p.videoTimecode||p.timecode||'',note:p.note||''}));
   const duration=activeMatchDurationSeconds(journal,points);
   let diff=0;
-  const timeline=points.map((p,i)=>{diff+=p.result==='GAGNE'?1:p.result==='PERDU'?-1:0;return {id:p.id,index:i+1,result:p.result,origin:p.origin,server:p.server||p.serveur||'',score:p.score||'',diff,important:matchPointImportantTypes(p),review:reviewPoints.some(r=>r.id===p.id),timecode:p.videoTimecode||p.timecode||''};});
+  const timeline=points.map((p,i)=>{diff+=p.result==='GAGNE'?1:p.result==='PERDU'?-1:0;return {id:p.id,index:i+1,result:p.result,origin:p.origin,cause:p.cause||'',phase:p.phase||'',server:p.server||p.serveur||'',score:p.score||'',diff,important:matchPointImportantTypes(p),review:reviewPoints.some(r=>r.id===p.id),timecode:p.videoTimecode||p.timecode||''};});
   const analysis={
     matchSummary:{title:config.title||'Match HWBT',date:config.date||String(config.finishedAt||config.createdAt||'').slice(0,10)||'',club:matchClubLabel(config),players:config.players||[],opponents:config.opponents||'',score:config.score||'',format:config.format||'Padel',status:config.status||'FIN_DE_MATCH_CONFIRMEE',totalPoints:points.length,won:won.length,lost:lost.length,durationActiveSeconds:duration,averagePointSeconds:points.length?Math.round(duration/points.length):0},
     coverage:{originKnown:points.length?Math.round(((wonKnown.length+lostKnown.length)/points.length)*100):0,causeKnown:points.filter(p=>p.cause).length,phaseKnown:points.filter(p=>p.phase).length,total:points.length,warnings:[]},
@@ -5927,7 +5939,7 @@ function createMatchAnalystMatch(){
   const score=(prompt('Score de départ des jeux ? Mets 0-0 si tu commences au début du match.','0-0')||'0-0').trim();
   const servingTeam=(prompt('Qui commence à servir ? Mets HWBT ou ADV.','HWBT')||'HWBT').trim().toUpperCase().startsWith('A')?'ADV':'HWBT';
   const id=Date.now();
-  const match={id,title,date:matchDate,club,location:club,score,currentScore:score,status:'EN_COURS',format:'Padel',playerIds,events:[],matchScore:{hwbtGames:0,advGames:0,hwbtPoints:0,advPoints:0,pointScore:'0-0',servingTeam},createdAt:new Date().toISOString()};
+  const match={id,title,date:matchDate,club,location:club,score,currentScore:score,status:'EN_COURS',format:'Padel',playerIds,events:[],matchScore:{sets:[],hwbtGames:0,advGames:0,hwbtPoints:0,advPoints:0,pointScore:'0-0',servingTeam},createdAt:new Date().toISOString()};
   const gameMatch=score.match(/(\d+)\s*[-/]\s*(\d+)/);
   if(gameMatch){match.matchScore.hwbtGames=Number(gameMatch[1])||0;match.matchScore.advGames=Number(gameMatch[2])||0;}
   match.currentScore=matchDisplayScore(match);
@@ -6025,15 +6037,18 @@ function ensureMatchScore(m){
     const game=parseGameScore(String(m.currentScore||m.score||'0-0').split('·')[0]);
     const pointPart=String(m.currentScore||m.score||'0-0').includes('·')?String(m.currentScore||m.score).split('·')[1]:'0-0';
     const point=parsePadelPointScore(pointPart);
-    m.matchScore={...game,hwbtPoints:point.hwbt,advPoints:point.adv,pointScore:formatPadelPointScore(point.hwbt,point.adv),servingTeam:m.servingTeam||'HWBT'};
+    m.matchScore={sets:[],...game,hwbtPoints:point.hwbt,advPoints:point.adv,pointScore:formatPadelPointScore(point.hwbt,point.adv),servingTeam:m.servingTeam||'HWBT'};
   }
+  if(!Array.isArray(m.matchScore.sets)) m.matchScore.sets=[];
   if(!m.matchScore.servingTeam) m.matchScore.servingTeam='HWBT';
   m.matchScore.pointScore=formatPadelPointScore(m.matchScore.hwbtPoints||0,m.matchScore.advPoints||0);
   return m.matchScore;
 }
 function matchDisplayScore(m){
   const s=ensureMatchScore(m);
-  return `${s.hwbtGames||0}-${s.advGames||0} · ${s.pointScore||'0-0'}`;
+  const done=(s.sets||[]).join(' ');
+  const cur=`${s.hwbtGames||0}-${s.advGames||0}`;
+  return `${done?done+' ':''}${cur} · ${s.pointScore||'0-0'}`;
 }
 function matchPointStateLabel(result){
   return result==='GAGNE'?'HWBT gagne le point':'HWBT perd le point';
@@ -6049,6 +6064,17 @@ function advanceMatchScore(m,result){
     gameWon=formatted==='Jeu HWBT'?'HWBT':'ADV';
     if(gameWon==='HWBT') s.hwbtGames=(s.hwbtGames||0)+1;
     else s.advGames=(s.advGames||0)+1;
+    s.sets=s.sets||[];
+    const g1=s.hwbtGames||0, g2=s.advGames||0;
+    const setDone=(g1>=6&&g1-g2>=2)||(g2>=6&&g2-g1>=2)||g1===7||g2===7;
+    if(setDone){
+      s.sets.push(`${g1}-${g2}`);
+      s.hwbtGames=0;
+      s.advGames=0;
+      s.tieBreak=false;
+    }else if(g1===6&&g2===6){
+      s.tieBreak=true;
+    }
     s.hwbtPoints=0;
     s.advPoints=0;
     s.pointScore='0-0';
@@ -6221,7 +6247,7 @@ function pageMatchAnalyst(){
     <div class="card" style="border-color:var(--bronze-dim2)"><div style="display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap"><div><div class="card-title">HWBT MATCH ANALYST</div><div style="font-size:34px;font-weight:900;line-height:1">ANALYSE D'APRÈS-MATCH</div><div class="muted-help" style="margin-top:8px;max-width:820px">${realCount?`Tu as ${realCount} vrai match${realCount>1?'s':''} encodé${realCount>1?'s':''}. L'analyse utilise ces données réelles.`:`Aucun vrai match encodé pour le moment. Crée un match pour remplacer les démonstrations.`}</div>${match&&!match.demo?`<div style="font-size:11px;color:var(--bronze);letter-spacing:1px;margin-top:9px">${esc(matchMetaLine(match))}</div>`:''}</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="createMatchAnalystMatch()">+ NOUVEAU MATCH</button><button class="btn btn-primary btn-sm" onclick="printMatchCoachPdf()">PDF COACH</button><button class="btn btn-ghost btn-sm" onclick="printMatchPlayerPdf()">FICHE JOUEURS</button>${match&&!match.demo?`<button class="btn btn-ghost btn-sm" onclick="editMatchMeta('${match.id}')">MODIFIER INFOS</button><button class="btn btn-ghost btn-sm" onclick="deleteMatchAnalystMatch('${match.id}')">SUPPRIMER</button>`:''}</div></div>
       <div class="g2" style="margin-top:14px"><div class="form-group"><label class="form-label">MATCH</label><select class="form-select" onchange="setUI({matchAnalystId:this.value})">${matches.map(m=>`<option value="${esc(m.id)}" ${String(m.id)===String(UI.matchAnalystId)?'selected':''}>${esc(m.title||m.name||'Match')}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">SOURCE</label><div class="form-input" style="height:auto;color:${match.demo?'var(--bronze)':'var(--vert)'}">${match.demo?'Démonstration hors données réelles':'Journal réel de la plateforme'}</div></div></div>
     </div>
-    <div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${tab===k?'active':''}" onclick="setUI({matchAnalystTab:'${k}'})">${l}</button>`).join('')}</div>
+    <div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${tab===k?'active':''}" onclick="setUI({matchAnalystTab:'${k}'${k==='encode'?`,matchAnalystId:(currentMatchForEncoding()||{}).id`:''}})">${l}</button>`).join('')}</div>
     ${tab==='encode'?matchEncoderHtml(match,a):tab==='closed'?matchClosedHtml():tab==='express'?matchExpressHtml(a):tab==='player'?matchPlayerHtml(a):tab==='timeline'?matchTimelineHtml(a):tab==='review'?matchReviewHtml(a):matchCoachHtml(a)}
   </div>`;
 }
@@ -6294,6 +6320,9 @@ function liveMatchCoachTopo(match,a){
 function matchEncoderHtml(match,a){
   const m=currentMatchForEncoding();
   if(!m) return `<div class="card" style="text-align:center;padding:38px;border-color:var(--bronze-dim2)"><div class="card-title">ENCODAGE MATCH</div><div style="font-size:28px;font-weight:900;margin-bottom:10px">Commence par créer un vrai match</div><div class="muted-help" style="margin-bottom:18px">Les démos servent juste à montrer le résultat. Pour travailler, crée ton match et encode les points.</div><button class="btn btn-primary" onclick="createMatchAnalystMatch()">+ NOUVEAU MATCH</button></div>`;
+  if(!match||String(match.id)!==String(m.id)){
+    a=analyserMatch(m.events||m.journal||m.eventLog||[],m);
+  }
   const scoreState=ensureMatchScore(m);
   const events=(m.events||[]).filter(e=>String(e.type).toUpperCase()==='POINT'&&e.active!==false&&!e.cancelled);
   const last=events.slice(-8).reverse();
@@ -6315,7 +6344,9 @@ function matchEncoderHtml(match,a){
     ['COLLECTIF','point construit par patience','construction','Duo · Patience','Duo HWBT'],
     ['COLLECTIF','montée au filet réussie','transition','Duo · Montée filet','Duo HWBT'],
     ['COLLECTIF','zone libre trouvée','placement','Duo · Zone libre','Duo HWBT'],
-    ['ADVERSAIRES','faute adverse provoquée','pression','Faute provoquée','Duo HWBT']
+    ['ADVERSAIRES','faute adv gauche provoquée','pression','ADV G · Faute provoquée','Faute adverse'],
+    ['ADVERSAIRES','faute adv droite provoquée','pression','ADV D · Faute provoquée','Faute adverse'],
+    ['ADVERSAIRES','faute adverse provoquée','pression','ADV · Faute non précisée','Faute adverse']
   ];
   const optionsLost=[
     ['JOUEUR_1','faute service','service',`${p1} · Service`,p1],
@@ -6330,6 +6361,9 @@ function matchEncoderHtml(match,a){
     ['JOUEUR_2','faute volée','filet',`${p2} · Volée`,p2],
     ['JOUEUR_2','faute haut tête vibora bandeja smash','attaque',`${p2} · Haut tête`,p2],
     ['JOUEUR_2','mauvais choix tactique','décision',`${p2} · Choix`,p2],
+    ['COLLECTIF','zone libre laissée ouverte','placement','Duo · Zone ouverte','Duo HWBT'],
+    ['COLLECTIF','manque de communication balle centrale','communication','Duo · Communication','Duo HWBT'],
+    ['COLLECTIF','duo cassé sur la montée','transition','Duo · Montée ratée','Duo HWBT'],
     ['ADVERSAIRES','adv gauche winner volée','filet','ADV G · Volée','ADV gauche'],
     ['ADVERSAIRES','adv gauche winner haut tête','attaque','ADV G · Haut tête','ADV gauche'],
     ['ADVERSAIRES','adv gauche winner fond de terrain','fond','ADV G · Fond','ADV gauche'],
@@ -6405,7 +6439,7 @@ function matchCoachHtml(a){
   const playerCards=(a.playerDetails||[]).map(pd=>`<div class="card" style="border-color:${pd.impact>=20?'var(--vert)':pd.impact<=-20?'var(--rouge)':'var(--border)'}">
     <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
       <div><div class="card-title">JOUEUR · ${esc(pd.label).toUpperCase()}</div><div style="font-size:24px;font-weight:900;line-height:1">${esc(pd.won)} / ${esc(pd.lost)}</div><div class="muted-help">points gagnés / points perdus</div></div>
-      <div style="text-align:right"><div style="font-size:26px;font-weight:900;color:${pd.impact>=20?'var(--vert)':pd.impact<=-20?'var(--rouge)':'var(--bronze)'}">${pd.impact>0?'+':''}${pd.impact}</div><div class="card-title">IMPACT</div></div>
+      <div style="text-align:right"><div style="font-size:26px;font-weight:900;color:${pd.impact>=20?'var(--vert)':pd.impact<=-20?'var(--rouge)':'var(--bronze)'}">${pd.impact>0?'+':''}${pd.impact}%</div><div class="card-title">IMPACT</div></div>
     </div>
     <div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.65;margin-top:12px;background:var(--bg4);border-left:3px solid var(--bronze);padding:10px;border-radius:0 6px 6px 0">${esc(pd.message)}</div>
     <div class="g2" style="margin-top:12px">
@@ -6419,13 +6453,13 @@ function matchCoachHtml(a){
   const padelRows=(padel.familyRows||[]).slice(0,6);
   const padelDeepHtml=`<div class="card" style="border-color:var(--bronze-dim2)">
     <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap">
-      <div><div class="card-title">LECTURE PADEL PROFONDE</div><div style="font-size:22px;font-weight:900;line-height:1.15">${esc(padel.headline||'Lecture à préciser')}</div></div>
+      <div><div class="card-title">LECTURE PADEL PROFONDE</div><div style="font-size:22px;font-weight:900;line-height:1.15">${esc(padel.headline||'Lecture à préciser')}</div><div class="muted-help" style="margin-top:6px">${esc(padel.defensiveHeadline||'')}</div></div>
       <div style="text-align:right"><div style="font-size:10px;color:var(--bronze);letter-spacing:1px">WINNERS ADV</div><div style="font-size:17px;font-weight:900">${esc(padel.side==='équilibré'?'équilibrés':`côté ${padel.side}`)}</div></div>
     </div>
     <div class="g3" style="margin-top:14px">
       <div>
         <div class="card-title">FAMILLES DE JEU</div>
-        ${padelRows.length?padelRows.map(r=>`<div style="display:grid;grid-template-columns:96px 1fr 62px;gap:8px;align-items:center;margin:8px 0"><div style="font-size:10px;color:var(--gray)">${esc(r.label)}</div><div style="height:7px;background:var(--border);border-radius:8px;overflow:hidden"><div style="height:100%;width:${Math.min(100,Math.round((r.total/Math.max(1,a.matchSummary.totalPoints))*100*2))}%;background:${r.balance>=0?'var(--bronze)':'var(--rouge)'}"></div></div><div style="font-size:11px;color:var(--offwhite);text-align:right">${esc(`${r.won}-${r.lost}`)}</div></div>`).join(''):'<div class="muted-help">Pas assez de phases renseignées.</div>'}
+        ${padelRows.length?padelRows.map(r=>`<div style="display:grid;grid-template-columns:96px 1fr 88px;gap:8px;align-items:center;margin:8px 0"><div style="font-size:10px;color:var(--gray)">${esc(r.label)}</div><div style="height:7px;background:var(--border);border-radius:8px;overflow:hidden"><div style="height:100%;width:${Math.min(100,Math.round((r.total/Math.max(1,a.matchSummary.totalPoints))*100*2))}%;background:${r.balance>=0?'var(--bronze)':'var(--rouge)'}"></div></div><div style="font-size:10px;color:var(--offwhite);text-align:right">${esc(`${r.won} + / ${r.lostOurs||0} donnés / ${r.lostTheirs||0} subis`)}</div></div>`).join(''):'<div class="muted-help">Pas assez de phases renseignées.</div>'}
       </div>
       <div>
         <div class="card-title">CE QU’IL FAUT DIRE</div>
