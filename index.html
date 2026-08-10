@@ -6214,6 +6214,7 @@ function refineMatchPoint(pointId,detail){
   e.detail=detail;
   e.cause=`${e.baseCause||e.cause||'point'} · ${detail}`;
   e.refinedAt=new Date().toISOString();
+  UI.matchRefinePointId=null;
   saveState();
   render();
 }
@@ -6222,7 +6223,8 @@ function clearMatchPointRefine(){
   render();
 }
 function matchRefineHtml(m,events){
-  const point=events.find(e=>String(e.id)===String(UI.matchRefinePointId))||events.at(-1);
+  if(!UI.matchRefinePointId)return '';
+  const point=events.find(e=>String(e.id)===String(UI.matchRefinePointId));
   if(!point)return '';
   const opts=matchRefineOptions(point);
   return `<div class="card" style="border-color:var(--bronze-dim2);padding:14px">
@@ -6558,9 +6560,9 @@ function matchEncoderHtml(match,a){
       <button class="match-live-main won ${pending==='GAGNE'?'active':''}" onclick="setMatchPointResult('GAGNE')"><span>POINT GAGNÉ HWBT</span><b>1er clic</b></button>
       <button class="match-live-main lost ${pending==='PERDU'?'active':''}" onclick="setMatchPointResult('PERDU')"><span>POINT PERDU HWBT</span><b>1er clic</b></button>
     </div>
-    ${events.length?matchLiveStatsHtml(m,a,events):''}
     ${matchRefineHtml(m,events)}
     ${pending?`<div class="card" style="border-color:${pending==='GAGNE'?'var(--bronze-dim2)':'var(--border2)'}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px"><div><div class="card-title">2E CLIC OBLIGATOIRE · ${pending==='GAGNE'?'COMMENT LE POINT EST GAGNÉ ?':'COMMENT LE POINT EST PERDU ?'}</div><div class="muted-help">${matchPointStateLabel(pending)}. Clique la grande famille: le score avance direct. Tu pourras préciser CD/RV/vitre/centre après.</div></div><button class="btn btn-ghost btn-sm" onclick="setMatchPointResult(null)">ANNULER CHOIX</button></div><div class="match-action-groups">${shotButtons}</div></div>`:''}
+    ${events.length?matchLiveStatsHtml(m,a,events):''}
     <div class="card" style="padding:14px">
       <div class="card-title">OUTILS MATCH</div>
       <input type="hidden" id="matchPointScore" value="">
