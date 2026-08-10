@@ -6182,12 +6182,88 @@ function addMatchPoint(result,origin,causePreset='',phasePreset=''){
   const cause=causePreset||document.getElementById('matchPointCause')?.value||'';
   const server=update.prev.server||document.getElementById('matchServingTeamInput')?.value||'J1';
   const tags=[...document.querySelectorAll('[data-match-tag]:checked')].map(x=>x.value);
-  events.push({type:'POINT',id:`m${m.id}-p${pointNumber}`,t:Math.round((now-start)/1000),result,origin,score:update.score,prevScore:update.prev.display,prevMatchScore:update.prev,gameWon:update.gameWon,gameScore:update.gameScore,pointScore:update.pointScore,server,serverLabel:matchServerLabel(m,server),superTieBreak:update.superTieBreak||false,tags,phase,cause,createdAt:new Date().toISOString()});
+  const point={type:'POINT',id:`m${m.id}-p${pointNumber}`,t:Math.round((now-start)/1000),result,origin,score:update.score,prevScore:update.prev.display,prevMatchScore:update.prev,gameWon:update.gameWon,gameScore:update.gameScore,pointScore:update.pointScore,server,serverLabel:matchServerLabel(m,server),superTieBreak:update.superTieBreak||false,tags,phase,cause,baseCause:cause,detail:'',createdAt:new Date().toISOString()};
+  events.push(point);
   if(document.getElementById('matchPointScore')) document.getElementById('matchPointScore').value='';
   document.querySelectorAll('[data-match-tag]:checked').forEach(x=>x.checked=false);
   UI.matchPointResult=null;
+  UI.matchRefinePointId=point.id;
   saveState();
   render();
+}
+function matchRefineOptions(point){
+  const text=`${point?.phase||''} ${point?.cause||''}`.toLowerCase();
+  if(/service/.test(text)) return point.result==='GAGNE'
+    ?['service gagnant','service au corps','service vitre','service + balle suivante','faute retour ADV G','faute retour ADV D']
+    :['double faute','service filet','service vitre','zone ratée','service trop neutre'];
+  if(/retour/.test(text)) return ['coup droit','revers','centre / corps','dans le filet','trop court','trop long','vitre'];
+  if(/fond/.test(text)) return ['coup droit','revers','vitre','balle courte','trop long','direction ratée','précipitation'];
+  if(/volée|volee|filet/.test(text)) return ['volée coup droit','volée revers','volée centre','volée basse','fermeture centre','trop de risque'];
+  if(/haut|vibora|bandeja|smash|attaque/.test(text)) return ['bandeja','vibora','smash','sortie vitre haute','mauvais choix haut tête','lob adverse trop bon'];
+  if(/lob|défense|defense|vitre/.test(text)) return ['lob haut','lob trop court','défense vitre','sortie de défense','chiquita','balle de survie'];
+  if(/communication|placement|transition|zone/.test(text)) return ['centre non annoncé','zone libre','montée décalée','replacement lent','choix duo','partenaire isolé'];
+  if(/pression|adverse|adv/.test(text)) return ['ADV gauche','ADV droite','faute forcée','faute gratuite','après long échange','sous pression'];
+  if(/choix|décision|decision/.test(text)) return ['trop vite','mauvaise cible','mauvais moment','balle pas attaquable','pas assez patient'];
+  return ['coup droit','revers','centre','vitre','choix','pression'];
+}
+function refineMatchPoint(pointId,detail){
+  const m=currentMatchForEncoding();
+  if(!m)return;
+  const e=(m.events||[]).find(x=>String(x.id)===String(pointId)&&String(x.type).toUpperCase()==='POINT');
+  if(!e)return;
+  e.detail=detail;
+  e.cause=`${e.baseCause||e.cause||'point'} · ${detail}`;
+  e.refinedAt=new Date().toISOString();
+  saveState();
+  render();
+}
+function clearMatchPointRefine(){
+  UI.matchRefinePointId=null;
+  render();
+}
+function matchRefineHtml(m,events){
+  const point=events.find(e=>String(e.id)===String(UI.matchRefinePointId))||events.at(-1);
+  if(!point)return '';
+  const opts=matchRefineOptions(point);
+  return `<div class="card" style="border-color:var(--bronze-dim2);padding:14px">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+      <div><div class="card-title">DÉTAIL FACULTATIF DU DERNIER POINT</div><div style="font-size:13px;color:var(--white);font-weight:800">${esc(point.result)} · ${esc(matchOriginLabel(m,point.origin))} · ${esc(point.baseCause||point.cause||'point')}</div><div class="muted-help" style="margin-top:4px">Optionnel: si tu as le temps, précise le coup pour obtenir des stats plus fines. Le score est déjà encodé.</div></div>
+      <button class="btn btn-ghost btn-sm" onclick="clearMatchPointRefine()">PASSER</button>
+    </div>
+    <div class="match-live-options" style="margin-top:12px">${opts.map(o=>`<button class="match-live-mini ${point.result==='GAGNE'?'won':'lost'}" onclick="refineMatchPoint('${point.id}','${jsStr(o)}')">${esc(o)}</button>`).join('')}</div>
+  </div>`;
+}
+function matchLiveStatsHtml(m,a,events){
+  const recent=events.slice(-8);
+  const rWon=recent.filter(e=>e.result==='GAGNE').length;
+  const rLost=recent.filter(e=>e.result==='PERDU').length;
+  const given=recent.filter(e=>e.result==='PERDU'&&['JOUEUR_1','JOUEUR_2','COLLECTIF'].includes(e.origin)).length;
+  const suffered=recent.filter(e=>e.result==='PERDU'&&e.origin==='ADVERSAIRES').length;
+  const wonByUs=recent.filter(e=>e.result==='GAGNE'&&['JOUEUR_1','JOUEUR_2','COLLECTIF'].includes(e.origin)).length;
+  const offered=recent.filter(e=>e.result==='GAGNE'&&e.origin==='ADVERSAIRES').length;
+  const topLost=matchTopEntries(matchCountBy(recent.filter(e=>e.result==='PERDU'),'cause'),1)[0];
+  const topWon=matchTopEntries(matchCountBy(recent.filter(e=>e.result==='GAGNE'),'cause'),1)[0];
+  const advLeft=a.adversarySideLost?.ADV_GAUCHE||0, advRight=a.adversarySideLost?.ADV_DROITE||0;
+  const advDanger=advLeft>advRight?'ADV gauche':advRight>advLeft?'ADV droite':'équilibré';
+  let advice='Prochain changement: garde une consigne simple, zone claire et moins de précipitation.';
+  if(given>suffered) advice='Priorité: réduire les points donnés. Retour simple, balle plus haute, zéro cadeau sur les deux prochains jeux.';
+  else if(suffered>given) advice=`Priorité: protéger la zone forte ${advDanger}. Plus de profondeur et moins de balle courte.`;
+  else if(wonByUs>=offered&&wonByUs>=2) advice='Levier positif: HWBT crée ses points. Continue à construire avant de finir.';
+  const box=(label,value,help)=>`<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px"><div class="card-title">${esc(label)}</div><div style="font-size:24px;font-weight:900;color:var(--white);line-height:1">${esc(value)}</div><div class="muted-help" style="margin-top:5px">${esc(help||'')}</div></div>`;
+  return `<div class="card" style="border-color:var(--bronze-dim2)">
+    <div class="card-title">STATS DIRECTES · CHANGEMENT DE CÔTÉ</div>
+    <div class="g4">
+      ${box('8 derniers',`${rWon}-${rLost}`,'points HWBT / ADV')}
+      ${box('Donnés',`${given}`,`${suffered} subis par l’adversaire`)}
+      ${box('Créés HWBT',`${wonByUs}`,`${offered} offerts par l’adversaire`)}
+      ${box('ADV danger',advDanger,`${advLeft}-${advRight} winners subis G/D`)}
+    </div>
+    <div class="g2" style="margin-top:10px">
+      <div class="muted-help"><b>Ce qui rapporte:</b> ${esc(topWon?.label||'pas encore assez clair')}</div>
+      <div class="muted-help"><b>Ce qui fuit:</b> ${esc(topLost?.label||'pas encore assez clair')}</div>
+    </div>
+    <div style="margin-top:12px;background:var(--bg4);border-left:3px solid var(--bronze);border-radius:0 6px 6px 0;padding:10px;font-size:13px;color:var(--offwhite);font-family:var(--font-body);line-height:1.55">${esc(advice)}</div>
+  </div>`;
 }
 function undoLastMatchPoint(){
   const m=currentMatchForEncoding();
@@ -6406,45 +6482,51 @@ function matchEncoderHtml(match,a){
   const p1=slots.p1;
   const p2=slots.p2;
   const optionsWon=[
-    ['JOUEUR_1','service gagnant ou service qui donne avantage','service',`${p1} · Service`,p1],
-    ['JOUEUR_1','retour agressif ou retour qui met sous pression','retour',`${p1} · Retour`,p1],
-    ['JOUEUR_1','winner fond de terrain','fond',`${p1} · Fond`,p1],
-    ['JOUEUR_1','volée gagnante','filet',`${p1} · Volée`,p1],
-    ['JOUEUR_1','winner haut tête vibora bandeja smash','attaque',`${p1} · Haut tête`,p1],
-    ['JOUEUR_2','service gagnant ou service qui donne avantage','service',`${p2} · Service`,p2],
-    ['JOUEUR_2','retour agressif ou retour qui met sous pression','retour',`${p2} · Retour`,p2],
-    ['JOUEUR_2','winner fond de terrain','fond',`${p2} · Fond`,p2],
-    ['JOUEUR_2','volée gagnante','filet',`${p2} · Volée`,p2],
-    ['JOUEUR_2','winner haut tête vibora bandeja smash','attaque',`${p2} · Haut tête`,p2],
-    ['COLLECTIF','point construit par patience','construction','Duo · Patience','Duo HWBT'],
-    ['COLLECTIF','montée au filet réussie','transition','Duo · Montée filet','Duo HWBT'],
-    ['COLLECTIF','zone libre trouvée','placement','Duo · Zone libre','Duo HWBT'],
+    ['JOUEUR_1','service +1','service',`${p1} · Service`,p1],
+    ['JOUEUR_1','retour +1','retour',`${p1} · Retour`,p1],
+    ['JOUEUR_1','fond +1','fond',`${p1} · Fond`,p1],
+    ['JOUEUR_1','filet +1','filet',`${p1} · Filet`,p1],
+    ['JOUEUR_1','haut tête +1','attaque',`${p1} · Haut tête`,p1],
+    ['JOUEUR_1','lob défense +1','défense lob',`${p1} · Lob/défense`,p1],
+    ['JOUEUR_2','service +1','service',`${p2} · Service`,p2],
+    ['JOUEUR_2','retour +1','retour',`${p2} · Retour`,p2],
+    ['JOUEUR_2','fond +1','fond',`${p2} · Fond`,p2],
+    ['JOUEUR_2','filet +1','filet',`${p2} · Filet`,p2],
+    ['JOUEUR_2','haut tête +1','attaque',`${p2} · Haut tête`,p2],
+    ['JOUEUR_2','lob défense +1','défense lob',`${p2} · Lob/défense`,p2],
+    ['COLLECTIF','construction duo +1','construction','Duo · Construction','Duo HWBT'],
+    ['COLLECTIF','transition filet +1','transition','Duo · Transition','Duo HWBT'],
+    ['COLLECTIF','zone libre trouvée +1','placement','Duo · Zone libre','Duo HWBT'],
     ['ADVERSAIRES','faute adv gauche provoquée','pression','ADV G · Faute provoquée','Faute adverse'],
     ['ADVERSAIRES','faute adv droite provoquée','pression','ADV D · Faute provoquée','Faute adverse'],
     ['ADVERSAIRES','faute adverse provoquée','pression','ADV · Faute non précisée','Faute adverse']
   ];
   const optionsLost=[
-    ['JOUEUR_1','faute service','service',`${p1} · Service`,p1],
-    ['JOUEUR_1','faute retour','retour',`${p1} · Retour`,p1],
-    ['JOUEUR_1','faute fond de terrain','fond',`${p1} · Fond`,p1],
-    ['JOUEUR_1','faute volée','filet',`${p1} · Volée`,p1],
-    ['JOUEUR_1','faute haut tête vibora bandeja smash','attaque',`${p1} · Haut tête`,p1],
+    ['JOUEUR_1','service donné','service',`${p1} · Service`,p1],
+    ['JOUEUR_1','retour donné','retour',`${p1} · Retour`,p1],
+    ['JOUEUR_1','fond donné','fond',`${p1} · Fond`,p1],
+    ['JOUEUR_1','filet donné','filet',`${p1} · Filet`,p1],
+    ['JOUEUR_1','haut tête donné','attaque',`${p1} · Haut tête`,p1],
+    ['JOUEUR_1','lob défense donné','défense lob',`${p1} · Lob/défense`,p1],
     ['JOUEUR_1','mauvais choix tactique','décision',`${p1} · Choix`,p1],
-    ['JOUEUR_2','faute service','service',`${p2} · Service`,p2],
-    ['JOUEUR_2','faute retour','retour',`${p2} · Retour`,p2],
-    ['JOUEUR_2','faute fond de terrain','fond',`${p2} · Fond`,p2],
-    ['JOUEUR_2','faute volée','filet',`${p2} · Volée`,p2],
-    ['JOUEUR_2','faute haut tête vibora bandeja smash','attaque',`${p2} · Haut tête`,p2],
+    ['JOUEUR_2','service donné','service',`${p2} · Service`,p2],
+    ['JOUEUR_2','retour donné','retour',`${p2} · Retour`,p2],
+    ['JOUEUR_2','fond donné','fond',`${p2} · Fond`,p2],
+    ['JOUEUR_2','filet donné','filet',`${p2} · Filet`,p2],
+    ['JOUEUR_2','haut tête donné','attaque',`${p2} · Haut tête`,p2],
+    ['JOUEUR_2','lob défense donné','défense lob',`${p2} · Lob/défense`,p2],
     ['JOUEUR_2','mauvais choix tactique','décision',`${p2} · Choix`,p2],
+    ['COLLECTIF','duo communication donné','communication','Duo · Communication','Duo HWBT'],
     ['COLLECTIF','zone libre laissée ouverte','placement','Duo · Zone ouverte','Duo HWBT'],
-    ['COLLECTIF','manque de communication balle centrale','communication','Duo · Communication','Duo HWBT'],
-    ['COLLECTIF','duo cassé sur la montée','transition','Duo · Montée ratée','Duo HWBT'],
-    ['ADVERSAIRES','adv gauche winner volée','filet','ADV G · Volée','ADV gauche'],
+    ['COLLECTIF','duo cassé sur la montée','transition','Duo · Transition ratée','Duo HWBT'],
+    ['ADVERSAIRES','adv gauche winner filet','filet','ADV G · Filet','ADV gauche'],
     ['ADVERSAIRES','adv gauche winner haut tête','attaque','ADV G · Haut tête','ADV gauche'],
-    ['ADVERSAIRES','adv gauche winner fond de terrain','fond','ADV G · Fond','ADV gauche'],
-    ['ADVERSAIRES','adv droite winner volée','filet','ADV D · Volée','ADV droite'],
+    ['ADVERSAIRES','adv gauche winner fond','fond','ADV G · Fond','ADV gauche'],
+    ['ADVERSAIRES','adv gauche winner retour','retour','ADV G · Retour','ADV gauche'],
+    ['ADVERSAIRES','adv droite winner filet','filet','ADV D · Filet','ADV droite'],
     ['ADVERSAIRES','adv droite winner haut tête','attaque','ADV D · Haut tête','ADV droite'],
-    ['ADVERSAIRES','adv droite winner fond de terrain','fond','ADV D · Fond','ADV droite']
+    ['ADVERSAIRES','adv droite winner fond','fond','ADV D · Fond','ADV droite'],
+    ['ADVERSAIRES','adv droite winner retour','retour','ADV D · Retour','ADV droite']
   ];
   const groupedActions=(pending==='GAGNE'?optionsWon:optionsLost).reduce((acc,item)=>{const group=item[4]||'Actions';(acc[group]||(acc[group]=[])).push(item);return acc;},{});
   const shotButtons=Object.entries(groupedActions).map(([group,items])=>`<div class="match-action-group"><div class="match-action-group-title">${esc(group)}</div><div class="match-live-options">${items.map(([origin,cause,phase,label])=>`<button class="match-live-mini ${pending==='GAGNE'?'won':'lost'}" onclick="addMatchPoint('${pending}','${origin}','${jsStr(cause)}','${jsStr(phase)}')">${esc(label)}</button>`).join('')}</div></div>`).join('');
@@ -6476,7 +6558,9 @@ function matchEncoderHtml(match,a){
       <button class="match-live-main won ${pending==='GAGNE'?'active':''}" onclick="setMatchPointResult('GAGNE')"><span>POINT GAGNÉ HWBT</span><b>1er clic</b></button>
       <button class="match-live-main lost ${pending==='PERDU'?'active':''}" onclick="setMatchPointResult('PERDU')"><span>POINT PERDU HWBT</span><b>1er clic</b></button>
     </div>
-    ${pending?`<div class="card" style="border-color:${pending==='GAGNE'?'var(--bronze-dim2)':'var(--border2)'}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px"><div><div class="card-title">2E CLIC · ${pending==='GAGNE'?'COMMENT LE POINT EST GAGNÉ ?':'COMMENT LE POINT EST PERDU ?'}</div><div class="muted-help">${matchPointStateLabel(pending)}. Clique le coup ou l’origine, puis le score central se met à jour.</div></div><button class="btn btn-ghost btn-sm" onclick="setMatchPointResult(null)">ANNULER CHOIX</button></div><div class="match-action-groups">${shotButtons}</div></div>`:''}
+    ${events.length?matchLiveStatsHtml(m,a,events):''}
+    ${matchRefineHtml(m,events)}
+    ${pending?`<div class="card" style="border-color:${pending==='GAGNE'?'var(--bronze-dim2)':'var(--border2)'}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px"><div><div class="card-title">2E CLIC OBLIGATOIRE · ${pending==='GAGNE'?'COMMENT LE POINT EST GAGNÉ ?':'COMMENT LE POINT EST PERDU ?'}</div><div class="muted-help">${matchPointStateLabel(pending)}. Clique la grande famille: le score avance direct. Tu pourras préciser CD/RV/vitre/centre après.</div></div><button class="btn btn-ghost btn-sm" onclick="setMatchPointResult(null)">ANNULER CHOIX</button></div><div class="match-action-groups">${shotButtons}</div></div>`:''}
     <div class="card" style="padding:14px">
       <div class="card-title">OUTILS MATCH</div>
       <input type="hidden" id="matchPointScore" value="">
