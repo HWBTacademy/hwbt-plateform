@@ -4159,6 +4159,31 @@ function playerSessionsTabHtml(player){
     ${STATE.role==='coach'?`<div style="display:flex;justify-content:flex-end"><button class="btn btn-primary" onclick="openModal('newSession',${player.id})">+ CRÉER UNE SÉANCE POUR ${esc((player.firstName||player.name.split(' ')[0]||player.name).toUpperCase())}</button></div>`:''}
   </div>`;
 }
+function manualPlayerProfileCard(player){
+  if(STATE.role!=='coach') return '';
+  const current=PROFILES.find(p=>p.id===player.profileId);
+  return `<div class="card" style="border-color:${current?ENERGY_COLORS[current.c1]+'66':'var(--bronze-dim2)'};margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap">
+      <div style="flex:1;min-width:220px">
+        <div class="card-title">PROFIL MENTAL SUR LA FICHE</div>
+        <div style="font-size:20px;font-weight:800;line-height:1.1;color:var(--white);margin-bottom:6px">${current?esc(current.name):'Profil à définir'}</div>
+        <div class="muted-help">Attribue ou corrige manuellement le profil joueur sans relancer le test. Le test reste disponible si tu veux une validation plus objective.</div>
+      </div>
+      <div style="min-width:min(340px,100%);display:grid;gap:8px">
+        <label class="form-label" style="margin:0">CHOISIR LE PROFIL</label>
+        <select class="form-select" onchange="setPlayerManualProfile(${player.id},this.value)">
+          <option value="" ${!player.profileId?'selected':''}>— Profil à définir —</option>
+          ${PROFILES.map(p=>`<option value="${p.id}" ${player.profileId===p.id?'selected':''}>${String(p.id).padStart(2,'0')} · ${esc(p.name)} · ${esc((p.c1||'').toUpperCase())} + ${esc((p.c2||'').toUpperCase())}</option>`).join('')}
+        </select>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="startTest(${player.id})">FAIRE / REFAIRE LE TEST</button>
+          ${player.profileId?`<button class="btn btn-ghost btn-sm" onclick="setPlayerManualProfile(${player.id},'')">RETIRER LE PROFIL</button>`:''}
+          ${player.profileId?`<button class="btn btn-primary btn-sm" onclick="setUI({page:'profiles',selectedProfileId:${player.profileId}})">VOIR LA FICHE PROFIL</button>`:''}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
 function pagePlayerDetail(playerId){
   if(STATE.role==='player'&&STATE.activePlayerId&&playerId!==STATE.activePlayerId) playerId=STATE.activePlayerId;
   const player=STATE.players.find(p=>p.id===playerId);
@@ -4221,7 +4246,7 @@ function pagePlayerDetail(playerId){
   if(sub==='profil'){
     if(pr){
       const deep=profileDeepRead(pr);
-      content=`<div class="g2">
+      content=`${manualPlayerProfileCard(player)}<div class="g2">
         <div>
           <div class="card">
             <div class="card-title">CE QUE LE TEST RACONTE</div>
@@ -4255,9 +4280,9 @@ function pagePlayerDetail(playerId){
         </div>
       </div>`;
     } else {
-      content=`<div class="card" style="text-align:center;padding:40px">
+      content=`${manualPlayerProfileCard(player)}<div class="card" style="text-align:center;padding:40px">
         <div style="font-size:13px;color:var(--gray);margin-bottom:10px">La fiche joueur est créée.</div>
-        <div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.7;margin-bottom:18px">Le profil couleur HWBT n'est pas encore défini. Lance le test de personnalité pour attribuer automatiquement son profil mental.</div>
+        <div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.7;margin-bottom:18px">Le profil couleur HWBT n'est pas encore défini. Tu peux le choisir manuellement sur la fiche ou lancer le test de personnalité.</div>
         <button class="btn btn-primary" onclick="startTest(${player.id})">COMMENCER LE TEST DE PERSONNALITÉ</button>
       </div>`;
     }
@@ -8655,6 +8680,7 @@ function renderModal(type,extra){
 function addPlayer(){const data=readPlayerForm();if(!data.firstName||!data.lastName){showNotif('Prénom et nom requis');return;}const id=Math.max(0,...STATE.players.map(p=>p.id))+1;if(!data.code)data.code=(data.firstName[0]+data.lastName[0]+String(id).padStart(3,'0')).toUpperCase();if(!data.playerPassword)data.playerPassword=String(data.code).toLowerCase();STATE.players.push({...data,id,profileId:null,level:null,levelManual:false,scores:{T:0,TA:0,P:0,M:0},aspects:{},futureAspects:[],sessions:[]});closeModal();showNotif('Fiche joueur créée');setUI({page:'players',selectedPlayerId:id,subpage:'profil'});}
 function savePlayer(id){const p=STATE.players.find(p=>p.id===id);if(!p)return;const data=readPlayerForm(p);if(!data.firstName||!data.lastName){showNotif('Prénom et nom requis');return;}if(!data.playerPassword)data.playerPassword=p.playerPassword||String(data.code||p.code||'').toLowerCase();Object.assign(p,data);closeModal();showNotif('Fiche joueur modifiée');render();}
 function deletePlayer(id){const p=STATE.players.find(p=>p.id===id);if(!p)return;const ok=confirm(`Supprimer ${p.name} ?\n\nSes matchs seront supprimés. Les séances de groupe garderont les autres joueurs. Les séances où il était seul seront supprimées.`);if(!ok)return;STATE.players=STATE.players.filter(x=>x.id!==id);STATE.matches=STATE.matches.filter(m=>m.playerId!==id);STATE.sessions=STATE.sessions.map(s=>{const ids=sessionPlayerIds(s).filter(pid=>pid!==id);return {...s,playerIds:ids,playerId:ids[0]||null};}).filter(s=>sessionPlayerIds(s).length>0);if(STATE.activePlayerId===id)STATE.activePlayerId=null;showNotif('Joueur supprimé');setUI({page:'players',selectedPlayerId:null,subpage:'profil'});}
+function setPlayerManualProfile(id,profileId){const p=STATE.players.find(p=>p.id===id);if(!p)return;const pid=parseInt(profileId);if(pid&&PROFILES.find(pr=>pr.id===pid)){p.profileId=pid;p.profileSource='manual';p.profileAssignedAt=new Date().toISOString();showNotif(`Profil attribué: ${PROFILES.find(pr=>pr.id===pid).name}`);}else{p.profileId=null;p.profileSource='';p.profileAssignedAt='';showNotif('Profil retiré de la fiche');}saveState();render();}
 function deleteSession(id){
   if(STATE.role!=='coach') return;
   const s=STATE.sessions.find(s=>s.id===id);
