@@ -6180,10 +6180,34 @@ function nextMatchServer(server){
   const idx=order.indexOf(server);
   return idx>=0?order[(idx+1)%order.length]:(matchServingTeamFromServer(server)==='HWBT'?'ADV_G':'J1');
 }
+function buildMatchServeOrder(firstHwbt,firstAdv){
+  const hwbtOther=firstHwbt==='J1'?'J2':'J1';
+  const advOther=firstAdv==='ADV_G'?'ADV_D':'ADV_G';
+  return [firstHwbt,firstAdv,hwbtOther,advOther];
+}
+function syncMatchServeOrder(s,server){
+  if(!s||!server) return;
+  if(['J1','J2'].includes(server)){
+    if(!s.firstHwbtServer) s.firstHwbtServer=server;
+    s.lastHwbtServer=server;
+  }
+  if(['ADV_G','ADV_D'].includes(server)&&s.firstHwbtServer&&!Array.isArray(s.setServeOrder)){
+    s.firstAdvServer=server;
+    s.setServeOrder=buildMatchServeOrder(s.firstHwbtServer,server);
+  }
+}
 function nextMatchServerAfterGame(s,previousServer){
+  syncMatchServeOrder(s,previousServer);
+  if(Array.isArray(s.setServeOrder)&&s.setServeOrder.length===4){
+    const idx=s.setServeOrder.indexOf(previousServer);
+    if(idx>=0) return s.setServeOrder[(idx+1)%s.setServeOrder.length];
+  }
   const team=matchServingTeamFromServer(previousServer);
   if(team==='HWBT'){
-    if(['J1','J2'].includes(previousServer)) s.lastHwbtServer=previousServer;
+    if(['J1','J2'].includes(previousServer)){
+      if(!s.firstHwbtServer) s.firstHwbtServer=previousServer;
+      s.lastHwbtServer=previousServer;
+    }
     return '';
   }
   if(team==='ADV'){
@@ -6299,7 +6323,7 @@ function setMatchCurrentScore(){
   state.pointScore=(state.superTieBreak||state.tieBreak)?formatNumericTieBreakScore(point.hwbt,point.adv):formatPadelPointScore(point.hwbt,point.adv);
   state.servingTeam=serving;
   state.server=server;
-  if(['J1','J2'].includes(server)) state.lastHwbtServer=server;
+  syncMatchServeOrder(state,server);
   m.currentScore=matchDisplayScore(m);
   m.score=m.currentScore;
   saveStateDebounced();
@@ -6358,7 +6382,7 @@ function ensureMatchScore(m){
   if(!Array.isArray(m.matchScore.sets)) m.matchScore.sets=[];
   if(m.matchScore.server===undefined||m.matchScore.server===null) m.matchScore.server=m.matchScore.servingTeam==='ADV'?'ADV_G':'';
   m.matchScore.servingTeam=matchServingTeamFromServer(m.matchScore.server||m.matchScore.servingTeam);
-  if(['J1','J2'].includes(m.matchScore.server)) m.matchScore.lastHwbtServer=m.matchScore.server;
+  syncMatchServeOrder(m.matchScore,m.matchScore.server);
   if(typeof m.matchScore.superTieBreakTarget!=='number') m.matchScore.superTieBreakTarget=10;
   if(typeof m.matchScore.tieBreakTarget!=='number') m.matchScore.tieBreakTarget=7;
   m.matchScore.pointScore=(m.matchScore.superTieBreak||m.matchScore.tieBreak)?formatNumericTieBreakScore(m.matchScore.hwbtPoints||0,m.matchScore.advPoints||0):formatPadelPointScore(m.matchScore.hwbtPoints||0,m.matchScore.advPoints||0);
@@ -6393,6 +6417,12 @@ function closeMatchSet(m,s,hwbtGames,advGames){
   s.advPoints=0;
   s.pointScore='0-0';
   s.tieBreak=false;
+  s.server='';
+  s.servingTeam='';
+  s.firstHwbtServer='';
+  s.firstAdvServer='';
+  s.lastHwbtServer='';
+  s.setServeOrder=null;
   const wins=matchSetWins(s.sets);
   if(m.matchFormat==='2SETS_SUPER10'){
     if(wins.hwbt>=2||wins.adv>=2){
@@ -6408,10 +6438,6 @@ function closeMatchSet(m,s,hwbtGames,advGames){
     s.matchWinner=hwbtGames>advGames?'HWBT':'ADV';
     m.status='FIN_DE_MATCH_CONFIRMEE';
     m.finishedAt=new Date().toISOString();
-  }
-  if(!s.matchWinner){
-    s.server='';
-    s.servingTeam='';
   }
 }
 function shouldCloseNormalSet(m,s){
@@ -6571,10 +6597,10 @@ function matchActionChoiceHtml(m,result){
     ['COLLECTIF','zone libre laissée ouverte','placement','Duo · Zone ouverte','Duo HWBT'],
     ['COLLECTIF','duo cassé sur la montée','transition','Duo · Transition ratée','Duo HWBT'],
     ['ADVERSAIRES','adv gauche winner filet','filet','ADV G · Filet','ADV gauche'],
-    ['ADVERSAIRES','adv gauche winner haut tête','attaque','ADV G · Haut tête','ADV gauche'],
+    ['ADVERSAIRES','adv gauche winner haut tête','attaque haut tête','ADV G · Haut tête','ADV gauche'],
     ['ADVERSAIRES','adv gauche winner fond','fond','ADV G · Fond','ADV gauche'],
     ['ADVERSAIRES','adv droite winner filet','filet','ADV D · Filet','ADV droite'],
-    ['ADVERSAIRES','adv droite winner haut tête','attaque','ADV D · Haut tête','ADV droite'],
+    ['ADVERSAIRES','adv droite winner haut tête','attaque haut tête','ADV D · Haut tête','ADV droite'],
     ['ADVERSAIRES','adv droite winner fond','fond','ADV D · Fond','ADV droite']
   ];
   const groupedActions=(result==='GAGNE'?optionsWon:optionsLost).reduce((acc,item)=>{const group=item[4]||'Actions';(acc[group]||(acc[group]=[])).push(item);return acc;},{});
@@ -6754,6 +6780,8 @@ function matchRefineOptions(point){
   const won=point?.result==='GAGNE';
   const has=(rx)=>rx.test(text);
   if(won&&has(/lob trop court|lob court|lob adverse court|mauvais lob/)) return ['lob court ADV G','lob court ADV D','lob court au centre','ADV G sous pression','ADV D sous pression','balle facile à finir'];
+  if(!won&&has(/adv gauche winner haut|adv droite winner haut|winner haut|haut tête/)) return ['bandeja ADV','víbora ADV','smash ADV','par 3 ADV','par 4 ADV','mauvais lob HWBT'];
+  if(!won&&has(/adv gauche winner fond|adv droite winner fond|winner fond/)) return ['coup droit ADV','revers ADV','bajada ADV','chiquita ADV','balle longue ADV','vitre ADV'];
   if(/service/.test(text)) return point.result==='GAGNE'
     ?['service vitre','service corps','service T','retour ADV G raté','retour ADV D raté','balle suivante facile']
     :['double faute','service dans le filet','service trop long','service vitre','zone ratée','service trop neutre'];
