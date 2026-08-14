@@ -6491,7 +6491,28 @@ function matchUpcomingImportanceHtml(m,scoreState){
   return `<div style="margin:10px auto 0;max-width:560px;text-align:center;border:1px solid var(--bronze-dim2);background:rgba(184,137,53,.14);color:var(--bronze);border-radius:8px;padding:8px 10px;font-size:11px;font-weight:900;letter-spacing:1.4px">${esc(label)}${esc(side)}</div>`;
 }
 function setMatchPointResult(result){
-  addMatchPoint(result,'INDETERMINE','point à qualifier','');
+  const m=currentMatchForEncoding();
+  UI.matchPointResult=result||null;
+  if(m) updateMatchEncoder(m,{actions:true});
+  else render();
+}
+function matchOriginChoiceHtml(m,result){
+  const slots=matchPlayerSlots(m);
+  const p1=slots.p1,p2=slots.p2;
+  const won=result==='GAGNE';
+  const originButtons=[
+    {origin:'JOUEUR_1',label:p1,cause:won?'point gagné par joueur':'point perdu par joueur',phase:'joueur'},
+    {origin:'JOUEUR_2',label:p2,cause:won?'point gagné par joueur':'point perdu par joueur',phase:'joueur'},
+    {origin:'COLLECTIF',label:'Duo HWBT',cause:won?'point construit par le duo':'point perdu par le duo',phase:'duo'},
+    {origin:'ADVERSAIRES',label:won?'Faute ADV':'Winner ADV',cause:won?'faute adverse à préciser':'winner adverse à préciser',phase:'pression'}
+  ];
+  return `<div class="card" style="border-color:${won?'var(--bronze-dim2)':'var(--border2)'};padding:14px">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px">
+      <div><div class="card-title">2E CLIC OBLIGATOIRE · ${won?'QUI GAGNE LE POINT ?':'QUI PERD / SUBIT LE POINT ?'}</div><div class="muted-help">Après ce clic, le score avance. Le détail reste optionnel juste en dessous.</div></div>
+      <button class="btn btn-ghost btn-sm" onclick="setMatchPointResult(null)">ANNULER</button>
+    </div>
+    <div class="match-live-options">${originButtons.map(o=>`<button class="match-live-mini ${won?'won':'lost'}" onclick="addMatchPoint('${result}','${o.origin}','${jsStr(o.cause)}','${jsStr(o.phase)}')">${esc(o.label)}</button>`).join('')}</div>
+  </div>`;
 }
 function matchQuickQualifyOptions(m,last){
   if(!last) return [];
@@ -6575,14 +6596,27 @@ function qualifyLastMatchPoint(matchId,pointId,origin,cause,phase,forced=false){
   saveStateDebounced();
   updateMatchEncoder(m,{actions:true,stats:true,points:true});
 }
+function detailLastMatchPoint(matchId,pointId,cause,phase,forced=false){
+  const m=(STATE.matches||[]).find(x=>String(x.id)===String(matchId));
+  if(!m) return;
+  const p=(m.events||[]).find(e=>String(e.id)===String(pointId)&&String(e.type).toUpperCase()==='POINT'&&e.active!==false&&!e.cancelled);
+  if(!p) return;
+  p.cause=cause;
+  p.baseCause=cause;
+  p.phase=phase||p.phase||'';
+  p.forced=!!forced;
+  p.detailedAt=new Date().toISOString();
+  saveStateDebounced();
+  updateMatchEncoder(m,{actions:true,stats:true,points:true});
+}
 function matchQuickQualifyHtml(m,events){
   const last=events.slice(-1)[0];
-  if(!last) return `<div class="card" style="padding:14px"><div class="card-title">QUALIFICATION OPTIONNELLE</div><div class="muted-help">Encode d'abord le point. Les 6 raccourcis utiles apparaîtront ici.</div></div>`;
+  if(!last) return `<div class="card" style="padding:14px"><div class="card-title">3E CLIC OPTIONNEL</div><div class="muted-help">Après les 2 clics obligatoires, les détails utiles apparaîtront ici.</div></div>`;
   const opts=matchQuickQualifyOptions(m,last).slice(0,6);
-  const done=last.origin&&last.origin!=='INDETERMINE';
-  return `<div class="card" style="padding:14px;border-color:${done?'var(--border)':'var(--bronze-dim2)'}">
-    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px"><div><div class="card-title">2E CLIC OPTIONNEL · DERNIER POINT</div><div class="muted-help">${done?'Qualifié':'À qualifier si tu as le temps'} · ${esc(last.result)} · ${esc(last.score||'score ?')}</div></div><span style="font-size:10px;color:${done?'var(--vert)':'var(--bronze)'};font-weight:900">${done?'OK':'BONUS'}</span></div>
-    <div class="match-live-options">${opts.map(o=>`<button class="match-live-mini ${last.result==='GAGNE'?'won':'lost'}" onclick="qualifyLastMatchPoint('${m.id}','${last.id}','${o.origin}','${jsStr(o.cause)}','${jsStr(o.phase)}',${o.forced?'true':'false'})">${esc(o.label)}</button>`).join('')}</div>
+  const detailed=last.cause&&last.cause!=='point gagné par joueur'&&last.cause!=='point perdu par joueur'&&last.cause!=='point construit par le duo'&&last.cause!=='point perdu par le duo'&&!String(last.cause||'').includes('à préciser');
+  return `<div class="card" style="padding:14px;border-color:${detailed?'var(--border)':'var(--bronze-dim2)'}">
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px"><div><div class="card-title">3E CLIC OPTIONNEL · COMMENT ?</div><div class="muted-help">${detailed?'Détail ajouté':'Si tu as le temps, précise le type d’action'} · ${esc(last.result)} · ${esc(matchOriginLabel(m,last.origin))} · ${esc(last.score||'score ?')}</div></div><span style="font-size:10px;color:${detailed?'var(--vert)':'var(--bronze)'};font-weight:900">${detailed?'DÉTAILLÉ':'OPTIONNEL'}</span></div>
+    <div class="match-live-options">${opts.map(o=>`<button class="match-live-mini ${last.result==='GAGNE'?'won':'lost'}" onclick="detailLastMatchPoint('${m.id}','${last.id}','${jsStr(o.cause)}','${jsStr(o.phase)}',${o.forced?'true':'false'})">${esc(o.label)}</button>`).join('')}</div>
   </div>`;
 }
 function updateMatchEncoder(m,parts={}){
@@ -6924,13 +6958,14 @@ function matchScoreboardInnerHtml(m,scoreState,events){
 }
 function matchActionsInnerHtml(m,events){
   const scoreState=ensureMatchScore(m);
+  const pending=UI.matchPointResult||null;
   return `<div>
     <div class="match-live-grid">
-      <button class="match-live-main won" onclick="addMatchPoint('GAGNE','INDETERMINE','point à qualifier','')"><span>POINT GAGNÉ HWBT</span><b>Score direct</b></button>
-      <button class="match-live-main lost" onclick="addMatchPoint('PERDU','INDETERMINE','point à qualifier','')"><span>POINT PERDU HWBT</span><b>Score direct</b></button>
+      <button class="match-live-main won ${pending==='GAGNE'?'active':''}" onclick="setMatchPointResult('GAGNE')"><span>POINT GAGNÉ HWBT</span><b>1er clic</b></button>
+      <button class="match-live-main lost ${pending==='PERDU'?'active':''}" onclick="setMatchPointResult('PERDU')"><span>POINT PERDU HWBT</span><b>1er clic</b></button>
     </div>
     ${!scoreState.server?`<div class="card" style="border-color:var(--rouge);padding:12px"><div class="card-title">SERVEUR À DÉFINIR</div><div class="muted-help">Choisis le serveur actuel avant le premier point du set. Après, la rotation suivra automatiquement.</div></div>`:''}
-    ${matchQuickQualifyHtml(m,events)}
+    ${pending?matchOriginChoiceHtml(m,pending):matchQuickQualifyHtml(m,events)}
   </div>`;
 }
 function matchLastPointsHtml(m,events){
