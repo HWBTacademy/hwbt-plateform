@@ -6180,6 +6180,19 @@ function nextMatchServer(server){
   const idx=order.indexOf(server);
   return idx>=0?order[(idx+1)%order.length]:(matchServingTeamFromServer(server)==='HWBT'?'ADV_G':'J1');
 }
+function nextMatchServerAfterGame(s,previousServer){
+  const team=matchServingTeamFromServer(previousServer);
+  if(team==='HWBT'){
+    if(['J1','J2'].includes(previousServer)) s.lastHwbtServer=previousServer;
+    return '';
+  }
+  if(team==='ADV'){
+    if(s.lastHwbtServer==='J1') return 'J2';
+    if(s.lastHwbtServer==='J2') return 'J1';
+    return nextMatchServer(previousServer);
+  }
+  return '';
+}
 function matchFormatLabel(format){
   if(format==='2SETS_SUPER10') return '2 sets de 6 + super tie-break 10';
   if(format==='FIRST_TO_9') return 'Premier à 9 jeux';
@@ -6286,6 +6299,7 @@ function setMatchCurrentScore(){
   state.pointScore=(state.superTieBreak||state.tieBreak)?formatNumericTieBreakScore(point.hwbt,point.adv):formatPadelPointScore(point.hwbt,point.adv);
   state.servingTeam=serving;
   state.server=server;
+  if(['J1','J2'].includes(server)) state.lastHwbtServer=server;
   m.currentScore=matchDisplayScore(m);
   m.score=m.currentScore;
   saveStateDebounced();
@@ -6344,6 +6358,7 @@ function ensureMatchScore(m){
   if(!Array.isArray(m.matchScore.sets)) m.matchScore.sets=[];
   if(m.matchScore.server===undefined||m.matchScore.server===null) m.matchScore.server=m.matchScore.servingTeam==='ADV'?'ADV_G':'';
   m.matchScore.servingTeam=matchServingTeamFromServer(m.matchScore.server||m.matchScore.servingTeam);
+  if(['J1','J2'].includes(m.matchScore.server)) m.matchScore.lastHwbtServer=m.matchScore.server;
   if(typeof m.matchScore.superTieBreakTarget!=='number') m.matchScore.superTieBreakTarget=10;
   if(typeof m.matchScore.tieBreakTarget!=='number') m.matchScore.tieBreakTarget=7;
   m.matchScore.pointScore=(m.matchScore.superTieBreak||m.matchScore.tieBreak)?formatNumericTieBreakScore(m.matchScore.hwbtPoints||0,m.matchScore.advPoints||0):formatPadelPointScore(m.matchScore.hwbtPoints||0,m.matchScore.advPoints||0);
@@ -6446,6 +6461,7 @@ function advanceMatchScore(m,result){
   else s.advPoints=(s.advPoints||0)+1;
   const formatted=formatPadelPointScore(s.hwbtPoints,s.advPoints);
   let gameWon='';
+  const previousServer=s.server;
   if(formatted==='Jeu HWBT'||formatted==='Jeu ADV'){
     gameWon=formatted==='Jeu HWBT'?'HWBT':'ADV';
     if(gameWon==='HWBT') s.hwbtGames=(s.hwbtGames||0)+1;
@@ -6463,7 +6479,7 @@ function advanceMatchScore(m,result){
     s.advPoints=0;
     s.pointScore='0-0';
     if(!setClosed){
-      s.server=nextMatchServer(s.server);
+      s.server=nextMatchServerAfterGame(s,previousServer);
       s.servingTeam=matchServingTeamFromServer(s.server);
     }
   }else{
@@ -6735,20 +6751,37 @@ function addMatchPoint(result,origin,causePreset='',phasePreset=''){
 }
 function matchRefineOptions(point){
   const text=`${point?.phase||''} ${point?.cause||''}`.toLowerCase();
+  const won=point?.result==='GAGNE';
+  const has=(rx)=>rx.test(text);
+  if(won&&has(/lob trop court|lob court|lob adverse court|mauvais lob/)) return ['lob court ADV G','lob court ADV D','lob court au centre','ADV G sous pression','ADV D sous pression','balle facile à finir'];
   if(/service/.test(text)) return point.result==='GAGNE'
-    ?['retour non touché','retour dans le filet','retour trop court','retour dehors','retour vitre','prépare la volée']
-    :['double faute','service filet','service vitre','zone ratée','service trop neutre'];
-  if(/retour/.test(text)) return ['dans le filet','trop court','trop long','vitre','balle facile donnée','retour sous pression'];
-  if(/fond/.test(text)) return ['coup droit','revers','vitre','balle courte','trop long','direction ratée','précipitation'];
-  if(/volée|volee|filet/.test(text)) return ['volée coup droit','volée revers','volée centre','volée basse','fermeture centre','trop de risque'];
+    ?['service vitre','service corps','service T','retour ADV G raté','retour ADV D raté','balle suivante facile']
+    :['double faute','service dans le filet','service trop long','service vitre','zone ratée','service trop neutre'];
+  if(/retour/.test(text)) return won
+    ?['retour sur ADV G','retour sur ADV D','retour au centre','bas dans les pieds','long vitre','retour agressif']
+    :['retour coup droit','retour revers','retour centre/corps','dans le filet','retour trop court','retour trop long'];
+  if(/fond/.test(text)) return won
+    ?['sur ADV G','sur ADV D','au milieu','vitre adverse','chiquita utile','balle longue profonde']
+    :['coup droit','revers','vitre','balle trop courte','trop long','précipitation'];
+  if(/volée|volee|filet/.test(text)) return won
+    ?['volée sur ADV G','volée sur ADV D','volée au centre','volée basse gagnée','fermeture centre','volée gagnante']
+    :['volée coup droit','volée revers','centre ouvert','volée basse ratée','trop de risque','replacement lent'];
   if(/haut|vibora|bandeja|smash|attaque|par 3|par 4/.test(text)) return point.result==='GAGNE'
-    ?['bandeja stable','vibora agressive','smash gagnant','par 3','par 4','adversaire recule']
+    ?['direction ADV G','direction ADV D','direction milieu','par 3','par 4','lob trop court ADV']
     :['mauvais choix haut tête','lob adverse trop bon','contact tardif','trop de risque','balle dans le filet','balle longue'];
-  if(/lob|défense|defense|vitre/.test(text)) return ['lob haut','lob trop court','défense vitre','sortie de défense','chiquita','balle de survie'];
-  if(/communication|placement|transition|zone/.test(text)) return ['centre non annoncé','zone libre','montée décalée','replacement lent','choix duo','partenaire isolé'];
+  if(/lob|défense|defense|vitre/.test(text)) return won
+    ?['lob sur ADV G','lob sur ADV D','lob au centre','défense vitre propre','sortie de défense','chiquita de relance']
+    :['lob trop court','lob trop long','vitre mal gérée','défense trop haute','balle de survie','ADV met pression'];
+  if(/communication|placement|transition|zone/.test(text)) return won
+    ?['centre bien fermé','zone libre trouvée','montée ensemble','partenaire libéré','bon choix duo','pression collective']
+    :['centre non annoncé','zone libre laissée','montée décalée','replacement lent','mauvais choix duo','partenaire isolé'];
   if(/pression|adverse|adv/.test(text)) return ['ADV gauche','ADV droite','faute forcée','faute gratuite','après long échange','sous pression'];
-  if(/choix|décision|decision/.test(text)) return ['trop vite','mauvaise cible','mauvais moment','balle pas attaquable','pas assez patient'];
-  return ['coup droit','revers','centre','vitre','choix','pression'];
+  if(/choix|décision|decision/.test(text)) return won
+    ?['bonne cible','bon moment','patience gagnante','balle attaquable','changement de rythme','lecture juste']
+    :['trop vite','mauvaise cible','mauvais moment','balle pas attaquable','pas assez patient','lecture tardive'];
+  return won
+    ?['sur ADV G','sur ADV D','au centre','par 3','par 4','faute forcée']
+    :['coup droit','revers','centre','vitre','choix','pression'];
 }
 function refineMatchPoint(pointId,detail){
   const m=currentMatchForEncoding()||selectedMatchAnalysis().match;
