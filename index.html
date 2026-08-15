@@ -5982,8 +5982,8 @@ function computePointImportance(match,prevScoreState){
   return {types:[...new Set(types)],importanceFor};
 }
 function matchImportanceLabel(types=[]){
-  const ordered=['BALLE_DE_MATCH','BALLE_DE_SET','BALLE_DE_JEU','40-40','SUPER_TIE_BREAK','TIE_BREAK','POINT_DECISIF'];
-  const labels={'40-40':'40-40','POINT_DECISIF':'POINT DÉCISIF',BALLE_DE_JEU:'BALLE DE JEU',BALLE_DE_SET:'BALLE DE SET',BALLE_DE_MATCH:'BALLE DE MATCH',TIE_BREAK:'TIE-BREAK',SUPER_TIE_BREAK:'SUPER TIE-BREAK'};
+  const ordered=['star point','BALLE_DE_MATCH','BALLE_DE_SET','BALLE_DE_JEU','40-40','SUPER_TIE_BREAK','TIE_BREAK','POINT_DECISIF'];
+  const labels={'star point':'STAR POINT','40-40':'40-40','POINT_DECISIF':'POINT DÉCISIF',BALLE_DE_JEU:'BALLE DE JEU',BALLE_DE_SET:'BALLE DE SET',BALLE_DE_MATCH:'BALLE DE MATCH',TIE_BREAK:'TIE-BREAK',SUPER_TIE_BREAK:'SUPER TIE-BREAK'};
   return ordered.filter(t=>types.includes(t)).map(t=>labels[t]).join(' · ');
 }
 function ensureMatchPointSeq(m){
@@ -6351,9 +6351,10 @@ function setMatchCurrentScore(){
   syncMatchServeOrder(state,server);
   m.currentScore=matchDisplayScore(m);
   m.score=m.currentScore;
+  UI.matchScoreCorrectionOpen=false;
   saveStateDebounced();
-  updateMatchEncoder(m,{scoreboard:true,actions:true,stats:true,points:true});
-  showNotif('Score de départ mis à jour');
+  render();
+  showNotif('Score manuel mis à jour');
 }
 function setMatchCurrentServer(){
   const m=currentMatchForEncoding();
@@ -6588,22 +6589,19 @@ function matchActionChoiceHtml(m,result){
   const serviceWonOptions=hwbtServing?[
     [servingPlayerOrigin,'service gagnant vitre','service',`${servingPlayerName} · Service vitre`,'Service gagnant'],
     [servingPlayerOrigin,'service gagnant corps','service',`${servingPlayerName} · Service corps`,'Service gagnant'],
-    [servingPlayerOrigin,'service gagnant T','service',`${servingPlayerName} · Service T`,'Service gagnant']
+    [servingPlayerOrigin,'service gagnant T','service',`${servingPlayerName} · Service T`,'Service gagnant'],
+    [servingPlayerOrigin,'point facile après service','service +1',`${servingPlayerName} · Point facile après service`,'Service gagnant']
   ]:[];
   const serviceLostOptions=hwbtServing?[
-    [servingPlayerOrigin,'service donné','service',`${servingPlayerName} · Service faute`,'Service donné']
+    [servingPlayerOrigin,'double faute','service',`${servingPlayerName} · Double faute`,'Service donné']
   ]:[];
   const returnWonOptions=!hwbtServing?[
     ['JOUEUR_1','retour +1','retour',`${p1} · Retour`,p1],
     ['JOUEUR_2','retour +1','retour',`${p2} · Retour`,p2]
   ]:[];
   const returnLostOptions=!hwbtServing?[
-    ['JOUEUR_1','retour coup droit faute','retour',`${p1} · Retour CD`,p1],
-    ['JOUEUR_1','retour revers faute','retour',`${p1} · Retour revers`,p1],
-    ['JOUEUR_1','retour centre corps faute','retour',`${p1} · Retour centre/corps`,p1],
-    ['JOUEUR_2','retour coup droit faute','retour',`${p2} · Retour CD`,p2],
-    ['JOUEUR_2','retour revers faute','retour',`${p2} · Retour revers`,p2],
-    ['JOUEUR_2','retour centre corps faute','retour',`${p2} · Retour centre/corps`,p2]
+    ['JOUEUR_1','retour faute','retour',`${p1} · Retour`,p1],
+    ['JOUEUR_2','retour faute','retour',`${p2} · Retour`,p2]
   ]:[];
   const optionsWon=[
     ...serviceWonOptions,
@@ -6731,7 +6729,7 @@ function matchQuickQualifyOptions(m,last){
   }
   if(serverTeam==='HWBT'){
     return [
-      btn(`${serverName} · service`,serverOrigin,'service donné','service',false),
+      btn(`${serverName} · double faute`,serverOrigin,'double faute','service',false),
       btn(`${p1} · fond`,'JOUEUR_1','fond donné','fond',false),
       btn(`${p2} · fond`,'JOUEUR_2','fond donné','fond',false),
       btn('Duo · communication','COLLECTIF','duo communication donné','communication',false),
@@ -6794,6 +6792,8 @@ function updateMatchEncoder(m,parts={}){
   if(parts.actions&&document.getElementById('matchActionsZone')) document.getElementById('matchActionsZone').innerHTML=matchActionsInnerHtml(m,events);
   if(parts.stats&&document.getElementById('matchLiveStatsZone')) document.getElementById('matchLiveStatsZone').innerHTML=events.length?matchLiveStatsHtml(m,a,events):'';
   if(parts.points&&document.getElementById('matchLastPointsZone')) document.getElementById('matchLastPointsZone').innerHTML=matchLastPointsHtml(m,events);
+  if(document.getElementById('matchFollowScoreZone')) document.getElementById('matchFollowScoreZone').innerHTML=matchMetricCard('Score suivi',m.currentScore||m.score||'0-0');
+  if(document.getElementById('matchFollowBalanceZone')) document.getElementById('matchFollowBalanceZone').innerHTML=matchMetricCard('Bilan live',`${a.matchSummary.won}-${a.matchSummary.lost}`,`${a.matchSummary.totalPoints} points encodés`);
 }
 function addMatchPoint(result,origin,causePreset='',phasePreset=''){
   const m=currentMatchForEncoding();
@@ -6819,10 +6819,11 @@ function addMatchPoint(result,origin,causePreset='',phasePreset=''){
   events.push(point);
   if(document.getElementById('matchPointScore')) document.getElementById('matchPointScore').value='';
   UI.matchPointResult=null;
-  UI.matchRefinePointId=point.id;
+  const skipRefine=/^service/i.test(String(phase||''))||result==='PERDU'&&/double faute/i.test(String(cause||''));
+  UI.matchRefinePointId=skipRefine?null:point.id;
   saveStateDebounced();
   updateMatchEncoder(m,{scoreboard:true,actions:true,stats:true,points:true});
-  if(update.matchFinished) showNotif(`Match terminé · vainqueur ${update.gameWon}`);
+  if(update.matchFinished||scoreState.matchWinner) showNotif(`Match terminé · vainqueur ${scoreState.matchWinner||update.gameWon}`);
 }
 function matchRefineOptions(point){
   const text=`${point?.phase||''} ${point?.cause||''}`.toLowerCase();
@@ -6832,8 +6833,8 @@ function matchRefineOptions(point){
   if(!won&&has(/adv gauche winner haut|adv droite winner haut|winner haut|haut tête/)) return ['bandeja ADV','víbora ADV','smash ADV','par 3 ADV','par 4 ADV','mauvais lob HWBT'];
   if(!won&&has(/adv gauche winner fond|adv droite winner fond|winner fond/)) return ['coup droit ADV','revers ADV','bajada ADV','chiquita ADV','balle longue ADV','vitre ADV'];
   if(/service/.test(text)) return point.result==='GAGNE'
-    ?['service vitre','service corps','service T','retour ADV G raté','retour ADV D raté','balle suivante facile']
-    :['double faute','service dans le filet','service trop long','service vitre','zone ratée','service trop neutre'];
+    ?['service vitre','service corps','service T','point facile après service']
+    :['double faute'];
   if(/retour/.test(text)) return won
     ?['retour sur ADV G','retour sur ADV D','retour au centre','bas dans les pieds','long vitre','retour agressif']
     :['retour coup droit','retour revers','retour centre/corps','dans le filet','retour trop court','retour trop long'];
@@ -6844,7 +6845,7 @@ function matchRefineOptions(point){
     ?['volée sur ADV G','volée sur ADV D','volée au centre','volée basse gagnée','fermeture centre','volée gagnante']
     :['volée coup droit','volée revers','centre ouvert','volée basse ratée','trop de risque','replacement lent'];
   if(/haut|vibora|bandeja|smash|attaque|par 3|par 4/.test(text)) return point.result==='GAGNE'
-    ?['direction ADV G','direction ADV D','direction milieu','par 3','par 4','lob trop court ADV']
+    ?['direction ADV G','direction ADV D','direction milieu','par 3','par 4']
     :['mauvais choix haut tête','lob adverse trop bon','contact tardif','trop de risque','balle dans le filet','balle longue'];
   if(/lob|défense|defense|vitre/.test(text)) return won
     ?['lob sur ADV G','lob sur ADV D','lob au centre','défense vitre propre','sortie de défense','chiquita de relance']
@@ -6877,6 +6878,26 @@ function clearMatchPointRefine(){
   const m=currentMatchForEncoding();
   if(m) updateMatchEncoder(m,{actions:true});
   else render();
+}
+function toggleMatchScoreCorrection(){
+  UI.matchScoreCorrectionOpen=!UI.matchScoreCorrectionOpen;
+  render();
+}
+function markLastMatchPointStar(){
+  const m=currentMatchForEncoding();
+  if(!m){showNotif('Aucun match actif');return;}
+  const p=matchLastActivePoint(m);
+  if(!p){showNotif('Aucun point à marquer');return;}
+  p.starPoint=!p.starPoint;
+  if(p.starPoint){
+    p.importance=Array.from(new Set([...(p.importance||[]),'star point']));
+    p.starPointAt=new Date().toISOString();
+  }else{
+    p.importance=(p.importance||[]).filter(x=>x!=='star point');
+  }
+  saveStateDebounced();
+  updateMatchEncoder(m,{actions:true,stats:true,points:true});
+  showNotif(p.starPoint?'Star point ajouté':'Star point retiré');
 }
 function matchRefineHtml(m,events){
   if(!UI.matchRefinePointId)return '';
@@ -7144,10 +7165,17 @@ function matchScoreboardInnerHtml(m,scoreState,events){
 function matchActionsInnerHtml(m,events){
   const scoreState=ensureMatchScore(m);
   const pending=UI.matchPointResult||null;
+  const a=analyserMatch(m.events||m.journal||m.eventLog||[],m);
+  const topo=liveMatchCoachTopo(m,a);
   return `<div>
     <div class="match-live-grid">
       <button class="match-live-main won ${pending==='GAGNE'?'active':''}" onclick="setMatchPointResult('GAGNE')"><span>POINT GAGNÉ HWBT</span><b>1er clic</b></button>
       <button class="match-live-main lost ${pending==='PERDU'?'active':''}" onclick="setMatchPointResult('PERDU')"><span>POINT PERDU HWBT</span><b>1er clic</b></button>
+    </div>
+    <div class="match-live-advice">
+      <div class="match-live-advice-box"><b>${esc(topo.status)}</b><span>${esc(topo.advice)}</span></div>
+      <div class="match-live-advice-box"><b>Point fort vu</b><span>${esc(topo.strength)}</span></div>
+      <div class="match-live-advice-box"><b>Point faible vu</b><span>${esc(topo.weakness)}</span></div>
     </div>
     ${!scoreState.server?`<div class="card" style="border-color:var(--rouge);padding:12px"><div class="card-title">SERVEUR À DÉFINIR</div><div class="muted-help">Choisis le serveur actuel puis clique <b>VALIDER SERVEUR</b>. Ce bouton ne touche jamais au score.</div></div>`:''}
     ${matchRefineHtml(m,events)}
@@ -7167,7 +7195,7 @@ function matchEncoderHtml(match,a){
   }
   const scoreState=ensureMatchScore(m);
   const events=matchActivePoints(m);
-  const topo=liveMatchCoachTopo(m,a);
+  const correctionOpen=!!UI.matchScoreCorrectionOpen;
   return `<div>
     <div class="card" style="border-color:var(--bronze-dim2)">
       <div style="display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap">
@@ -7178,16 +7206,17 @@ function matchEncoderHtml(match,a){
       <div class="g3" style="margin-top:16px;align-items:end">
         <div class="form-group"><label class="form-label">SERVEUR ACTUEL</label><select class="form-select" id="matchServingTeamInput">${matchServerOptionsHtml(m,scoreState.server)}</select></div>
         <button class="btn btn-primary" onclick="setMatchCurrentServer()">VALIDER SERVEUR</button>
-        <button class="btn btn-ghost" onclick="setMatchCurrentScore()">CORRIGER SCORE MANUEL</button>
-        <div class="form-group"><label class="form-label">JEUX ACTUELS</label><input class="form-input" id="matchCurrentGamesInput" value="${scoreState.hwbtGames||0}-${scoreState.advGames||0}" placeholder="0-0"></div>
-        <div class="form-group"><label class="form-label">${scoreState.superTieBreak?'POINTS SUPER TIE-BREAK':scoreState.tieBreak?'POINTS TIE-BREAK':'POINTS DU JEU'}</label><input class="form-input" id="matchCurrentPointsInput" value="${esc(scoreState.pointScore||'0-0')}" placeholder="${scoreState.superTieBreak||scoreState.tieBreak?'6-4':'0-0, 15-0, 40-30...'}"></div>
-        <div class="muted-help" style="align-self:center">Le score manuel sert uniquement si tu dois corriger une erreur d’encodage.</div>
+        <button class="btn btn-ghost" onclick="toggleMatchScoreCorrection()">${correctionOpen?'FERMER SCORE MANUEL':'CORRIGER SCORE MANUEL'}</button>
       </div>
-      <div class="match-live-advice">
-        <div class="match-live-advice-box"><b>${esc(topo.status)}</b><span>${esc(topo.advice)}</span></div>
-        <div class="match-live-advice-box"><b>Point fort vu</b><span>${esc(topo.strength)}</span></div>
-        <div class="match-live-advice-box"><b>Point faible vu</b><span>${esc(topo.weakness)}</span></div>
-      </div>
+      ${correctionOpen?`<div class="card" style="margin-top:12px;padding:12px;border-color:var(--bronze-dim2)">
+        <div class="card-title">CORRECTION SCORE MANUELLE</div>
+        <div class="g3" style="align-items:end;margin-top:8px">
+          <div class="form-group"><label class="form-label">JEUX ACTUELS</label><input class="form-input" id="matchCurrentGamesInput" value="${scoreState.hwbtGames||0}-${scoreState.advGames||0}" placeholder="0-0"></div>
+          <div class="form-group"><label class="form-label">${scoreState.superTieBreak?'POINTS SUPER TIE-BREAK':scoreState.tieBreak?'POINTS TIE-BREAK':'POINTS DU JEU'}</label><input class="form-input" id="matchCurrentPointsInput" value="${esc(scoreState.pointScore||'0-0')}" placeholder="${scoreState.superTieBreak||scoreState.tieBreak?'6-4':'0-0, 15-0, 40-30...'}"></div>
+          <button class="btn btn-primary" onclick="setMatchCurrentScore()">APPLIQUER CORRECTION</button>
+        </div>
+        <div class="muted-help">À utiliser seulement si tu as raté un point ou si le score réel ne correspond plus à l’écran.</div>
+      </div>`:''}
     </div>
     <div id="matchActionsZone">${matchActionsInnerHtml(m,events)}</div>
     <div id="matchLiveStatsZone">${events.length?matchLiveStatsHtml(m,a,events):''}</div>
@@ -7196,11 +7225,12 @@ function matchEncoderHtml(match,a){
       <input type="hidden" id="matchPointScore" value="">
       <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:10px">
         <button class="btn btn-ghost" onclick="undoLastMatchPoint()">ANNULER DERNIER POINT</button>
+        <button class="btn btn-ghost" onclick="markLastMatchPointStar()">STAR POINT</button>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost" onclick="deleteMatchAnalystMatch('${m.id}')">SUPPRIMER MATCH</button><button class="btn btn-primary" onclick="finishMatchAnalystMatch()">CLÔTURER LE MATCH</button></div>
       </div>
     </div>
     <div class="g2">
-      <div class="g2">${matchMetricCard('Score suivi',m.currentScore||m.score||'0-0')}${matchMetricCard('Bilan live',`${a.matchSummary.won}-${a.matchSummary.lost}`,`${a.matchSummary.totalPoints} points encodés`)}</div>
+      <div class="g2"><div id="matchFollowScoreZone">${matchMetricCard('Score suivi',m.currentScore||m.score||'0-0')}</div><div id="matchFollowBalanceZone">${matchMetricCard('Bilan live',`${a.matchSummary.won}-${a.matchSummary.lost}`,`${a.matchSummary.totalPoints} points encodés`)}</div></div>
       <div class="card"><div class="card-title">DERNIERS POINTS</div><div id="matchLastPointsZone">${matchLastPointsHtml(m,events)}</div></div>
     </div>
   </div>`;
@@ -7398,7 +7428,7 @@ function matchReviewHtml(a){
   const originOptions=[['JOUEUR_1',slots.p1],['JOUEUR_2',slots.p2],['COLLECTIF','Duo'],['ADVERSAIRES','ADV'],['INDETERMINE','?']];
   const causeOptions=[
     ['service gagnant','service'],['retour +1','retour'],['fond +1','fond'],['filet +1','filet'],['haut tête +1','attaque haut tête'],['construction duo +1','construction'],
-    ['service donné','service'],['retour faute','retour'],['fond donné','fond'],['filet donné','filet'],['mauvais choix','décision'],['winner adverse','pression']
+    ['double faute','service'],['retour faute','retour'],['fond donné','fond'],['filet donné','filet'],['mauvais choix','décision'],['winner adverse','pression']
   ];
   return `<div class="card"><div class="card-title">ENRICHIR LE MATCH</div><div style="font-size:26px;font-weight:900;color:${todo?'var(--bronze)':'var(--vert)'}">${todo} point${todo>1?'s':''} à qualifier</div><div class="muted-help" style="margin-top:6px">Le live reste rapide. Ici, tu précises calmement les points indéterminés ou trop généraux.</div></div>
   <div class="g2">${points.map((p,i)=>{
