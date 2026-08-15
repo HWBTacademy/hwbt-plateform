@@ -6355,6 +6355,21 @@ function setMatchCurrentScore(){
   updateMatchEncoder(m,{scoreboard:true,actions:true,stats:true,points:true});
   showNotif('Score de départ mis à jour');
 }
+function setMatchCurrentServer(){
+  const m=currentMatchForEncoding();
+  if(!m)return;
+  const server=document.getElementById('matchServingTeamInput')?.value||'';
+  if(!server){showNotif('Choisis le serveur actuel');return;}
+  const state=ensureMatchScore(m);
+  state.server=server;
+  state.servingTeam=matchServingTeamFromServer(server);
+  syncMatchServeOrder(state,server);
+  m.currentScore=matchDisplayScore(m);
+  m.score=m.currentScore;
+  saveStateDebounced();
+  updateMatchEncoder(m,{scoreboard:true,actions:true,stats:true,points:true});
+  showNotif(`Serveur validé: ${matchServerLabel(m,server)}`);
+}
 function parseGameScore(score){
   const s=String(score||'0-0').trim();
   const m=s.match(/(\d+)\s*[-/]\s*(\d+)/);
@@ -6567,16 +6582,32 @@ function matchActionChoiceHtml(m,result){
   const scoreState=ensureMatchScore(m);
   const slots=matchPlayerSlots(m);
   const p1=slots.p1,p2=slots.p2;
+  const hwbtServing=scoreState.servingTeam==='HWBT';
   const servingPlayerOrigin=scoreState.server==='J2'?'JOUEUR_2':'JOUEUR_1';
   const servingPlayerName=scoreState.server==='J2'?p2:p1;
-  const serviceWonOptions=scoreState.servingTeam==='HWBT'?[
+  const serviceWonOptions=hwbtServing?[
     [servingPlayerOrigin,'service gagnant vitre','service',`${servingPlayerName} · Service vitre`,'Service gagnant'],
     [servingPlayerOrigin,'service gagnant corps','service',`${servingPlayerName} · Service corps`,'Service gagnant'],
     [servingPlayerOrigin,'service gagnant T','service',`${servingPlayerName} · Service T`,'Service gagnant']
   ]:[];
+  const serviceLostOptions=hwbtServing?[
+    [servingPlayerOrigin,'service donné','service',`${servingPlayerName} · Service faute`,'Service donné']
+  ]:[];
+  const returnWonOptions=!hwbtServing?[
+    ['JOUEUR_1','retour +1','retour',`${p1} · Retour`,p1],
+    ['JOUEUR_2','retour +1','retour',`${p2} · Retour`,p2]
+  ]:[];
+  const returnLostOptions=!hwbtServing?[
+    ['JOUEUR_1','retour coup droit faute','retour',`${p1} · Retour CD`,p1],
+    ['JOUEUR_1','retour revers faute','retour',`${p1} · Retour revers`,p1],
+    ['JOUEUR_1','retour centre corps faute','retour',`${p1} · Retour centre/corps`,p1],
+    ['JOUEUR_2','retour coup droit faute','retour',`${p2} · Retour CD`,p2],
+    ['JOUEUR_2','retour revers faute','retour',`${p2} · Retour revers`,p2],
+    ['JOUEUR_2','retour centre corps faute','retour',`${p2} · Retour centre/corps`,p2]
+  ]:[];
   const optionsWon=[
     ...serviceWonOptions,
-    ['JOUEUR_1','retour +1','retour',`${p1} · Retour`,p1],
+    ...returnWonOptions,
     ['JOUEUR_1','fond +1','fond',`${p1} · Fond`,p1],
     ['JOUEUR_1','filet +1','filet',`${p1} · Filet`,p1],
     ['JOUEUR_1','bandeja gagnante','attaque haut tête',`${p1} · Bandeja`,p1],
@@ -6584,7 +6615,6 @@ function matchActionChoiceHtml(m,result){
     ['JOUEUR_1','smash gagnant','attaque haut tête',`${p1} · Smash`,p1],
     ['JOUEUR_1','par 3 / par 4','attaque haut tête',`${p1} · Par 3/4`,p1],
     ['JOUEUR_1','lob défense +1','défense lob',`${p1} · Lob/défense`,p1],
-    ['JOUEUR_2','retour +1','retour',`${p2} · Retour`,p2],
     ['JOUEUR_2','fond +1','fond',`${p2} · Fond`,p2],
     ['JOUEUR_2','filet +1','filet',`${p2} · Filet`,p2],
     ['JOUEUR_2','bandeja gagnante','attaque haut tête',`${p2} · Bandeja`,p2],
@@ -6600,19 +6630,13 @@ function matchActionChoiceHtml(m,result){
     ['ADVERSAIRES','faute adverse provoquée','pression','ADV · Faute non précisée','Faute adverse']
   ];
   const optionsLost=[
-    ['JOUEUR_1','service donné','service',`${p1} · Service`,p1],
-    ['JOUEUR_1','retour coup droit faute','retour',`${p1} · Retour CD`,p1],
-    ['JOUEUR_1','retour revers faute','retour',`${p1} · Retour revers`,p1],
-    ['JOUEUR_1','retour centre corps faute','retour',`${p1} · Retour centre/corps`,p1],
+    ...serviceLostOptions,
+    ...returnLostOptions,
     ['JOUEUR_1','fond donné','fond',`${p1} · Fond`,p1],
     ['JOUEUR_1','filet donné','filet',`${p1} · Filet`,p1],
     ['JOUEUR_1','haut tête donné','attaque',`${p1} · Haut tête`,p1],
     ['JOUEUR_1','lob défense donné','défense lob',`${p1} · Lob/défense`,p1],
     ['JOUEUR_1','mauvais choix tactique','décision',`${p1} · Choix`,p1],
-    ['JOUEUR_2','service donné','service',`${p2} · Service`,p2],
-    ['JOUEUR_2','retour coup droit faute','retour',`${p2} · Retour CD`,p2],
-    ['JOUEUR_2','retour revers faute','retour',`${p2} · Retour revers`,p2],
-    ['JOUEUR_2','retour centre corps faute','retour',`${p2} · Retour centre/corps`,p2],
     ['JOUEUR_2','fond donné','fond',`${p2} · Fond`,p2],
     ['JOUEUR_2','filet donné','filet',`${p2} · Filet`,p2],
     ['JOUEUR_2','haut tête donné','attaque',`${p2} · Haut tête`,p2],
@@ -7125,7 +7149,7 @@ function matchActionsInnerHtml(m,events){
       <button class="match-live-main won ${pending==='GAGNE'?'active':''}" onclick="setMatchPointResult('GAGNE')"><span>POINT GAGNÉ HWBT</span><b>1er clic</b></button>
       <button class="match-live-main lost ${pending==='PERDU'?'active':''}" onclick="setMatchPointResult('PERDU')"><span>POINT PERDU HWBT</span><b>1er clic</b></button>
     </div>
-    ${!scoreState.server?`<div class="card" style="border-color:var(--rouge);padding:12px"><div class="card-title">SERVEUR À DÉFINIR</div><div class="muted-help">Choisis le serveur actuel avant le premier point du set. Après, la rotation suivra automatiquement.</div></div>`:''}
+    ${!scoreState.server?`<div class="card" style="border-color:var(--rouge);padding:12px"><div class="card-title">SERVEUR À DÉFINIR</div><div class="muted-help">Choisis le serveur actuel puis clique <b>VALIDER SERVEUR</b>. Ce bouton ne touche jamais au score.</div></div>`:''}
     ${matchRefineHtml(m,events)}
     ${pending?matchActionChoiceHtml(m,pending):''}
   </div>`;
@@ -7152,10 +7176,12 @@ function matchEncoderHtml(match,a){
       </div>
       <div id="matchScoreboardZone">${matchScoreboardInnerHtml(m,scoreState,events)}</div>
       <div class="g3" style="margin-top:16px;align-items:end">
+        <div class="form-group"><label class="form-label">SERVEUR ACTUEL</label><select class="form-select" id="matchServingTeamInput">${matchServerOptionsHtml(m,scoreState.server)}</select></div>
+        <button class="btn btn-primary" onclick="setMatchCurrentServer()">VALIDER SERVEUR</button>
+        <button class="btn btn-ghost" onclick="setMatchCurrentScore()">CORRIGER SCORE MANUEL</button>
         <div class="form-group"><label class="form-label">JEUX ACTUELS</label><input class="form-input" id="matchCurrentGamesInput" value="${scoreState.hwbtGames||0}-${scoreState.advGames||0}" placeholder="0-0"></div>
         <div class="form-group"><label class="form-label">${scoreState.superTieBreak?'POINTS SUPER TIE-BREAK':scoreState.tieBreak?'POINTS TIE-BREAK':'POINTS DU JEU'}</label><input class="form-input" id="matchCurrentPointsInput" value="${esc(scoreState.pointScore||'0-0')}" placeholder="${scoreState.superTieBreak||scoreState.tieBreak?'6-4':'0-0, 15-0, 40-30...'}"></div>
-        <div class="form-group"><label class="form-label">SERVEUR ACTUEL</label><select class="form-select" id="matchServingTeamInput">${matchServerOptionsHtml(m,scoreState.server)}</select></div>
-        <button class="btn btn-ghost" onclick="setMatchCurrentScore()">METTRE À JOUR LE SCORE</button>
+        <div class="muted-help" style="align-self:center">Le score manuel sert uniquement si tu dois corriger une erreur d’encodage.</div>
       </div>
       <div class="match-live-advice">
         <div class="match-live-advice-box"><b>${esc(topo.status)}</b><span>${esc(topo.advice)}</span></div>
