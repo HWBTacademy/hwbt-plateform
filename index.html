@@ -5760,7 +5760,7 @@ function playerMatchPerformanceScore(player){
 // HWBT MATCH ANALYST - pure event-journal analysis
 // ══════════════════════════════════════════════════
 const MATCH_ORIGINS=['JOUEUR_1','JOUEUR_2','COLLECTIF','ADVERSAIRES','INDETERMINE'];
-const IMPORTANT_POINT_TYPES=['40-40','POINT_DECISIF','BALLE_DE_JEU','BALLE_DE_SET','BALLE_DE_MATCH','TIE_BREAK','SUPER_TIE_BREAK'];
+const IMPORTANT_POINT_TYPES=['STAR_POINT','40-40','POINT_DECISIF','BALLE_DE_JEU','BALLE_DE_SET','BALLE_DE_MATCH','TIE_BREAK','SUPER_TIE_BREAK'];
 function normMatchResult(v){
   const s=String(v||'').toUpperCase();
   if(['GAGNE','GAGNÉ','WIN','HWBT','WON'].includes(s)) return 'GAGNE';
@@ -7112,6 +7112,89 @@ function matchStructureHelpHtml(ps){
 function matchBreakdownHtml(title,data,total,excluded,labels={},order=['JOUEUR_1','JOUEUR_2','COLLECTIF','ADVERSAIRES']){
   return `<div class="card"><div class="card-title">${esc(title)}</div>${order.map(o=>`<div style="display:grid;grid-template-columns:104px 1fr 70px;gap:10px;align-items:center;margin:9px 0"><div style="font-size:10px;color:var(--gray)">${esc(labels[o]||o.replace('_',' '))}</div><div style="height:7px;background:var(--border);border-radius:8px;overflow:hidden"><div style="height:100%;width:${total?Math.round((data[o]||0)/total*100):0}%;background:var(--bronze)"></div></div><div style="font-size:11px;color:var(--offwhite);text-align:right">${pctX(data[o]||0,total)}</div></div>`).join('')}${excluded?`<div style="font-size:11px;color:var(--bronze);margin-top:10px">${excluded} points indéterminés exclus de cette répartition.</div>`:''}</div>`;
 }
+function matchMiniBar(label,value,total,color='var(--bronze)',help=''){
+  const pct=total?Math.round((value/total)*100):0;
+  return `<div style="display:grid;grid-template-columns:112px 1fr 48px;gap:10px;align-items:center;margin:8px 0">
+    <div style="font-size:10px;color:var(--gray);line-height:1.2">${esc(label)}</div>
+    <div style="height:8px;background:var(--border);border-radius:8px;overflow:hidden"><div style="height:100%;width:${Math.max(0,Math.min(100,pct))}%;background:${color}"></div></div>
+    <div style="font-size:11px;color:var(--offwhite);text-align:right">${value}/${total||0}</div>
+    ${help?`<div></div><div class="muted-help" style="grid-column:2/4;margin-top:-4px">${esc(help)}</div>`:''}
+  </div>`;
+}
+function matchPadelDashboardHtml(a){
+  const ps=a.pointStructure||{};
+  const pair=a.pairAnalysis||{};
+  const service=a.serviceAnalysis||{};
+  const padel=a.padelAnalysis||{};
+  const total=a.matchSummary?.totalPoints||0;
+  const won=a.matchSummary?.won||0;
+  const lost=a.matchSummary?.lost||0;
+  const advG=a.adversarySideLost?.ADV_GAUCHE||0;
+  const advD=a.adversarySideLost?.ADV_DROITE||0;
+  const advU=a.adversarySideLost?.ADV_INCONNU||0;
+  const totalAdv=Math.max(1,advG+advD+advU);
+  const hot=a.scoreContext?.important||{};
+  const familyRows=(padel.familyRows||[]).slice(0,7);
+  const winRate=matchPercent(won,total);
+  const serviceWin=service.hwbtServe?.winRate||0;
+  const returnWin=service.advServe?.winRate||0;
+  const pressureText=advG>advD?`ADV gauche gagne le plus de points directs (${advG}).`:advD>advG?`ADV droite gagne le plus de points directs (${advD}).`:'Les winners adverses sont plutôt répartis.';
+  return `<div class="card" style="border-color:var(--bronze-dim2)">
+    <div class="card-title">RADAR PADEL · LECTURE COACH</div>
+    <div class="g3" style="margin-top:12px">
+      <div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:14px">
+        <div class="card-title">MATCH</div>
+        ${matchMiniBar('Points gagnés',won,total,'var(--bronze)',`${winRate}% de réussite sur les points encodés`)}
+        ${matchMiniBar('Créés HWBT',ps.points_construits||0,Math.max(1,ps.wonKnown||won),'var(--vert)','points gagnés par action HWBT')}
+        ${matchMiniBar('Donnés HWBT',ps.points_concedes||0,Math.max(1,ps.lostKnown||lost),'#e74c3c','points perdus par faute/choix HWBT')}
+        ${matchMiniBar('Points chauds',hot.won||0,Math.max(1,(hot.won||0)+(hot.lost||0)),'var(--bronze)','balles de jeu/set/match/star point')}
+      </div>
+      <div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:14px">
+        <div class="card-title">SERVICE / RETOUR</div>
+        ${matchMiniBar('Service HWBT',service.hwbtServe?.won||0,service.hwbtServe?.points||0,'var(--bronze)',`${serviceWin}% quand HWBT sert`)}
+        ${matchMiniBar('Retour HWBT',service.advServe?.won||0,service.advServe?.points||0,'var(--bleu)',`${returnWin}% quand ADV sert`)}
+        ${matchMiniBar('Breaks pour',service.breakBallsConverted||0,service.breakBallsFor||0,'var(--vert)','conversion des opportunités')}
+        ${matchMiniBar('Breaks sauvés',service.breakBallsSaved||0,service.breakBallsFaced||0,'var(--bronze)','résistance sous pression')}
+      </div>
+      <div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:14px">
+        <div class="card-title">DUO / ADVERSAIRE</div>
+        ${matchMiniBar('Construction duo',pair.built||0,Math.max(1,ps.wonKnown||won),'var(--bronze)','points gagnés ensemble')}
+        ${matchMiniBar('Fautes provoquées',pair.forcedErrors||0,Math.max(1,ps.wonKnown||won),'var(--vert)','pression qui fait rater ADV')}
+        ${matchMiniBar('Winners ADV',pair.sufferedWinners||0,Math.max(1,ps.lostKnown||lost),'#e74c3c','points réellement subis')}
+        <div class="muted-help" style="margin-top:8px">${esc(pressureText)}</div>
+      </div>
+    </div>
+    <div class="g2" style="margin-top:14px">
+      <div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:14px">
+        <div class="card-title">CARTE DE PRESSION ADVERSAIRE</div>
+        <div style="position:relative;height:178px;border:2px solid var(--border2);border-radius:10px;background:linear-gradient(90deg,rgba(184,137,53,.08),rgba(0,0,0,.2));overflow:hidden">
+          <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--border2)"></div>
+          <div style="position:absolute;left:8%;right:8%;top:50%;height:1px;background:var(--border2)"></div>
+          <div style="position:absolute;left:8%;top:16px;font-size:10px;color:var(--gray)">ADV GAUCHE</div>
+          <div style="position:absolute;right:8%;top:16px;font-size:10px;color:var(--gray)">ADV DROITE</div>
+          <div style="position:absolute;left:12%;top:58px;width:${34+Math.min(40,advG*8)}px;height:${34+Math.min(40,advG*8)}px;border-radius:50%;background:rgba(231,76,60,.26);border:1px solid #e74c3c;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900">${advG}</div>
+          <div style="position:absolute;right:12%;top:58px;width:${34+Math.min(40,advD*8)}px;height:${34+Math.min(40,advD*8)}px;border-radius:50%;background:rgba(231,76,60,.26);border:1px solid #e74c3c;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900">${advD}</div>
+          <div style="position:absolute;left:50%;bottom:14px;transform:translateX(-50%);font-size:10px;color:var(--bronze);letter-spacing:1px">winners subis / côté encodé</div>
+        </div>
+        <div class="muted-help" style="margin-top:10px">${esc(padel.sideAdvice||'Encode ADV gauche / ADV droite pour rendre cette carte plus utile.')}</div>
+      </div>
+      <div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:14px">
+        <div class="card-title">FAMILLES PADEL</div>
+        ${familyRows.length?familyRows.map(r=>{
+          const color=r.balance>=2?'var(--vert)':r.balance<=-2?'#e74c3c':'var(--bronze)';
+          const totalFam=Math.max(1,r.won+r.lostOurs+r.lostTheirs);
+          return `<div style="border-bottom:1px solid var(--border);padding:8px 0">
+            <div style="display:flex;justify-content:space-between;gap:8px"><b style="font-size:12px;color:var(--white)">${esc(r.label)}</b><span style="font-size:11px;color:${color};font-weight:900">${r.balance>0?'+':''}${r.balance}</span></div>
+            <div style="display:grid;grid-template-columns:${matchPercent(r.won,totalFam)}% ${matchPercent(r.lostOurs,totalFam)}% ${matchPercent(r.lostTheirs,totalFam)}%;height:8px;border-radius:8px;overflow:hidden;background:var(--border);margin-top:6px">
+              <div style="background:var(--vert)"></div><div style="background:#e74c3c"></div><div style="background:var(--bronze)"></div>
+            </div>
+            <div class="muted-help" style="margin-top:4px">+${r.won} · donnés ${r.lostOurs} · subis ${r.lostTheirs}</div>
+          </div>`;
+        }).join(''):'<div class="muted-help">Encode les familles de coups pour obtenir cette lecture.</div>'}
+      </div>
+    </div>
+  </div>`;
+}
 function pageMatchAnalyst(){
   const {match,analysis:a}=selectedMatchAnalysis();
   const tab=UI.matchAnalystTab||'coach';
@@ -7375,6 +7458,7 @@ function matchCoachHtml(a){
   const noteBlock=a.coachNote?`<div class="card" style="border-color:var(--bronze-dim2)"><div class="card-title">NOTE EXPRESS COACH</div><div style="font-size:13px;color:var(--offwhite);font-family:var(--font-body);line-height:1.65;white-space:pre-wrap">${esc(a.coachNote)}</div>${a.coachNoteSavedAt?`<div class="muted-help" style="margin-top:8px">Sauvegardée ${esc(new Date(a.coachNoteSavedAt).toLocaleString('fr-BE'))}</div>`:''}</div>`:'';
   return `<div class="card" style="border-color:var(--bronze-dim2)"><div class="card-title">CONTEXTE MATCH</div><div style="display:flex;gap:10px;flex-wrap:wrap"><span class="future-chip">${esc(formatShortDate(a.matchSummary.date)||a.matchSummary.date||'Date ?')}</span><span class="future-chip">${esc(a.matchSummary.club||'Club non précisé')}</span><span class="future-chip">${esc(a.matchSummary.title||'Match HWBT')}</span></div></div>
   <div class="g4">${matchMetricCard('Résultat',a.matchSummary.score||'—')}${matchMetricCard('Format',a.matchSummary.format||'Padel')}${matchMetricCard('Durée active',secondsLabel(a.matchSummary.durationActiveSeconds))}${matchMetricCard('Couverture',`${a.coverage.originKnown}%`,`${a.coverage.total-a.coverage.causeKnown} causes non renseignées`)}</div>
+  ${matchPadelDashboardHtml(a)}
   ${noteBlock}
   ${hotBlock}
   ${serviceBlock}
