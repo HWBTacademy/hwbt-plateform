@@ -5893,6 +5893,7 @@ function matchPadelDeepAnalysis(points,won,lost,playerDetails,pairAnalysis,advSi
 }
 function normalizeImportantType(v){
   const s=String(v||'').toUpperCase().replace(/\s+/g,'_');
+  if(s.includes('STAR')) return 'STAR_POINT';
   if(s==='40-40'||s.includes('EGALITE')) return '40-40';
   if(s.includes('SUPER')) return 'SUPER_TIE_BREAK';
   if(s.includes('TIE')) return 'TIE_BREAK';
@@ -5919,6 +5920,7 @@ function matchPointImportantTypes(p){
 }
 function matchPointScoreOpportunity(prev){
   const ps=String(prev?.pointScore||'0-0');
+  if(prev?.starPointActive||ps==='STAR POINT') return ['HWBT','ADV'];
   if(ps==='Av HWBT') return ['HWBT'];
   if(ps==='Av ADV') return ['ADV'];
   const parsed=parsePadelPointScore(ps);
@@ -5956,6 +5958,9 @@ function computePointImportance(match,prevScoreState){
   const types=[];
   const pointScore=String(prev.pointScore||'0-0');
   const opportunities=prev.superTieBreak?tieBreakOpportunity(prev,prev.superTieBreakTarget||10):prev.tieBreak?tieBreakOpportunity(prev,prev.tieBreakTarget||7):matchPointScoreOpportunity(prev);
+  if(prev.starPointActive||pointScore==='STAR POINT'){
+    types.push('STAR_POINT','POINT_DECISIF','BALLE_DE_JEU');
+  }
   if(pointScore==='40-40'||pointScore==='Av HWBT'||pointScore==='Av ADV') types.push('40-40');
   if(prev.tieBreak) types.push('TIE_BREAK');
   if(prev.superTieBreak) types.push('SUPER_TIE_BREAK');
@@ -5982,8 +5987,8 @@ function computePointImportance(match,prevScoreState){
   return {types:[...new Set(types)],importanceFor};
 }
 function matchImportanceLabel(types=[]){
-  const ordered=['star point','BALLE_DE_MATCH','BALLE_DE_SET','BALLE_DE_JEU','40-40','SUPER_TIE_BREAK','TIE_BREAK','POINT_DECISIF'];
-  const labels={'star point':'STAR POINT','40-40':'40-40','POINT_DECISIF':'POINT DÉCISIF',BALLE_DE_JEU:'BALLE DE JEU',BALLE_DE_SET:'BALLE DE SET',BALLE_DE_MATCH:'BALLE DE MATCH',TIE_BREAK:'TIE-BREAK',SUPER_TIE_BREAK:'SUPER TIE-BREAK'};
+  const ordered=['STAR_POINT','BALLE_DE_MATCH','BALLE_DE_SET','BALLE_DE_JEU','40-40','SUPER_TIE_BREAK','TIE_BREAK','POINT_DECISIF'];
+  const labels={STAR_POINT:'STAR POINT','40-40':'40-40','POINT_DECISIF':'POINT DÉCISIF',BALLE_DE_JEU:'BALLE DE JEU',BALLE_DE_SET:'BALLE DE SET',BALLE_DE_MATCH:'BALLE DE MATCH',TIE_BREAK:'TIE-BREAK',SUPER_TIE_BREAK:'SUPER TIE-BREAK'};
   return ordered.filter(t=>types.includes(t)).map(t=>labels[t]).join(' · ');
 }
 function ensureMatchPointSeq(m){
@@ -6345,7 +6350,10 @@ function setMatchCurrentScore(){
   const point=(state.superTieBreak||state.tieBreak)?parseSuperTieBreakScore(points):parsePadelPointScore(points);
   state.hwbtPoints=point.hwbt;
   state.advPoints=point.adv;
+  state.starPointActive=!(state.superTieBreak||state.tieBreak)&&/star/i.test(points);
+  state.deuceCycles=state.starPointActive?2:state.deuceCycles||0;
   state.pointScore=(state.superTieBreak||state.tieBreak)?formatNumericTieBreakScore(point.hwbt,point.adv):formatPadelPointScore(point.hwbt,point.adv);
+  if(state.starPointActive) state.pointScore='STAR POINT';
   state.servingTeam=serving;
   state.server=server;
   syncMatchServeOrder(state,server);
@@ -6378,6 +6386,7 @@ function parseGameScore(score){
 }
 function parsePadelPointScore(score){
   const s=String(score||'0-0').trim().toLowerCase();
+  if(s.includes('star')) return {hwbt:3,adv:3,label:'STAR POINT'};
   if(s.includes('av hwbt')||s.includes('adv hwbt')) return {hwbt:4,adv:3,label:'Av HWBT'};
   if(s.includes('av adv')||s.includes('adv adv')||s.includes('av advers')) return {hwbt:3,adv:4,label:'Av ADV'};
   if(s.includes('égalité')||s.includes('egalite')||s.includes('deuce')) return {hwbt:3,adv:3,label:'40-40'};
@@ -6426,7 +6435,8 @@ function ensureMatchScore(m){
   syncMatchServeOrder(m.matchScore,m.matchScore.server);
   if(typeof m.matchScore.superTieBreakTarget!=='number') m.matchScore.superTieBreakTarget=10;
   if(typeof m.matchScore.tieBreakTarget!=='number') m.matchScore.tieBreakTarget=7;
-  m.matchScore.pointScore=(m.matchScore.superTieBreak||m.matchScore.tieBreak)?formatNumericTieBreakScore(m.matchScore.hwbtPoints||0,m.matchScore.advPoints||0):formatPadelPointScore(m.matchScore.hwbtPoints||0,m.matchScore.advPoints||0);
+  if(typeof m.matchScore.deuceCycles!=='number') m.matchScore.deuceCycles=Number(m.matchScore.deuceCycles)||0;
+  m.matchScore.pointScore=(m.matchScore.superTieBreak||m.matchScore.tieBreak)?formatNumericTieBreakScore(m.matchScore.hwbtPoints||0,m.matchScore.advPoints||0):m.matchScore.starPointActive?'STAR POINT':formatPadelPointScore(m.matchScore.hwbtPoints||0,m.matchScore.advPoints||0);
   return m.matchScore;
 }
 function matchDisplayScore(m){
@@ -6457,6 +6467,8 @@ function closeMatchSet(m,s,hwbtGames,advGames){
   s.hwbtPoints=0;
   s.advPoints=0;
   s.pointScore='0-0';
+  s.deuceCycles=0;
+  s.starPointActive=false;
   s.tieBreak=false;
   s.server='';
   s.servingTeam='';
@@ -6524,11 +6536,37 @@ function advanceMatchScore(m,result){
     m.score=m.currentScore;
     return {prev,score:m.currentScore,gameWon,servingTeam:s.servingTeam,server:s.server,pointScore:s.pointScore,gameScore:`${s.hwbtGames||0}-${s.advGames||0}`,superTieBreak:!!prev.superTieBreak,tieBreak:!!prev.tieBreak,matchFinished:!!s.matchWinner};
   }
+  const previousServer=s.server;
+  if(s.starPointActive){
+    const gameWon=result==='GAGNE'?'HWBT':'ADV';
+    if(gameWon==='HWBT') s.hwbtGames=(s.hwbtGames||0)+1;
+    else s.advGames=(s.advGames||0)+1;
+    const g1=s.hwbtGames||0, g2=s.advGames||0;
+    let setClosed=false;
+    if(shouldCloseNormalSet(m,s)){
+      closeMatchSet(m,s,g1,g2);
+      setClosed=true;
+    }else if(shouldStartSetTieBreak(m,s)){
+      s.tieBreak=true;
+      s.tieBreakTarget=7;
+    }
+    s.hwbtPoints=0;
+    s.advPoints=0;
+    s.deuceCycles=0;
+    s.starPointActive=false;
+    s.pointScore='0-0';
+    if(!setClosed){
+      s.server=nextMatchServerAfterGame(s,previousServer);
+      s.servingTeam=matchServingTeamFromServer(s.server);
+    }
+    m.currentScore=matchDisplayScore(m);
+    m.score=m.currentScore;
+    return {prev,score:m.currentScore,gameWon,servingTeam:s.servingTeam,server:s.server,pointScore:s.pointScore,gameScore:`${s.hwbtGames||0}-${s.advGames||0}`,starPoint:true,matchFinished:!!s.matchWinner};
+  }
   if(result==='GAGNE') s.hwbtPoints=(s.hwbtPoints||0)+1;
   else s.advPoints=(s.advPoints||0)+1;
   const formatted=formatPadelPointScore(s.hwbtPoints,s.advPoints);
   let gameWon='';
-  const previousServer=s.server;
   if(formatted==='Jeu HWBT'||formatted==='Jeu ADV'){
     gameWon=formatted==='Jeu HWBT'?'HWBT':'ADV';
     if(gameWon==='HWBT') s.hwbtGames=(s.hwbtGames||0)+1;
@@ -6544,6 +6582,8 @@ function advanceMatchScore(m,result){
     }
     s.hwbtPoints=0;
     s.advPoints=0;
+    s.deuceCycles=0;
+    s.starPointActive=false;
     s.pointScore='0-0';
     if(!setClosed){
       s.server=nextMatchServerAfterGame(s,previousServer);
@@ -6551,10 +6591,12 @@ function advanceMatchScore(m,result){
     }
   }else{
     if(formatted==='40-40'&&s.hwbtPoints>=3&&s.advPoints>=3){
+      if(prev.pointScore==='Av HWBT'||prev.pointScore==='Av ADV') s.deuceCycles=(s.deuceCycles||0)+1;
       s.hwbtPoints=3;
       s.advPoints=3;
+      s.starPointActive=(s.deuceCycles||0)>=2;
     }
-    s.pointScore=formatted;
+    s.pointScore=s.starPointActive?'STAR POINT':formatted;
   }
   m.currentScore=matchDisplayScore(m);
   m.score=m.currentScore;
@@ -6890,10 +6932,10 @@ function markLastMatchPointStar(){
   if(!p){showNotif('Aucun point à marquer');return;}
   p.starPoint=!p.starPoint;
   if(p.starPoint){
-    p.importance=Array.from(new Set([...(p.importance||[]),'star point']));
+    p.importance=Array.from(new Set([...(p.importance||[]),'STAR_POINT']));
     p.starPointAt=new Date().toISOString();
   }else{
-    p.importance=(p.importance||[]).filter(x=>x!=='star point');
+    p.importance=(p.importance||[]).filter(x=>normalizeImportantType(x)!=='STAR_POINT');
   }
   saveStateDebounced();
   updateMatchEncoder(m,{actions:true,stats:true,points:true});
@@ -7172,14 +7214,14 @@ function matchActionsInnerHtml(m,events){
       <button class="match-live-main won ${pending==='GAGNE'?'active':''}" onclick="setMatchPointResult('GAGNE')"><span>POINT GAGNÉ HWBT</span><b>1er clic</b></button>
       <button class="match-live-main lost ${pending==='PERDU'?'active':''}" onclick="setMatchPointResult('PERDU')"><span>POINT PERDU HWBT</span><b>1er clic</b></button>
     </div>
+    ${!scoreState.server?`<div class="card" style="border-color:var(--rouge);padding:12px"><div class="card-title">SERVEUR À DÉFINIR</div><div class="muted-help">Choisis le serveur actuel puis clique <b>VALIDER SERVEUR</b>. Ce bouton ne touche jamais au score.</div></div>`:''}
+    ${pending?matchActionChoiceHtml(m,pending):''}
+    ${matchRefineHtml(m,events)}
     <div class="match-live-advice">
       <div class="match-live-advice-box"><b>${esc(topo.status)}</b><span>${esc(topo.advice)}</span></div>
       <div class="match-live-advice-box"><b>Point fort vu</b><span>${esc(topo.strength)}</span></div>
       <div class="match-live-advice-box"><b>Point faible vu</b><span>${esc(topo.weakness)}</span></div>
     </div>
-    ${!scoreState.server?`<div class="card" style="border-color:var(--rouge);padding:12px"><div class="card-title">SERVEUR À DÉFINIR</div><div class="muted-help">Choisis le serveur actuel puis clique <b>VALIDER SERVEUR</b>. Ce bouton ne touche jamais au score.</div></div>`:''}
-    ${matchRefineHtml(m,events)}
-    ${pending?matchActionChoiceHtml(m,pending):''}
   </div>`;
 }
 function matchLastPointsHtml(m,events){
@@ -7225,7 +7267,6 @@ function matchEncoderHtml(match,a){
       <input type="hidden" id="matchPointScore" value="">
       <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:10px">
         <button class="btn btn-ghost" onclick="undoLastMatchPoint()">ANNULER DERNIER POINT</button>
-        <button class="btn btn-ghost" onclick="markLastMatchPointStar()">STAR POINT</button>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost" onclick="deleteMatchAnalystMatch('${m.id}')">SUPPRIMER MATCH</button><button class="btn btn-primary" onclick="finishMatchAnalystMatch()">CLÔTURER LE MATCH</button></div>
       </div>
     </div>
