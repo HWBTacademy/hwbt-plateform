@@ -7028,8 +7028,13 @@ function deleteMatchAnalystMatch(id){
 function editMatchMeta(id){
   const m=STATE.matches.find(x=>String(x.id)===String(id));
   if(!m){showNotif('Match introuvable');return;}
+  const nextTitle=(prompt('Nom du match ?',m.title||m.name||'Match HWBT')||m.title||m.name||'').trim();
   const nextDate=(prompt('Date du match ?',m.date||String(m.finishedAt||m.createdAt||'').slice(0,10)||todayIso())||m.date||'').trim();
   const nextClub=(prompt('Club / lieu du match ?',matchClubLabel(m)==='Club non précisé'?'':matchClubLabel(m))||'').trim();
+  if(nextTitle){
+    m.title=nextTitle;
+    m.name=nextTitle;
+  }
   if(nextDate) m.date=nextDate;
   m.club=nextClub;
   m.location=nextClub;
