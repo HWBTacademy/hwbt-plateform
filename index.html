@@ -5978,7 +5978,7 @@ function computePointImportance(match,prevScoreState){
       const currentWins=matchSetWins(prev.sets||[]);
       const nextWins={...currentWins};
       nextWins[side.toLowerCase()]++;
-      const closesMatch=match?.matchFormat==='2SETS_SUPER10'
+      const closesMatch=match?.matchFormat==='2SETS_SUPER10'||match?.matchFormat==='FIP_2SETS_SUPER10_STAR'
         ? nextWins.hwbt>=2||nextWins.adv>=2
         : ['ONE_SET','FIRST_TO_9'].includes(match?.matchFormat);
       if(closesMatch) types.push('BALLE_DE_MATCH');
@@ -6248,10 +6248,14 @@ function nextMatchServerAfterGame(s,previousServer){
   return '';
 }
 function matchFormatLabel(format){
+  if(format==='FIP_2SETS_SUPER10_STAR') return 'FIP · 2 sets de 6 + super tie-break 10 + Star Point';
   if(format==='2SETS_SUPER10') return '2 sets de 6 + super tie-break 10';
   if(format==='FIRST_TO_9') return 'Premier à 9 jeux';
   if(format==='ONE_SET') return '1 set';
   return 'Match libre';
+}
+function matchUsesStarPoint(m){
+  return m?.matchFormat==='FIP_2SETS_SUPER10_STAR';
 }
 function matchCreateModalHtml(){
   const today=new Date().toISOString().slice(0,10);
@@ -6267,7 +6271,7 @@ function matchCreateModalHtml(){
       <div class="form-group"><label class="form-label">DATE</label><input class="form-input" id="newMatchDate" type="date" value="${today}"></div>
       <div class="form-group"><label class="form-label">CLUB / LIEU</label><input class="form-input" id="newMatchClub" value="L'Argayon"></div>
       <div class="form-group"><label class="form-label">NOM DU MATCH</label><input class="form-input" id="newMatchTitle" placeholder="Ex: Lucas + Fabien vs adversaires"></div>
-      <div class="form-group"><label class="form-label">FORMAT</label><select class="form-select" id="newMatchFormat"><option value="2SETS_SUPER10">2 sets de 6 + super tie-break 10</option><option value="FIRST_TO_9">Premier à 9 jeux</option></select></div>
+      <div class="form-group"><label class="form-label">FORMAT</label><select class="form-select" id="newMatchFormat"><option value="FIP_2SETS_SUPER10_STAR">Match FIP · 2 sets de 6 + super tie-break + Star Point</option><option value="2SETS_SUPER10">Match classique · 2 sets de 6 + super tie-break</option><option value="FIRST_TO_9">Match 9 jeux</option></select></div>
       <div class="form-group"><label class="form-label">SCORE DE DÉPART</label><input class="form-input" id="newMatchScore" value="0-0" placeholder="0-0"></div>
       <div class="form-group"><label class="form-label">SERVEUR DE DÉPART</label><select class="form-select" id="newMatchServer"><option value="">À définir au début du match</option><option value="J1">Joueur HWBT 1</option><option value="J2">Joueur HWBT 2</option><option value="ADV_G">ADV gauche</option><option value="ADV_D">ADV droite</option></select></div>
     </div>
@@ -6350,7 +6354,7 @@ function setMatchCurrentScore(){
   const point=(state.superTieBreak||state.tieBreak)?parseSuperTieBreakScore(points):parsePadelPointScore(points);
   state.hwbtPoints=point.hwbt;
   state.advPoints=point.adv;
-  state.starPointActive=!(state.superTieBreak||state.tieBreak)&&/star/i.test(points);
+  state.starPointActive=matchUsesStarPoint(m)&&!(state.superTieBreak||state.tieBreak)&&/star/i.test(points);
   state.deuceCycles=state.starPointActive?2:state.deuceCycles||0;
   state.pointScore=(state.superTieBreak||state.tieBreak)?formatNumericTieBreakScore(point.hwbt,point.adv):formatPadelPointScore(point.hwbt,point.adv);
   if(state.starPointActive) state.pointScore='STAR POINT';
@@ -6436,6 +6440,7 @@ function ensureMatchScore(m){
   if(typeof m.matchScore.superTieBreakTarget!=='number') m.matchScore.superTieBreakTarget=10;
   if(typeof m.matchScore.tieBreakTarget!=='number') m.matchScore.tieBreakTarget=7;
   if(typeof m.matchScore.deuceCycles!=='number') m.matchScore.deuceCycles=Number(m.matchScore.deuceCycles)||0;
+  if(!matchUsesStarPoint(m)) m.matchScore.starPointActive=false;
   m.matchScore.pointScore=(m.matchScore.superTieBreak||m.matchScore.tieBreak)?formatNumericTieBreakScore(m.matchScore.hwbtPoints||0,m.matchScore.advPoints||0):m.matchScore.starPointActive?'STAR POINT':formatPadelPointScore(m.matchScore.hwbtPoints||0,m.matchScore.advPoints||0);
   return m.matchScore;
 }
@@ -6477,7 +6482,7 @@ function closeMatchSet(m,s,hwbtGames,advGames){
   s.lastHwbtServer='';
   s.setServeOrder=null;
   const wins=matchSetWins(s.sets);
-  if(m.matchFormat==='2SETS_SUPER10'){
+  if(m.matchFormat==='2SETS_SUPER10'||m.matchFormat==='FIP_2SETS_SUPER10_STAR'){
     if(wins.hwbt>=2||wins.adv>=2){
       s.matchWinner=wins.hwbt>wins.adv?'HWBT':'ADV';
       m.status='FIN_DE_MATCH_CONFIRMEE';
@@ -6537,7 +6542,7 @@ function advanceMatchScore(m,result){
     return {prev,score:m.currentScore,gameWon,servingTeam:s.servingTeam,server:s.server,pointScore:s.pointScore,gameScore:`${s.hwbtGames||0}-${s.advGames||0}`,superTieBreak:!!prev.superTieBreak,tieBreak:!!prev.tieBreak,matchFinished:!!s.matchWinner};
   }
   const previousServer=s.server;
-  if(s.starPointActive){
+  if(matchUsesStarPoint(m)&&s.starPointActive){
     const gameWon=result==='GAGNE'?'HWBT':'ADV';
     if(gameWon==='HWBT') s.hwbtGames=(s.hwbtGames||0)+1;
     else s.advGames=(s.advGames||0)+1;
@@ -6594,7 +6599,7 @@ function advanceMatchScore(m,result){
       if(prev.pointScore==='Av HWBT'||prev.pointScore==='Av ADV') s.deuceCycles=(s.deuceCycles||0)+1;
       s.hwbtPoints=3;
       s.advPoints=3;
-      s.starPointActive=(s.deuceCycles||0)>=2;
+      s.starPointActive=matchUsesStarPoint(m)&&(s.deuceCycles||0)>=2;
     }
     s.pointScore=s.starPointActive?'STAR POINT':formatted;
   }
@@ -6686,10 +6691,10 @@ function matchActionChoiceHtml(m,result){
     ['COLLECTIF','zone libre laissée ouverte','placement','Duo · Zone ouverte','Duo HWBT'],
     ['COLLECTIF','duo cassé sur la montée','transition','Duo · Transition ratée','Duo HWBT'],
     ['ADVERSAIRES','adv gauche winner filet','filet','ADV G · Filet','ADV gauche'],
-    ['ADVERSAIRES','adv gauche winner haut tête','attaque haut tête','ADV G · Haut tête','ADV gauche'],
+    ['ADVERSAIRES','adv gauche winner haut tête','attaque haut tête','Gauche · Haut tête','ADV gauche'],
     ['ADVERSAIRES','adv gauche winner fond','fond','ADV G · Fond','ADV gauche'],
     ['ADVERSAIRES','adv droite winner filet','filet','ADV D · Filet','ADV droite'],
-    ['ADVERSAIRES','adv droite winner haut tête','attaque haut tête','ADV D · Haut tête','ADV droite'],
+    ['ADVERSAIRES','adv droite winner haut tête','attaque haut tête','Droite · Haut tête','ADV droite'],
     ['ADVERSAIRES','adv droite winner fond','fond','ADV D · Fond','ADV droite']
   ];
   const groupedActions=(result==='GAGNE'?optionsWon:optionsLost).reduce((acc,item)=>{const group=item[4]||'Actions';(acc[group]||(acc[group]=[])).push(item);return acc;},{});
@@ -6872,7 +6877,7 @@ function matchRefineOptions(point){
   const won=point?.result==='GAGNE';
   const has=(rx)=>rx.test(text);
   if(won&&has(/lob trop court|lob court|lob adverse court|mauvais lob/)) return ['lob court ADV G','lob court ADV D','lob court au centre','ADV G sous pression','ADV D sous pression','balle facile à finir'];
-  if(!won&&has(/adv gauche winner haut|adv droite winner haut|winner haut|haut tête/)) return ['bandeja ADV','víbora ADV','smash ADV','par 3 ADV','par 4 ADV','mauvais lob HWBT'];
+  if(!won&&has(/adv gauche winner haut|adv droite winner haut|winner haut|haut tête/)) return ['bandeja','víbora','smash','par 3','par 4','mauvais lob HWBT'];
   if(!won&&has(/adv gauche winner fond|adv droite winner fond|winner fond/)) return ['coup droit ADV','revers ADV','bajada ADV','chiquita ADV','balle longue ADV','vitre ADV'];
   if(/service/.test(text)) return point.result==='GAGNE'
     ?['service vitre','service corps','service T','point facile après service']
@@ -6888,7 +6893,7 @@ function matchRefineOptions(point){
     :['volée coup droit','volée revers','centre ouvert','volée basse ratée','trop de risque','replacement lent'];
   if(/haut|vibora|bandeja|smash|attaque|par 3|par 4/.test(text)) return point.result==='GAGNE'
     ?['direction ADV G','direction ADV D','direction milieu','par 3','par 4']
-    :['mauvais choix haut tête','lob adverse trop bon','contact tardif','trop de risque','balle dans le filet','balle longue'];
+    :['bandeja','víbora','smash','par 3','par 4','mauvais lob HWBT'];
   if(/lob|défense|defense|vitre/.test(text)) return won
     ?['lob sur ADV G','lob sur ADV D','lob au centre','défense vitre propre','sortie de défense','chiquita de relance']
     :['lob trop court','lob trop long','vitre mal gérée','défense trop haute','balle de survie','ADV met pression'];
