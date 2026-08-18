@@ -6670,9 +6670,8 @@ function matchActionChoiceHtml(m,result){
     ['COLLECTIF','construction duo +1','construction','Duo · Construction','Duo HWBT'],
     ['COLLECTIF','transition filet +1','transition','Duo · Transition','Duo HWBT'],
     ['COLLECTIF','zone libre trouvée +1','placement','Duo · Zone libre','Duo HWBT'],
-    ['ADVERSAIRES','faute adv gauche provoquée','pression','ADV G · Faute provoquée','Faute adverse'],
-    ['ADVERSAIRES','faute adv droite provoquée','pression','ADV D · Faute provoquée','Faute adverse'],
-    ['ADVERSAIRES','faute adverse provoquée','pression','ADV · Faute non précisée','Faute adverse']
+    ['ADVERSAIRES','faute adv gauche','faute adverse',`ADV G · Faute`,'Faute adverse'],
+    ['ADVERSAIRES','faute adv droite','faute adverse',`ADV D · Faute`,'Faute adverse']
   ];
   const optionsLost=[
     ...serviceLostOptions,
@@ -6742,8 +6741,8 @@ function matchQuickQualifyOptions(m,last){
       btn('Duo · choix juste','COLLECTIF','décision juste sous pression','décision',true),
       btn(`${p1} · calme`,'JOUEUR_1','point important maîtrisé','mental',true),
       btn(`${p2} · calme`,'JOUEUR_2','point important maîtrisé','mental',true),
-      btn('ADV G · forcé','ADVERSAIRES','faute adv gauche provoquée','pression',true),
-      btn('ADV D · forcé','ADVERSAIRES','faute adv droite provoquée','pression',true),
+      btn('ADV G · faute','ADVERSAIRES','faute adv gauche','faute adverse',false),
+      btn('ADV D · faute','ADVERSAIRES','faute adv droite','faute adverse',false),
       btn('ADV · cadeau','ADVERSAIRES','faute adverse gratuite','pression',false)
     ]:[
       btn(`${p1} · choix vite`,'JOUEUR_1','mauvais choix sous pression','décision',false),
@@ -6760,8 +6759,8 @@ function matchQuickQualifyOptions(m,last){
       btn(`${p1} · filet`,'JOUEUR_1','filet +1','filet',true),
       btn(`${p2} · filet`,'JOUEUR_2','filet +1','filet',true),
       btn('Duo · patience','COLLECTIF','construction duo +1','construction',true),
-      btn('ADV G · forcé','ADVERSAIRES','faute adv gauche provoquée','pression',true),
-      btn('ADV D · forcé','ADVERSAIRES','faute adv droite provoquée','pression',true)
+      btn('ADV G · faute','ADVERSAIRES','faute adv gauche','faute adverse',false),
+      btn('ADV D · faute','ADVERSAIRES','faute adv droite','faute adverse',false)
     ];
   }
   if(won){
@@ -6897,6 +6896,7 @@ function matchRefineOptions(point){
   if(/lob|défense|defense|vitre/.test(text)) return won
     ?['lob sur ADV G','lob sur ADV D','lob au centre','défense vitre propre','sortie de défense','chiquita de relance']
     :['lob trop court','lob trop long','vitre mal gérée','défense trop haute','balle de survie','ADV met pression'];
+  if(won&&/faute adverse|faute adv/.test(text)) return ['fond','filet / volée','haut tête','retour','lob / défense','choix tactique'];
   if(/communication|placement|transition|zone/.test(text)) return won
     ?['centre bien fermé','zone libre trouvée','montée ensemble','partenaire libéré','bon choix duo','pression collective']
     :['centre non annoncé','zone libre laissée','montée décalée','replacement lent','mauvais choix duo','partenaire isolé'];
@@ -7169,7 +7169,7 @@ function matchPadelDashboardHtml(a){
       <div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:14px">
         <div class="card-title">DUO / ADVERSAIRE</div>
         ${matchMiniBar('Construction duo',pair.built||0,Math.max(1,ps.wonKnown||won),'var(--bronze)','points gagnés ensemble')}
-        ${matchMiniBar('Fautes provoquées',pair.forcedErrors||0,Math.max(1,ps.wonKnown||won),'var(--vert)','pression qui fait rater ADV')}
+        ${matchMiniBar('Fautes ADV',ps.points_offerts||0,Math.max(1,ps.wonKnown||won),'var(--vert)','points donnés par l’adversaire')}
         ${matchMiniBar('Winners ADV',pair.sufferedWinners||0,Math.max(1,ps.lostKnown||lost),'#e74c3c','points réellement subis')}
         <div class="muted-help" style="margin-top:8px">${esc(pressureText)}</div>
       </div>
@@ -7483,7 +7483,7 @@ function matchCoachHtml(a){
     <div class="card-title">LECTURE DE LA PAIRE</div>
     <div class="g4">
       ${matchMetricCard('Construction duo',`${pair.built||0}`,`${pair.constructionRate||0}% des points gagnés connus`)}
-      ${matchMetricCard('Fautes provoquées',`${pair.forcedErrors||0}`,`${pair.pressureRate||0}% des points gagnés connus`)}
+      ${matchMetricCard('Fautes ADV',`${ps.points_offerts||0}`,`${pctX(ps.points_offerts||0,ps.wonKnown)} des points gagnés connus`)}
       ${matchMetricCard('Erreurs duo',`${pair.pairErrors||0}`,'placement, communication, zone libre')}
       ${matchMetricCard('Winners subis',`${pair.sufferedWinners||0}`,`${pair.sufferedRate||0}% des points perdus connus`)}
     </div>
