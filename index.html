@@ -2765,9 +2765,27 @@ function prepTextArea(sessionId,idx,key,label,value,rows=3){
     <textarea class="form-input" id="${id}" rows="${rows}" oninput="updateSessionBlock(${sessionId},${idx},'prep.${key}',this.value)">${esc(value||'')}</textarea>
   </div>`;
 }
+function exerciseDictationPanelHtml(sessionId,idx,isCooling=false){
+  if(isCooling) return '';
+  const textareaId=`dict_ex_${sessionId}_${idx}`;
+  return `<div style="border:1px solid var(--bronze-dim2);background:linear-gradient(135deg,var(--bg4),var(--bg2));border-radius:8px;padding:12px;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:8px">
+      <div>
+        <div style="font-size:10px;letter-spacing:1.8px;color:var(--bronze);font-weight:800">DICTÉE EXERCICE</div>
+        <div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-top:4px">Explique ton exercice naturellement: joueurs, placement, balles, règles, objectif, score, points coach. L’app complète la fiche et propose un schéma.</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="startExerciseDictation(${sessionId},${idx})">DICTER</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="applyDictatedExercise(${sessionId},${idx})">COMPLÉTER FICHE + SCHÉMA</button>
+      </div>
+    </div>
+    <textarea class="form-input" id="${textareaId}" rows="3" placeholder="Ex: 4 joueurs, deux au fond, deux au filet. Le coach lance depuis le panier. Objectif: apprendre à lober avant la vitre, faire reculer les adversaires puis monter. 1 point si le lob passe au-dessus du joueur au filet..."></textarea>
+  </div>`;
+}
 function sessionPrepEditorHtml(s,idx,b,isCooling){
   const prep=ensureBlockPrep(b,isCooling);
   return `<div>
+    ${exerciseDictationPanelHtml(s.id,idx,isCooling)}
     ${prepTextArea(s.id,idx,'objective','OBJECTIF',prep.objective,3)}
     <div class="g2">
       <div style="border:1px solid var(--border);background:var(--bg2);border-radius:8px;padding:12px">
@@ -3038,19 +3056,7 @@ function exerciseDiagramFromText(id){
   const ex=(STATE.customExercises||[]).find(e=>e.id===id);
   if(!ex)return;
   const text=[document.getElementById('ex_flow')?.value,document.getElementById('ex_setup')?.value,ex.flow,ex.setup].join(' ').toLowerCase();
-  const items=[
-    {type:'coach',label:'CO',color:'#ffffff',x:50,y:103},
-    {type:'basket',label:'PAN',color:'#a67c52',x:58,y:106},
-    {type:'feeder',label:'L',color:'#f39c12',x:42,y:106},
-    {type:'player',label:'J1',color:'#c0392b',x:28,y:156},
-    {type:'player',label:'J2',color:'#2980b9',x:72,y:156}
-  ];
-  if(/cible|zone|viser|objectif|pied|vitre|long/.test(text))items.push({type:'target',label:'C',color:'#ffffff',x:72,y:44},{type:'zone',label:'ZONE',color:'#27ae60',x:62,y:34,w:22,h:18});
-  if(/lancer|panier|coach|envoi|envoy/.test(text))items.push({type:'feed',label:'Lancer',color:'#f39c12',x:42,y:106,x2:28,y2:156});
-  if(/lob/.test(text))items.push({type:'lob',label:'Lob courbe',color:'#f4d35e',x:28,y:156,x2:72,y2:44});
-  else if(/balle|trajectoire|volée|service|retour|frappe/.test(text))items.push({type:'shot',label:'Balle droite',color:'#f4d35e',x:28,y:156,x2:72,y2:44});
-  if(/monte|replacement|déplacement|course|suivre|avancer|revenir/.test(text))items.push({type:'run',label:'Course',color:'#ffffff',x:28,y:156,x2:45,y2:128});
-  ex.diagramItems=items;
+  ex.diagramItems=generateDiagramItemsFromExerciseText(text);
   saveState();
   refreshExerciseDiagram(id);
   showNotif('Schéma généré depuis le texte');
@@ -9419,6 +9425,172 @@ function rewritePlainExercise(sessionId,idx){
   updateSessionBlock(sessionId,idx,'exercise',next);
   showNotif('Consigne corrigée et reformulée');
 }
+function sentenceParts(text){
+  return cleanWritingText(text)
+    .split(/(?:\.|;|\n| puis | ensuite | après | et après |, puis |\. puis )/i)
+    .map(x=>x.replace(/^[-•]\s*/,'').trim())
+    .filter(x=>x.length>2);
+}
+function bulletsFromParts(parts,fallback=[],limit=4){
+  const src=(parts&&parts.length?parts:fallback).filter(Boolean).slice(0,limit);
+  return src.map(x=>`- ${String(x).replace(/[. ]+$/,'')}.`).join('\n');
+}
+function extractAfterLabel(text,labels){
+  const source=String(text||'');
+  for(const label of labels){
+    const re=new RegExp(`${label}\\s*[:\\-]\\s*([^\\.\\n]+)`,'i');
+    const m=source.match(re);
+    if(m&&m[1]) return cleanWritingText(m[1]);
+  }
+  return '';
+}
+function guessExerciseTitle(text,stepName='Exercice'){
+  const raw=cleanWritingText(text);
+  const explicit=extractAfterLabel(raw,['nom','titre','exercice']);
+  if(explicit) return explicit.slice(0,58);
+  if(/lob/.test(raw.toLowerCase())) return `${stepName} · lob avant vitre`;
+  if(/vol[ée]e|filet/.test(raw.toLowerCase())) return `${stepName} · construire au filet`;
+  if(/service/.test(raw.toLowerCase())) return `${stepName} · service + première balle`;
+  if(/retour/.test(raw.toLowerCase())) return `${stepName} · retour sous contrainte`;
+  return raw.split(/[.;]/)[0].trim().slice(0,58)||`${stepName} · exercice terrain`;
+}
+function inferPrepFromDictation(text,ctx={}){
+  const raw=cleanWritingText(text);
+  const low=raw.toLowerCase();
+  const parts=sentenceParts(raw);
+  const theme=ctx.theme||'le thème du jour';
+  const objectiveLabel=extractAfterLabel(raw,['objectif','but','intention']);
+  const setupLabel=extractAfterLabel(raw,['organisation','mise en place','placement','format']);
+  const ruleLabel=extractAfterLabel(raw,['score','comptage','règle','regle']);
+  const coachLabel=extractAfterLabel(raw,['attention','consigne coach','coach']);
+  const players=/4 joueurs|quatre joueurs|2v2|2 vs 2/.test(low)?'4 joueurs en situation de jeu.':(/2 joueurs|deux joueurs|1v1|1 vs 1/.test(low)?'2 joueurs en opposition ou en rotation.':'1 à 4 joueurs selon le groupe.');
+  const material=[];
+  if(/panier|lancer|coach lance|envoi/.test(low)) material.push('panier de balles');
+  if(/c[oô]ne|plot|zone|cible/.test(low)) material.push('cônes ou zones cibles');
+  if(/lichette|ligne|rubalise|cable|câble/.test(low)) material.push('lichettes ou lignes');
+  const objectiveFallback=[
+    objectiveLabel||`Faire comprendre ${theme} par une situation claire.`,
+    /lob/.test(low)?'Apprendre à utiliser le lob pour gagner du temps ou faire reculer.':'Relier le choix tactique au geste technique.',
+    /filet|vol[ée]e/.test(low)?'Construire l’avantage avant de chercher le point gagnant.':'Donner un repère simple à répéter en match.'
+  ];
+  const setupFallback=[
+    players,
+    material.length?`Matériel: raquettes, balles, ${material.join(', ')}.`:'Matériel: raquettes et balles, ajouter des zones si besoin.',
+    /fond/.test(low)?'Placer au moins un joueur au fond pour démarrer la situation.':'Placer les joueurs rapidement pour éviter l’attente.',
+    /filet|vol[ée]e/.test(low)?'Prévoir une présence au filet pour créer la contrainte.':'Délimiter la zone de jeu avant de lancer.'
+  ];
+  const flowFallback=parts.length?parts:[
+    'Lancer le jeu avec une consigne courte.',
+    'Observer quelques points avant de corriger.',
+    'Faire un arrêt rapide avec une question.',
+    'Relancer avec un bonus ou une difficulté.'
+  ];
+  const ruleFallback=[
+    ruleLabel||(/point|bonus|score/.test(low)?'Garder le score annoncé dans la consigne dictée.':'1 point bonus quand le bon choix apparaît dans le jeu.'),
+    /zone|cible/.test(low)?'Le point est validé si la balle atteint la zone demandée.':'Le point récompense l’intention juste, pas seulement le point gagné.',
+    'Adapter en R-1 ou R+1 selon la réussite.'
+  ];
+  const coachFallback=[
+    coachLabel||'Observer avant de corriger.',
+    /placement|position/.test(low)?'Regarder le placement avant et après la frappe.':'Corriger un seul repère à la fois.',
+    /partenaire|duo|communication/.test(low)?'Faire parler les partenaires avant la frappe importante.':'Valoriser une réussite précise avant de guider.'
+  ];
+  const questionFallback=[
+    /lob/.test(low)?'Pourquoi le lob te donne-t-il du temps ?':'Qu’est-ce qui t’a aidé à gagner le point ?',
+    /filet|vol[ée]e/.test(low)?'À quel moment peux-tu monter au filet ?':'Quel choix était le plus simple ?',
+    /placement|position/.test(low)?'Où devais-tu te placer avant la frappe ?':'Comment peux-tu refaire ce choix en match ?'
+  ];
+  const benefitsFallback=[
+    /lob/.test(low)?'Le joueur apprend à respirer et à reprendre la position.':'Le joueur comprend mieux la situation avant le geste.',
+    /filet|vol[ée]e/.test(low)?'Le duo apprend à construire l’attaque ensemble.':'Le repère devient plus facile à refaire en match.',
+    'La séance donne une trace claire pour la prochaine progression.'
+  ];
+  return {
+    objective:bulletsFromParts(objectiveLabel?[objectiveLabel]:objectiveFallback,objectiveFallback,4),
+    setup:bulletsFromParts(setupLabel?[setupLabel]:setupFallback,setupFallback,4),
+    flow:bulletsFromParts(flowFallback,flowFallback,6),
+    rule:bulletsFromParts(ruleLabel?[ruleLabel,...ruleFallback.slice(1)]:ruleFallback,ruleFallback,4),
+    coach:bulletsFromParts(coachFallback,coachFallback,4),
+    questions:bulletsFromParts(questionFallback,questionFallback,4),
+    benefits:bulletsFromParts(benefitsFallback,benefitsFallback,4)
+  };
+}
+function generateDiagramItemsFromExerciseText(text){
+  const low=String(text||'').toLowerCase();
+  const four=/4 joueurs|quatre joueurs|2v2|2 vs 2|double|duo/.test(low);
+  const atNet=/filet|vol[ée]e|attaqu/.test(low);
+  const fromBack=/fond|vitre|défense|defense|lob|bajada/.test(low);
+  const items=[
+    {type:'coach',label:'CO',color:'#ffffff',x:50,y:103},
+    {type:'basket',label:'PAN',color:'#a67c52',x:58,y:106}
+  ];
+  if(/lancer|panier|coach lance|envoi|envoy/.test(low)) items.push({type:'feeder',label:'L',color:'#f39c12',x:42,y:106});
+  if(four){
+    items.push(
+      {type:'player',label:'J1',color:'#c0392b',x:28,y:158},
+      {type:'player',label:'J2',color:'#2980b9',x:72,y:158},
+      {type:'player',label:'J3',color:'#27ae60',x:28,y:42},
+      {type:'player',label:'J4',color:'#d4a017',x:72,y:42}
+    );
+  }else{
+    items.push(
+      {type:'player',label:'J1',color:'#c0392b',x:32,y:158},
+      {type:'player',label:'J2',color:'#2980b9',x:68,y:42}
+    );
+  }
+  if(atNet&&!four) items.push({type:'player',label:'J2',color:'#2980b9',x:68,y:82});
+  if(/cible|zone|viser|objectif|pied|long|couloir/.test(low)){
+    items.push({type:'target',label:'C',color:'#ffffff',x:72,y:44},{type:'zone',label:'ZONE',color:'#27ae60',x:60,y:34,w:25,h:18});
+  }
+  if(/cone|cône|plot/.test(low)){
+    items.push({type:'cone',label:'△',color:'#ff7f50',x:35,y:124},{type:'cone',label:'△',color:'#ff7f50',x:65,y:124});
+  }
+  if(/lob/.test(low)) items.push({type:'lob',label:'Lob courbe',color:'#f4d35e',x:30,y:158,x2:70,y2:42});
+  else if(/balle|trajectoire|vol[ée]e|service|retour|frappe|chiquita|bajada/.test(low)) items.push({type:'shot',label:'Balle droite',color:'#f4d35e',x:30,y:158,x2:70,y2:42});
+  if(/lancer|panier|coach lance|envoi|envoy/.test(low)) items.push({type:'feed',label:'Lancer',color:'#f39c12',x:42,y:106,x2:30,y2:158});
+  if(/monte|avancer|filet|replacement|déplacement|course|suivre|revenir/.test(low)){
+    items.push({type:'run',label:'Course',color:'#ffffff',x:30,y:158,x2:42,y2:122});
+    if(four) items.push({type:'run',label:'Course',color:'#ffffff',x:72,y:158,x2:62,y2:122});
+  }
+  if(fromBack&&/vitre/.test(low)) items.push({type:'zone',label:'VITRE',color:'#d4a017',x:10,y:170,w:80,h:16});
+  return items;
+}
+function startExerciseDictation(sessionId,idx){
+  const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const el=document.getElementById(`dict_ex_${sessionId}_${idx}`);
+  if(!el){showNotif('Zone de dictée introuvable');return;}
+  if(!SpeechRecognition){showNotif('Dictée non disponible ici: utilise le micro du clavier et colle le texte.');el.focus();return;}
+  const rec=new SpeechRecognition();
+  rec.lang='fr-BE';
+  rec.continuous=false;
+  rec.interimResults=false;
+  rec.onresult=e=>{
+    const text=[...e.results].map(r=>r[0]?.transcript||'').join(' ').trim();
+    el.value=[el.value,text].filter(Boolean).join(' ').trim();
+    showNotif('Dictée ajoutée');
+  };
+  rec.onerror=()=>{showNotif('Dictée interrompue: tu peux utiliser le micro du clavier.');};
+  rec.start();
+  showNotif('Je t’écoute: dicte ton exercice');
+}
+function applyDictatedExercise(sessionId,idx){
+  const s=STATE.sessions.find(s=>s.id===sessionId);
+  const b=ensureSessionBlock(s,idx);
+  const el=document.getElementById(`dict_ex_${sessionId}_${idx}`);
+  const raw=String(el?.value||'').trim();
+  if(!s||!b) return;
+  if(!raw){showNotif('Dicte ou écris d’abord ton exercice');return;}
+  const step=sessionStructure(s)[idx]||{};
+  const theme=s.aftMeta?.theme||sessionThemeLabel(s);
+  const prep=inferPrepFromDictation(raw,{step,theme});
+  b.prep=prep;
+  b.exercise=prepToExerciseText(prep);
+  b.exerciseName=guessExerciseTitle(raw,step.name||b.sessionPart||'Exercice');
+  b.diagramItems=generateDiagramItemsFromExerciseText(raw);
+  saveState();
+  render();
+  showNotif('Fiche complétée et schéma proposé');
+}
 function diagramCourtClick(evt,sessionId,blockIdx){
   const s=STATE.sessions.find(s=>s.id===sessionId); const b=ensureSessionBlock(s,blockIdx); if(!b) return;
   const svg=evt.currentTarget, r=svg.getBoundingClientRect();
@@ -9481,20 +9653,7 @@ function diagramToText(sessionId,blockIdx){
 function diagramFromText(sessionId,blockIdx){
   const s=STATE.sessions.find(s=>s.id===sessionId); const b=ensureSessionBlock(s,blockIdx); if(!b)return;
   const text=String(b.exercise||'').toLowerCase();
-  const items=[
-    {type:'coach',label:'CO',color:'#ffffff',x:50,y:103},
-    {type:'basket',label:'PAN',color:'#a67c52',x:58,y:106},
-    {type:'feeder',label:'L',color:'#f39c12',x:42,y:106},
-    {type:'player',label:'J1',color:'#c0392b',x:28,y:156},
-    {type:'player',label:'J2',color:'#2980b9',x:72,y:156}
-  ];
-  if(/cible|zone|viser|objectif|pied|vitre|long/.test(text))items.push({type:'target',label:'C',color:'#ffffff',x:72,y:44},{type:'zone',label:'ZONE',color:'#27ae60',x:62,y:34,w:22,h:18});
-  if(/lancer|panier|coach|envoi|envoy/.test(text))items.push({type:'feed',label:'Lancer',color:'#f39c12',x:42,y:106,x2:28,y2:156});
-  if(/lob/.test(text))items.push({type:'lob',label:'Lob courbe',color:'#f4d35e',x:28,y:156,x2:72,y2:44});
-  else if(/balle|trajectoire|volée|service|retour|frappe/.test(text))items.push({type:'shot',label:'Balle droite',color:'#f4d35e',x:28,y:156,x2:72,y2:44});
-  if(/monte|replacement|déplacement|course|suivre|avancer|revenir/.test(text))items.push({type:'run',label:'Course',color:'#ffffff',x:28,y:156,x2:45,y2:128});
-  if(/cone|cône|plot/.test(text))items.push({type:'cone',label:'△',color:'#ff7f50',x:35,y:126},{type:'cone',label:'△',color:'#ff7f50',x:65,y:126});
-  b.diagramItems=items;
+  b.diagramItems=generateDiagramItemsFromExerciseText(text);
   saveState(); render(); showNotif('Schéma généré depuis le texte');
 }
 function copyDiagramFromBlock(sessionId,fromIdx,toIdx){
