@@ -588,7 +588,7 @@ let STATE = {
     invoiceSeq: 1,
     settings: {
       companyName: 'HWBT Academy', ownerName: '', address: '', postalCode: '', city: '',
-      enterpriseNumber: '', iban: '', email: '', phone: '', legalNote: ''
+      enterpriseNumber: '', iban: '', email: '', phone: '', legalNote: '', venueName: "L'Argayon"
     },
     defaults: {courtCost:0, lessonCost60:0, lessonCost90:0}
   }
@@ -630,6 +630,7 @@ function applySavedState(saved){
   if(!STATE.finance||typeof STATE.finance!=='object') STATE.finance={payments:[],invoiceSeq:1,settings:{},defaults:{}};
   if(!Array.isArray(STATE.finance.payments)) STATE.finance.payments=[];
   if(!STATE.finance.settings||typeof STATE.finance.settings!=='object') STATE.finance.settings={};
+  if(!STATE.finance.settings.venueName) STATE.finance.settings.venueName="L'Argayon";
   if(!STATE.finance.defaults||typeof STATE.finance.defaults!=='object') STATE.finance.defaults={courtCost:0,lessonCost60:0,lessonCost90:0};
   STATE.finance.invoiceSeq=Math.max(1,Number(STATE.finance.invoiceSeq)||1);
   return true;
@@ -3508,6 +3509,21 @@ function hoursLabel(value){
 function paymentTotal(payment){
   return amountNumber(payment.courtCost)+amountNumber(payment.lessonCost);
 }
+function paymentCollected(payment){
+  return Math.min(paymentTotal(payment),amountNumber(payment.paidAmount));
+}
+function paymentCourtCollected(payment){
+  return Math.min(amountNumber(payment.courtCost),paymentCollected(payment));
+}
+function paymentCourtPaid(payment){
+  return Math.min(amountNumber(payment.courtCost),amountNumber(payment.courtPaidAmount));
+}
+function paymentCourtReserved(payment){
+  return Math.max(0,paymentCourtCollected(payment)-paymentCourtPaid(payment));
+}
+function paymentCoachCollected(payment){
+  return Math.min(amountNumber(payment.lessonCost),Math.max(0,paymentCollected(payment)-amountNumber(payment.courtCost)));
+}
 function paymentStatus(payment){
   const total=paymentTotal(payment);
   const paid=amountNumber(payment.paidAmount);
@@ -3559,22 +3575,25 @@ function pagePayments(){
   const records=[...finance.payments].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||Number(b.id)-Number(a.id));
   const billed=records.reduce((sum,p)=>sum+paymentTotal(p),0);
   const paid=records.reduce((sum,p)=>sum+Math.min(paymentTotal(p),amountNumber(p.paidAmount)),0);
-  const court=records.reduce((sum,p)=>sum+amountNumber(p.courtCost),0);
-  const lessons=records.reduce((sum,p)=>sum+amountNumber(p.lessonCost),0);
+  const courtReserved=records.reduce((sum,p)=>sum+paymentCourtReserved(p),0);
+  const courtPaidVenue=records.reduce((sum,p)=>sum+paymentCourtPaid(p),0);
+  const courtUncollected=records.reduce((sum,p)=>sum+Math.max(0,amountNumber(p.courtCost)-paymentCourtCollected(p)),0);
+  const coachAvailable=records.reduce((sum,p)=>sum+paymentCoachCollected(p),0);
   const hours=records.reduce((sum,p)=>sum+paymentHours(p),0);
   const missing=financeCompleteness();
+  const venue=finance.settings.venueName||"L'Argayon";
   return `<div class="content">
     ${quoteBand()}
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px">
-      <div><div style="font-size:28px;font-weight:900;letter-spacing:1px">PAIEMENTS & FACTURES</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-top:6px">Une ligne par client et par cours · terrain + cours · date et heures réellement données.</div></div>
+      <div><div style="font-size:28px;font-weight:900;letter-spacing:1px">PAIEMENTS & FACTURES</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-top:6px">L’argent du terrain est bloqué en priorité pour ${esc(venue)}. Seul le reste appartient au coach.</div></div>
       <button class="btn btn-primary" onclick="openModal('newPayment',{})">+ AJOUTER UN COURS / PAIEMENT</button>
     </div>
     ${missing.length?`<div class="card" style="border-color:var(--jaune);background:var(--jaune-dim)"><div style="font-size:11px;color:var(--jaune);font-weight:700">FACTURES À COMPLÉTER</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);margin-top:6px">Il manque: ${esc(missing.join(', '))}. Complète les réglages en bas de cette page avant d’envoyer une facture.</div></div>`:''}
     <div class="g4" style="margin-bottom:18px">
-      <div class="stat-card"><div class="stat-label">TOTAL FACTURÉ</div><div class="stat-value">${money(billed)}</div><div class="stat-sub">${records.length} ligne${records.length===1?'':'s'}</div></div>
-      <div class="stat-card"><div class="stat-label">ENCAISSÉ</div><div class="stat-value" style="color:var(--vert)">${money(paid)}</div><div class="stat-sub">Reste ${money(Math.max(0,billed-paid))}</div></div>
-      <div class="stat-card"><div class="stat-label">TERRAIN / COURS</div><div class="stat-value" style="font-size:20px">${money(court)} + ${money(lessons)}</div><div class="stat-sub">Calcul séparé</div></div>
-      <div class="stat-card"><div class="stat-label">HEURES DONNÉES</div><div class="stat-value">${hoursLabel(hours)}</div><div class="stat-sub">Selon début et fin</div></div>
+      <div class="stat-card" style="border-color:var(--jaune)"><div class="stat-label">ARGENT BLOQUÉ TERRAIN</div><div class="stat-value" style="color:var(--jaune)">${money(courtReserved)}</div><div class="stat-sub">À verser à ${esc(venue)}</div></div>
+      <div class="stat-card"><div class="stat-label">DÉJÀ VERSÉ À ${esc(venue).toUpperCase()}</div><div class="stat-value">${money(courtPaidVenue)}</div><div class="stat-sub">Terrain non encaissé: ${money(courtUncollected)}</div></div>
+      <div class="stat-card" style="border-color:var(--vert)"><div class="stat-label">ARGENT DU COACH</div><div class="stat-value" style="color:var(--vert)">${money(coachAvailable)}</div><div class="stat-sub">Disponible après terrain</div></div>
+      <div class="stat-card"><div class="stat-label">TOTAL / HEURES</div><div class="stat-value" style="font-size:20px">${money(billed)} · ${hoursLabel(hours)}</div><div class="stat-sub">Encaissé ${money(paid)} · reste ${money(Math.max(0,billed-paid))}</div></div>
     </div>
     <div class="card">
       <div class="card-header"><div class="card-title" style="margin:0">COURS & ENCAISSEMENTS</div><div style="font-size:10px;color:var(--gray3)">${records.filter(p=>paymentStatus(p)!=='paid').length} à suivre</div></div>
@@ -3583,11 +3602,15 @@ function pagePayments(){
         const session=paymentSession(p);
         const total=paymentTotal(p);
         const balance=Math.max(0,total-amountNumber(p.paidAmount));
+        const reserved=paymentCourtReserved(p);
+        const coachMoney=paymentCoachCollected(p);
+        const courtPaid=paymentCourtPaid(p);
+        const courtCollected=paymentCourtCollected(p);
         return `<div style="display:grid;grid-template-columns:minmax(170px,1.35fr) minmax(155px,1fr) minmax(170px,1fr) auto;gap:14px;align-items:center;padding:14px 0;border-top:1px solid var(--border)">
           <div><div style="font-size:14px;font-weight:800">${esc(player?.name||p.billingSnapshot?.name||'Client supprimé')}</div><div style="font-size:9px;color:var(--gray3);letter-spacing:1px;margin-top:4px">${esc(formatShortDate(p.date)||p.date||'—')} · ${esc(p.startTime||'—')}${p.endTime?`–${esc(p.endTime)}`:''} · ${hoursLabel(paymentHours(p))}</div>${session?`<div style="font-size:9px;color:var(--bronze);margin-top:3px">Séance #${session.id} · ${esc(sessionTypeLabel(session.sessionType,session.sessionDuration))}</div>`:''}</div>
-          <div><div style="font-size:10px;color:var(--gray)">Terrain ${money(p.courtCost)}</div><div style="font-size:10px;color:var(--gray);margin-top:4px">Cours ${money(p.lessonCost)}</div><div style="font-size:16px;font-weight:900;margin-top:5px">${money(total)}</div></div>
-          <div>${paymentStatusBadge(p)}<div style="font-size:10px;color:var(--gray);margin-top:7px">Reçu ${money(p.paidAmount)}${balance?` · reste ${money(balance)}`:''}</div><div style="font-size:9px;color:var(--gray3);margin-top:4px">${esc(p.method||'Mode non défini')}${p.invoiceRequested?` · ${esc(p.invoiceNumber||'Facture')}`:' · sans facture'}</div></div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${paymentStatus(p)!=='paid'?`<button class="btn btn-success btn-sm" onclick="markPaymentPaid(${p.id})">ENCAISSÉ</button>`:''}${p.invoiceRequested?`<button class="btn btn-primary btn-sm" onclick="openInvoice(${p.id})">FACTURE</button>`:''}<button class="btn btn-ghost btn-sm" onclick="openModal('editPayment',${p.id})">MODIFIER</button><button class="btn btn-danger btn-sm" onclick="deletePayment(${p.id})">SUPPRIMER</button></div>
+          <div><div style="font-size:10px;color:var(--gray)">Terrain ${money(p.courtCost)}</div><div style="font-size:10px;color:var(--gray);margin-top:4px">Cours ${money(p.lessonCost)}</div><div style="font-size:16px;font-weight:900;margin-top:5px">${money(total)}</div><div style="font-size:9px;color:var(--jaune);margin-top:5px">Bloqué terrain ${money(reserved)}</div><div style="font-size:9px;color:var(--vert);margin-top:3px">Coach disponible ${money(coachMoney)}</div></div>
+          <div>${paymentStatusBadge(p)}<div style="font-size:10px;color:var(--gray);margin-top:7px">Reçu ${money(p.paidAmount)}${balance?` · reste ${money(balance)}`:''}</div><div style="font-size:9px;color:${!amountNumber(p.courtCost)?'var(--gray3)':courtPaid>=amountNumber(p.courtCost)?'var(--vert)':'var(--jaune)'};margin-top:4px">${!amountNumber(p.courtCost)?'Aucune part terrain':courtPaid?`${money(courtPaid)} versé à ${esc(venue)}`:`Terrain à payer à ${esc(venue)}`}</div><div style="font-size:9px;color:var(--gray3);margin-top:4px">${esc(p.method||'Mode non défini')}${p.invoiceRequested?` · ${esc(p.invoiceNumber||'Facture')}`:' · sans facture'}</div></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${paymentStatus(p)!=='paid'?`<button class="btn btn-success btn-sm" onclick="markPaymentPaid(${p.id})">ENCAISSÉ</button>`:''}${courtCollected>courtPaid?`<button class="btn btn-ghost btn-sm" style="border-color:var(--jaune);color:var(--jaune)" onclick="markCourtPaid(${p.id})">VERSÉ ${esc(venue).toUpperCase()}</button>`:''}${p.invoiceRequested?`<button class="btn btn-primary btn-sm" onclick="openInvoice(${p.id})">FACTURE</button>`:''}<button class="btn btn-ghost btn-sm" onclick="openModal('editPayment',${p.id})">MODIFIER</button><button class="btn btn-danger btn-sm" onclick="deletePayment(${p.id})">SUPPRIMER</button></div>
         </div>`;
       }).join(''):`<div style="padding:22px 0;color:var(--gray);font-size:12px;font-family:var(--font-body)">Aucun cours facturé pour le moment. Ajoute une ligne depuis cette page ou depuis une séance.</div>`}
     </div>
@@ -3603,6 +3626,7 @@ function paymentSettingsHtml(){
     <div class="form-group"><label class="form-label">ADRESSE</label><input class="form-input" id="fin_address" value="${esc(s.address||'')}"></div>
     <div class="g3"><div class="form-group"><label class="form-label">CODE POSTAL</label><input class="form-input" id="fin_postalCode" value="${esc(s.postalCode||'')}"></div><div class="form-group"><label class="form-label">VILLE</label><input class="form-input" id="fin_city" value="${esc(s.city||'')}"></div><div class="form-group"><label class="form-label">N° ENTREPRISE / TVA</label><input class="form-input" id="fin_enterpriseNumber" value="${esc(s.enterpriseNumber||'')}"></div></div>
     <div class="g3"><div class="form-group"><label class="form-label">IBAN</label><input class="form-input" id="fin_iban" value="${esc(s.iban||'')}"></div><div class="form-group"><label class="form-label">E-MAIL</label><input class="form-input" id="fin_email" value="${esc(s.email||'')}"></div><div class="form-group"><label class="form-label">TÉLÉPHONE</label><input class="form-input" id="fin_phone" value="${esc(s.phone||'')}"></div></div>
+    <div class="form-group"><label class="form-label">BÉNÉFICIAIRE DE LA PART TERRAIN</label><input class="form-input" id="fin_venueName" value="${esc(s.venueName||"L'Argayon")}" placeholder="Ex: L'Argayon"></div>
     <div class="form-group"><label class="form-label">MENTION LÉGALE / TVA</label><input class="form-input" id="fin_legalNote" value="${esc(s.legalNote||'')}" placeholder="Ex: régime de TVA applicable, conditions de paiement..."></div>
     <div class="divider"></div><div class="card-title">MONTANTS PAR DÉFAUT</div>
     <div class="g3"><div class="form-group"><label class="form-label">PART TERRAIN / CLIENT</label><input class="form-input" id="fin_courtCost" type="number" min="0" step="0.01" value="${esc(d.courtCost||0)}"></div><div class="form-group"><label class="form-label">COURS 1H</label><input class="form-input" id="fin_lessonCost60" type="number" min="0" step="0.01" value="${esc(d.lessonCost60||0)}"></div><div class="form-group"><label class="form-label">COURS 1H30</label><input class="form-input" id="fin_lessonCost90" type="number" min="0" step="0.01" value="${esc(d.lessonCost90||0)}"></div></div>
@@ -3614,7 +3638,7 @@ function savePaymentSettings(){
   const value=id=>document.getElementById(id)?.value.trim()||'';
   finance.settings={
     companyName:value('fin_companyName'),ownerName:value('fin_ownerName'),address:value('fin_address'),postalCode:value('fin_postalCode'),city:value('fin_city'),
-    enterpriseNumber:value('fin_enterpriseNumber'),iban:value('fin_iban'),email:value('fin_email'),phone:value('fin_phone'),legalNote:value('fin_legalNote')
+    enterpriseNumber:value('fin_enterpriseNumber'),iban:value('fin_iban'),email:value('fin_email'),phone:value('fin_phone'),legalNote:value('fin_legalNote'),venueName:value('fin_venueName')||"L'Argayon"
   };
   finance.defaults={courtCost:amountNumber(value('fin_courtCost')),lessonCost60:amountNumber(value('fin_lessonCost60')),lessonCost90:amountNumber(value('fin_lessonCost90'))};
   saveState();showNotif('Réglages de facturation enregistrés');render();
@@ -3632,6 +3656,7 @@ function paymentFormHtml(input=null){
   const courtCost=isEdit?amountNumber(input.courtCost):amountNumber(finance.defaults.courtCost);
   const lessonCost=isEdit?amountNumber(input.lessonCost):amountNumber(duration===90?finance.defaults.lessonCost90:finance.defaults.lessonCost60);
   const paidAmount=isEdit?amountNumber(input.paidAmount):0;
+  const courtPaidAmount=isEdit?amountNumber(input.courtPaidAmount):0;
   const selectedSessionId=Number(isEdit?input.sessionId:config.sessionId)||0;
   return `<div class="modal-title">${isEdit?'MODIFIER LE COURS / PAIEMENT':'AJOUTER UN COURS / PAIEMENT'}</div><button class="modal-close" onclick="closeModal()">×</button>
     <input type="hidden" id="pay_id" value="${isEdit?input.id:''}">
@@ -3639,8 +3664,8 @@ function paymentFormHtml(input=null){
     <div class="form-group"><label class="form-label">CLIENT</label><select class="form-select" id="pay_playerId">${STATE.players.map(p=>`<option value="${p.id}" ${playerId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>
     <div class="g3"><div class="form-group"><label class="form-label">DATE DU COURS</label><input class="form-input" id="pay_date" type="date" value="${esc(date)}"></div><div class="form-group"><label class="form-label">HEURE DÉBUT</label><input class="form-input" id="pay_startTime" type="time" value="${esc(startTime)}" oninput="updatePaymentCalculation()"></div><div class="form-group"><label class="form-label">HEURE FIN</label><input class="form-input" id="pay_endTime" type="time" value="${esc(endTime)}" oninput="updatePaymentCalculation()"></div></div>
     <div class="g2"><div class="form-group"><label class="form-label">PART TERRAIN (€)</label><input class="form-input" id="pay_courtCost" type="number" min="0" step="0.01" value="${courtCost}" oninput="updatePaymentCalculation()"></div><div class="form-group"><label class="form-label">COÛT DU COURS (€)</label><input class="form-input" id="pay_lessonCost" type="number" min="0" step="0.01" value="${lessonCost}" oninput="updatePaymentCalculation()"></div></div>
-    <div style="background:var(--bg4);border:1px solid var(--bronze-dim2);border-radius:8px;padding:14px;margin-bottom:14px;display:flex;justify-content:space-between;gap:14px;align-items:center"><div><div style="font-size:9px;color:var(--bronze);letter-spacing:1.5px">DURÉE DONNÉE</div><div id="pay_hours_preview" style="font-size:18px;font-weight:800;margin-top:4px">${hoursLabel(minutesBetweenTimes(startTime,endTime)/60)}</div></div><div style="text-align:right"><div style="font-size:9px;color:var(--bronze);letter-spacing:1.5px">TOTAL TERRAIN + COURS</div><div id="pay_total_preview" style="font-size:26px;font-weight:900;margin-top:4px">${money(courtCost+lessonCost)}</div></div></div>
-    <div class="g2"><div class="form-group"><label class="form-label">MONTANT DÉJÀ REÇU (€)</label><input class="form-input" id="pay_paidAmount" type="number" min="0" step="0.01" value="${paidAmount}"></div><div class="form-group"><label class="form-label">MODE DE PAIEMENT</label><select class="form-select" id="pay_method">${['','Cash','Virement','Payconiq','Carte','Autre'].map(m=>`<option value="${m}" ${(input?.method||'')===m?'selected':''}>${m||'— À définir —'}</option>`).join('')}</select></div></div>
+    <div style="background:var(--bg4);border:1px solid var(--bronze-dim2);border-radius:8px;padding:14px;margin-bottom:14px"><div style="display:flex;justify-content:space-between;gap:14px;align-items:center"><div><div style="font-size:9px;color:var(--bronze);letter-spacing:1.5px">DURÉE DONNÉE</div><div id="pay_hours_preview" style="font-size:18px;font-weight:800;margin-top:4px">${hoursLabel(minutesBetweenTimes(startTime,endTime)/60)}</div></div><div style="text-align:right"><div style="font-size:9px;color:var(--bronze);letter-spacing:1.5px">TOTAL TERRAIN + COURS</div><div id="pay_total_preview" style="font-size:26px;font-weight:900;margin-top:4px">${money(courtCost+lessonCost)}</div></div></div><div class="divider"></div><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:11px"><span style="color:var(--jaune)">Bloqué terrain: <b id="pay_court_reserved_preview">${money(Math.max(0,Math.min(paidAmount,courtCost)-Math.min(courtPaidAmount,courtCost)))}</b></span><span style="color:var(--vert)">Argent coach: <b id="pay_coach_preview">${money(Math.max(0,Math.min(paidAmount,courtCost+lessonCost)-courtCost))}</b></span></div><div style="font-size:9px;color:var(--gray3);margin-top:7px">Un paiement partiel est toujours réservé d’abord au terrain.</div></div>
+    <div class="g3"><div class="form-group"><label class="form-label">MONTANT DÉJÀ REÇU (€)</label><input class="form-input" id="pay_paidAmount" type="number" min="0" step="0.01" value="${paidAmount}" oninput="updatePaymentCalculation()"></div><div class="form-group"><label class="form-label">DÉJÀ VERSÉ À ${esc(finance.settings.venueName||"L'Argayon").toUpperCase()} (€)</label><input class="form-input" id="pay_courtPaidAmount" type="number" min="0" step="0.01" value="${courtPaidAmount}" oninput="updatePaymentCalculation()"></div><div class="form-group"><label class="form-label">MODE DE PAIEMENT</label><select class="form-select" id="pay_method">${['','Cash','Virement','Payconiq','Carte','Autre'].map(m=>`<option value="${m}" ${(input?.method||'')===m?'selected':''}>${m||'— À définir —'}</option>`).join('')}</select></div></div>
     <div class="form-group"><label class="session-player-choice"><input type="checkbox" id="pay_invoiceRequested" ${input?.invoiceRequested?'checked':''}><span><span class="session-player-name">LE CLIENT SOUHAITE UNE FACTURE</span><span class="session-player-meta">Un numéro de facture sera attribué et le document pourra être imprimé.</span></span></label></div>
     <div class="form-group"><label class="form-label">NOTE</label><textarea class="form-input" id="pay_notes" rows="3" placeholder="Communication, précision sur le cours, acompte...">${esc(input?.notes||'')}</textarea></div>
     <div class="form-actions">${isEdit?`<button class="btn btn-danger" onclick="deletePayment(${input.id})">SUPPRIMER</button>`:''}<button class="btn btn-ghost" onclick="closeModal()">ANNULER</button><button class="btn btn-primary" onclick="savePayment()">${isEdit?'ENREGISTRER':'AJOUTER'}</button></div>`;
@@ -3665,11 +3690,22 @@ function updatePaymentCalculation(){
   const start=document.getElementById('pay_startTime')?.value||'';
   const end=document.getElementById('pay_endTime')?.value||'';
   const hours=minutesBetweenTimes(start,end)/60;
-  const total=amountNumber(document.getElementById('pay_courtCost')?.value)+amountNumber(document.getElementById('pay_lessonCost')?.value);
+  const court=amountNumber(document.getElementById('pay_courtCost')?.value);
+  const lesson=amountNumber(document.getElementById('pay_lessonCost')?.value);
+  const total=court+lesson;
+  const collected=Math.min(total,amountNumber(document.getElementById('pay_paidAmount')?.value));
+  const courtCollected=Math.min(court,collected);
+  const courtPaid=Math.min(court,amountNumber(document.getElementById('pay_courtPaidAmount')?.value));
+  const courtReserved=Math.max(0,courtCollected-courtPaid);
+  const coachMoney=Math.min(lesson,Math.max(0,collected-court));
   const hoursBox=document.getElementById('pay_hours_preview');
   const totalBox=document.getElementById('pay_total_preview');
+  const reservedBox=document.getElementById('pay_court_reserved_preview');
+  const coachBox=document.getElementById('pay_coach_preview');
   if(hoursBox) hoursBox.textContent=hoursLabel(hours);
   if(totalBox) totalBox.textContent=money(total);
+  if(reservedBox) reservedBox.textContent=money(courtReserved);
+  if(coachBox) coachBox.textContent=money(coachMoney);
 }
 function savePayment(){
   const finance=financeState();
@@ -3684,15 +3720,21 @@ function savePayment(){
   if(!startTime||!endTime){showNotif('Indique l’heure de début et l’heure de fin');return;}
   if(startTime&&endTime&&!minutesBetweenTimes(startTime,endTime)){showNotif('Vérifie les heures de début et de fin');return;}
   const invoiceRequested=!!document.getElementById('pay_invoiceRequested')?.checked;
+  const courtCost=amountNumber(document.getElementById('pay_courtCost')?.value);
+  const lessonCost=amountNumber(document.getElementById('pay_lessonCost')?.value);
+  const paidAmount=amountNumber(document.getElementById('pay_paidAmount')?.value);
+  const courtCollected=Math.min(courtCost,Math.min(courtCost+lessonCost,paidAmount));
+  const courtPaidAmount=Math.min(courtCollected,amountNumber(document.getElementById('pay_courtPaidAmount')?.value));
   const record={
     ...(existing||{}),
     id:existing?.id||Math.max(0,...finance.payments.map(p=>Number(p.id)||0))+1,
     playerId,
     sessionId:Number(document.getElementById('pay_sessionId')?.value)||null,
     date,startTime,endTime,hours:minutesBetweenTimes(startTime,endTime)/60,
-    courtCost:amountNumber(document.getElementById('pay_courtCost')?.value),
-    lessonCost:amountNumber(document.getElementById('pay_lessonCost')?.value),
-    paidAmount:amountNumber(document.getElementById('pay_paidAmount')?.value),
+    courtCost,
+    lessonCost,
+    paidAmount,
+    courtPaidAmount,
     method:document.getElementById('pay_method')?.value||'',
     notes:document.getElementById('pay_notes')?.value.trim()||'',
     invoiceRequested,
@@ -3714,6 +3756,20 @@ function markPaymentPaid(id){
   payment.paidAmount=paymentTotal(payment);
   payment.paidAt=new Date().toISOString();
   saveState();showNotif('Paiement marqué comme encaissé');render();
+}
+function markCourtPaid(id){
+  const finance=financeState();
+  const payment=finance.payments.find(p=>p.id===id);
+  if(!payment) return;
+  const venue=finance.settings.venueName||"L'Argayon";
+  const collected=paymentCourtCollected(payment);
+  const alreadyPaid=paymentCourtPaid(payment);
+  const amount=Math.max(0,collected-alreadyPaid);
+  if(!amount){showNotif('Aucun montant terrain encaissé à verser');return;}
+  if(!confirm(`Confirmer que ${money(amount)} ont été versés à ${venue} pour le terrain ?`)) return;
+  payment.courtPaidAmount=collected;
+  payment.courtPaidAt=new Date().toISOString();
+  saveState();showNotif(`Terrain marqué comme payé à ${venue}`);render();
 }
 function deletePayment(id){
   const finance=financeState();
