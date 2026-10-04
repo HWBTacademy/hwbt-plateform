@@ -5014,7 +5014,7 @@ function pageSessionDetail(sessionId){
   const tab=UI.sessionTab||defaultSessionTab(s);
   const tabs=[['briefing','Briefing'],['preparation','Préparation'],['terrain','Terrain'],['evaluation','Évaluation'],['retours','Retours'],['resume','Résumé']];
   return `<div class="content">${quoteBand()}
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:null,sessionMode:null,sessionTab:null})">← RETOUR</button><div style="flex:1"><div style="font-size:22px;font-weight:800;letter-spacing:1px;line-height:1.05">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2);margin-top:4px">${esc(sessionDateLine(s))} · ${sessionTypeLabel(s.sessionType,s.sessionDuration)} · ${statusBadge(s.status)}</div></div>${s.status==='planned'?`<button class="btn btn-primary" onclick="markSessionReady(${s.id})">COURS PRÊT</button>`:''}<button class="btn btn-ghost" onclick="downloadSessionCalendar(${s.id})">AJOUTER À L'AGENDA</button><button class="btn btn-primary" onclick="printSessionPdf(${s.id})">PDF SÉANCE</button><button class="btn btn-ghost" onclick="openModal('newPayment',{sessionId:${s.id}})">€ PAIEMENT</button>${s.status==='planned'||s.status==='ready'||s.status==='open'?`<button class="btn btn-ghost" onclick="enterFieldMode(${s.id})">MODE TERRAIN</button>`:''}${s.status==='closed_coach'||s.status==='completed'?`<button class="btn btn-ghost" onclick="toggleSessionEdit(${s.id})">${s.editMode?'TERMINER MODIF':'MODIFIER'}</button>`:''}<button class="btn btn-danger" onclick="deleteSession(${s.id})">SUPPRIMER</button></div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:null,sessionMode:null,sessionTab:null})">← RETOUR</button><div style="flex:1"><div style="font-size:22px;font-weight:800;letter-spacing:1px;line-height:1.05">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2);margin-top:4px">${esc(sessionDateLine(s))} · ${sessionTypeLabel(s.sessionType,s.sessionDuration)} · ${statusBadge(s.status)}</div></div>${s.status==='planned'?`<button class="btn btn-primary" onclick="markSessionReady(${s.id})">COURS PRÊT</button>`:''}${STATE.role==='coach'?`<button class="btn btn-ghost" onclick="openModal('editSessionSchedule',${s.id})">MODIFIER DATE / HEURE</button>`:''}<button class="btn btn-ghost" onclick="downloadSessionCalendar(${s.id})">AJOUTER À L'AGENDA</button><button class="btn btn-primary" onclick="printSessionPdf(${s.id})">PDF SÉANCE</button><button class="btn btn-ghost" onclick="openModal('newPayment',{sessionId:${s.id}})">€ PAIEMENT</button>${s.status==='planned'||s.status==='ready'||s.status==='open'?`<button class="btn btn-ghost" onclick="enterFieldMode(${s.id})">MODE TERRAIN</button>`:''}${s.status==='closed_coach'||s.status==='completed'?`<button class="btn btn-ghost" onclick="toggleSessionEdit(${s.id})">${s.editMode?'TERMINER MODIF':'MODIFIER'}</button>`:''}<button class="btn btn-danger" onclick="deleteSession(${s.id})">SUPPRIMER</button></div>
     <div class="tabs" style="margin-bottom:18px;overflow:auto">${tabs.map(t=>sessionDetailTabButton(t[0],t[1],tab)).join('')}</div>
     ${sessionDetailContent(s,tab,group,main,pr)}
   </div>`;
@@ -9243,10 +9243,55 @@ function saveExerciseEdit(id){
   showNotif('Mini-fiche exercice mise à jour');
   render();
 }
+function editSessionScheduleModalHtml(sessionId){
+  const s=STATE.sessions.find(session=>session.id===sessionId);
+  if(!s) return `<div class="modal-title">SÉANCE INTROUVABLE</div><button class="modal-close" onclick="closeModal()">×</button>`;
+  return `<div class="modal-title">MODIFIER DATE / HEURE</div><button class="modal-close" onclick="closeModal()">×</button>
+    <div style="background:var(--bg4);border-left:3px solid var(--bronze);padding:10px 12px;border-radius:0 6px 6px 0;font-size:10px;color:var(--gray);font-family:var(--font-body);line-height:1.55;margin-bottom:14px">
+      <strong style="color:var(--offwhite)">${esc(sessionTitle(s))}</strong><br>
+      La nouvelle planification sera utilisée dans l’agenda, la fiche de séance, le PDF et les prochains fichiers calendrier. Un événement déjà importé dans un agenda externe devra être remplacé manuellement.
+    </div>
+    <div class="g3">
+      <div class="form-group"><label class="form-label">DATE</label><input class="form-input" id="m_edit_session_date" type="date" value="${esc(s.date||'')}"></div>
+      <div class="form-group"><label class="form-label">HEURE</label><input class="form-input" id="m_edit_session_time" type="time" value="${esc(s.time||'')}"></div>
+      <div class="form-group"><label class="form-label">LIEU</label><input class="form-input" id="m_edit_session_location" value="${esc(s.location||'')}" placeholder="Ex: L'Argayon"></div>
+    </div>
+    <div style="font-size:10px;color:var(--gray2);font-family:var(--font-body);line-height:1.5;margin-top:4px">Les paiements et factures déjà enregistrés restent inchangés.</div>
+    <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">ANNULER</button><button class="btn btn-primary" onclick="saveSessionSchedule(${s.id})">ENREGISTRER</button></div>`;
+}
+function saveSessionSchedule(sessionId){
+  if(STATE.role!=='coach') return;
+  const s=STATE.sessions.find(session=>session.id===sessionId);
+  if(!s) return;
+  const date=document.getElementById('m_edit_session_date')?.value||'';
+  const time=document.getElementById('m_edit_session_time')?.value||'';
+  const location=document.getElementById('m_edit_session_location')?.value?.trim()||'';
+  if(!date){showNotif('Choisis une date pour la séance');return;}
+  const previous={date:s.date||'',time:s.time||'',location:s.location||''};
+  const next={date,time,location};
+  if(previous.date===next.date&&previous.time===next.time&&previous.location===next.location){
+    closeModal();
+    showNotif('Aucune modification à enregistrer');
+    return;
+  }
+  if(!Array.isArray(s.scheduleHistory)) s.scheduleHistory=[];
+  s.scheduleHistory.push({changedAt:new Date().toISOString(),previous,next});
+  if(s.scheduleHistory.length>20) s.scheduleHistory=s.scheduleHistory.slice(-20);
+  s.date=date;
+  s.time=time;
+  s.location=location;
+  s.scheduleUpdatedAt=new Date().toISOString();
+  UI.agendaMonth=monthKeyFromDate(date);
+  saveState();
+  closeModal();
+  showNotif('Date, heure et lieu de la séance mis à jour');
+  render();
+}
 function renderModal(type,extra){
   if(type==='addPlayer') return playerFormHtml();
   if(type==='editPlayer'){const p=STATE.players.find(p=>p.id===extra);return p?playerFormHtml(p):`<div class="modal-title">JOUEUR INTROUVABLE</div><button class="modal-close" onclick="closeModal()">×</button>`}
   if(type==='newSession') return newSessionModalHtml(extra);
+  if(type==='editSessionSchedule') return editSessionScheduleModalHtml(extra);
   if(type==='newPayment') return paymentFormHtml(extra);
   if(type==='editPayment') return paymentFormHtml(STATE.finance?.payments?.find(p=>p.id===extra)||null);
   if(type==='newMatchAnalyst') return matchCreateModalHtml();
