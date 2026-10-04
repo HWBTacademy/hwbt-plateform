@@ -445,6 +445,7 @@ body{min-width:0}
     </div>
     <div class="nav-section">
       <div class="nav-label">BUSINESS</div>
+      <div class="nav-item" data-page="payments" onclick="setUI({page:'payments'})" style="display: flex;"><span class="nav-icon">€</span>PAIEMENTS</div>
       <div class="nav-item" data-page="shop" onclick="setUI({page:'shop'})" style="display: flex;"><span class="nav-icon">◫</span>SHOP</div>
       <div class="nav-item" data-page="contentStudio" onclick="setUI({page:'contentStudio',contentTab:'dashboard'})" style="display: flex;"><span class="nav-icon">▣</span>CONTENT STUDIO</div>
       <div class="nav-item" data-page="commandCenter" onclick="setUI({page:'commandCenter',commandTab:'brief'})" style="display: flex;"><span class="nav-icon">◆</span>COMMAND CENTER</div>
@@ -581,7 +582,16 @@ let STATE = {
   testResults: {},
   commandCenter: {briefs:[],chats:[],debriefs:[],contentIdeas:[],decisions:[],tasks:[]},
   contentStudio: {posts:[],ideas:[]},
-  performanceLab: {players:{},notes:[]}
+  performanceLab: {players:{},notes:[]},
+  finance: {
+    payments: [],
+    invoiceSeq: 1,
+    settings: {
+      companyName: 'HWBT Academy', ownerName: '', address: '', postalCode: '', city: '',
+      enterpriseNumber: '', iban: '', email: '', phone: '', legalNote: ''
+    },
+    defaults: {courtCost:0, lessonCost60:0, lessonCost90:0}
+  }
 };
 
 let UI = {page:'dashboard', subpage:'profil', pillarFilter:'T', selectedPlayerId:null, selectedSessionId:null, testState:null};
@@ -589,7 +599,7 @@ const STORAGE_KEY='hwbt_academy_v3_state';
 let REMOTE_SAVE_TIMER=null;
 let REMOTE_READY=false;
 function statePayload(){
-  return {players:STATE.players,sessions:STATE.sessions,matches:STATE.matches,customExercises:STATE.customExercises||[],testResults:STATE.testResults,commandCenter:STATE.commandCenter||{},contentStudio:STATE.contentStudio||{},performanceLab:STATE.performanceLab||{},updatedAt:new Date().toISOString()};
+  return {players:STATE.players,sessions:STATE.sessions,matches:STATE.matches,customExercises:STATE.customExercises||[],testResults:STATE.testResults,commandCenter:STATE.commandCenter||{},contentStudio:STATE.contentStudio||{},performanceLab:STATE.performanceLab||{},finance:STATE.finance||{},updatedAt:new Date().toISOString()};
 }
 function applySavedState(saved){
   if(!saved||typeof saved!=='object') return false;
@@ -608,6 +618,7 @@ function applySavedState(saved){
   if(saved.commandCenter&&typeof saved.commandCenter==='object')STATE.commandCenter={briefs:[],chats:[],debriefs:[],contentIdeas:[],decisions:[],tasks:[],...saved.commandCenter};
   if(saved.contentStudio&&typeof saved.contentStudio==='object')STATE.contentStudio={posts:[],ideas:[],...saved.contentStudio};
   if(saved.performanceLab&&typeof saved.performanceLab==='object')STATE.performanceLab={players:{},notes:[],...saved.performanceLab};
+  if(saved.finance&&typeof saved.finance==='object')STATE.finance={...STATE.finance,...saved.finance,settings:{...STATE.finance.settings,...(saved.finance.settings||{})},defaults:{...STATE.finance.defaults,...(saved.finance.defaults||{})}};
   if(!Array.isArray(STATE.customExercises)) STATE.customExercises=[];
   if(!STATE.commandCenter) STATE.commandCenter={briefs:[],chats:[],debriefs:[],contentIdeas:[],decisions:[],tasks:[]};
   if(!STATE.contentStudio) STATE.contentStudio={posts:[],ideas:[]};
@@ -616,6 +627,11 @@ function applySavedState(saved){
   if(!STATE.performanceLab) STATE.performanceLab={players:{},notes:[]};
   if(!STATE.performanceLab.players||typeof STATE.performanceLab.players!=='object') STATE.performanceLab.players={};
   if(!Array.isArray(STATE.performanceLab.notes)) STATE.performanceLab.notes=[];
+  if(!STATE.finance||typeof STATE.finance!=='object') STATE.finance={payments:[],invoiceSeq:1,settings:{},defaults:{}};
+  if(!Array.isArray(STATE.finance.payments)) STATE.finance.payments=[];
+  if(!STATE.finance.settings||typeof STATE.finance.settings!=='object') STATE.finance.settings={};
+  if(!STATE.finance.defaults||typeof STATE.finance.defaults!=='object') STATE.finance.defaults={courtCost:0,lessonCost60:0,lessonCost90:0};
+  STATE.finance.invoiceSeq=Math.max(1,Number(STATE.finance.invoiceSeq)||1);
   return true;
 }
 function saveState(){
@@ -3250,7 +3266,7 @@ function showNotif(msg,ms=2000){
   clearTimeout(n._t);n._t=setTimeout(()=>n.style.display='none',ms);
 }
 const EN_TEXT={
-  'ACADÉMIE':'ACADEMY','TABLEAU DE BORD':'DASHBOARD','JOUEURS':'PLAYERS','SÉANCES':'SESSIONS',
+  'ACADÉMIE':'ACADEMY','TABLEAU DE BORD':'DASHBOARD','JOUEURS':'PLAYERS','SÉANCES':'SESSIONS','PAIEMENTS':'PAYMENTS',
   'PROFILS & ANALYSE':'PROFILES & ANALYSIS','12 PROFILS':'12 PROFILES','TEST PERSONNALITÉ':'PERSONALITY TEST',
   'JOUEUR':'PLAYER','La progression se mesure.':'Progress is measured.','ACCÈS RAPIDE':'QUICK ACCESS',
   'Préparer une fiche, ouvrir une séance, garder la trace.':'Prepare a profile, open a session, keep the record.',
@@ -3379,7 +3395,7 @@ function setLang(lang){
   render();
 }
 function updateChromeText(){
-  const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
+  const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',payments:'PAIEMENTS',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
   document.querySelectorAll('.nav-item').forEach(n=>{
     const icon=n.querySelector('.nav-icon')?.textContent||'';
     const label=navNames[n.dataset.page]||n.dataset.page;
@@ -3415,17 +3431,18 @@ function render(){
   document.getElementById('roleTag').textContent=tr(STATE.role==='coach'?'COACH':'JOUEUR');
   const nav=document.querySelectorAll('.nav-item');
   nav.forEach(n=>{
-    const coachOnly=['exercises','aspectsLibrary','commandCenter','contentStudio','matchAnalyst'].includes(n.dataset.page);
+    const coachOnly=['exercises','aspectsLibrary','payments','commandCenter','contentStudio','matchAnalyst'].includes(n.dataset.page);
     const playerHidden=['test'].includes(n.dataset.page);
     n.style.display=STATE.role==='player'&&(coachOnly||playerHidden)?'none':'flex';
     n.classList.toggle('active',n.dataset.page===UI.page);
   });
-  const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
+  const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',payments:'PAIEMENTS',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
   document.getElementById('pageTitle').textContent=tr(STATE.role==='player'&&UI.page==='dashboard'?'MON CARNET JOUEUR':(titles[UI.page]||UI.page.toUpperCase()));
   const mc=document.getElementById('mainContent');
   if(UI.page==='dashboard') mc.innerHTML=STATE.role==='player'?pagePlayerPortal():pageDashboard();
   else if(UI.page==='players') mc.innerHTML=UI.selectedPlayerId?pagePlayerDetail(UI.selectedPlayerId):pagePlayersList();
   else if(UI.page==='sessions') mc.innerHTML=UI.selectedSessionId?pageSessionDetail(UI.selectedSessionId):pageSessionsList();
+  else if(UI.page==='payments') mc.innerHTML=pagePayments();
   else if(UI.page==='commandCenter') mc.innerHTML=pageCommandCenter();
   else if(UI.page==='contentStudio') mc.innerHTML=pageContentStudio();
   else if(UI.page==='shop') mc.innerHTML=pageShop();
@@ -3439,6 +3456,300 @@ function render(){
   else if(UI.page==='nutrition') mc.innerHTML=pageNutrition();
   translateDom(mc);
   saveState();
+}
+
+// ══════════════════════════════════════════════════
+// PAIEMENTS & FACTURES
+// ══════════════════════════════════════════════════
+function financeState(){
+  if(!STATE.finance||typeof STATE.finance!=='object') STATE.finance={};
+  if(!Array.isArray(STATE.finance.payments)) STATE.finance.payments=[];
+  if(!STATE.finance.settings||typeof STATE.finance.settings!=='object') STATE.finance.settings={};
+  if(!STATE.finance.defaults||typeof STATE.finance.defaults!=='object') STATE.finance.defaults={courtCost:0,lessonCost60:0,lessonCost90:0};
+  STATE.finance.invoiceSeq=Math.max(1,Number(STATE.finance.invoiceSeq)||1);
+  return STATE.finance;
+}
+function amountNumber(value){
+  const n=Number(String(value??'').replace(',','.'));
+  return Number.isFinite(n)?Math.max(0,n):0;
+}
+function money(value){
+  return new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR'}).format(amountNumber(value));
+}
+function minutesBetweenTimes(start,end){
+  if(!start||!end) return 0;
+  const [sh,sm]=String(start).split(':').map(Number);
+  const [eh,em]=String(end).split(':').map(Number);
+  if([sh,sm,eh,em].some(v=>!Number.isFinite(v))) return 0;
+  let minutes=(eh*60+em)-(sh*60+sm);
+  if(minutes<0) minutes+=24*60;
+  return minutes;
+}
+function addMinutesToTime(time,minutes){
+  if(!time) return '';
+  const [h,m]=String(time).split(':').map(Number);
+  if(!Number.isFinite(h)||!Number.isFinite(m)) return '';
+  const total=(h*60+m+Number(minutes||0))%(24*60);
+  return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
+}
+function paymentHours(payment){
+  const minutes=minutesBetweenTimes(payment.startTime,payment.endTime);
+  if(minutes) return minutes/60;
+  return amountNumber(payment.hours||payment.durationHours||0);
+}
+function hoursLabel(value){
+  const hours=amountNumber(value);
+  if(!hours) return '—';
+  const whole=Math.floor(hours);
+  const minutes=Math.round((hours-whole)*60);
+  if(!whole) return `${minutes} min`;
+  return minutes?`${whole} h ${String(minutes).padStart(2,'0')}`:`${whole} h`;
+}
+function paymentTotal(payment){
+  return amountNumber(payment.courtCost)+amountNumber(payment.lessonCost);
+}
+function paymentStatus(payment){
+  const total=paymentTotal(payment);
+  const paid=amountNumber(payment.paidAmount);
+  if(total>0&&paid>=total-.005) return 'paid';
+  if(paid>0) return 'partial';
+  return 'unpaid';
+}
+function paymentStatusLabel(payment){
+  return ({paid:'PAYÉ',partial:'PARTIEL',unpaid:'À PAYER'})[paymentStatus(payment)];
+}
+function paymentStatusBadge(payment){
+  const status=paymentStatus(payment);
+  const color=status==='paid'?'var(--vert)':status==='partial'?'var(--jaune)':'var(--rouge)';
+  return `<span class="badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${paymentStatusLabel(payment)}</span>`;
+}
+function playerBillingSnapshot(player){
+  return {
+    name:player?.billingName||player?.name||'',
+    address:player?.billingAddress||'',
+    postalCode:player?.billingPostalCode||'',
+    city:player?.billingCity||'',
+    vat:player?.billingVat||'',
+    email:player?.email||player?.parentEmail||''
+  };
+}
+function nextInvoiceNumber(date){
+  const finance=financeState();
+  const year=String(date||todayIso()).slice(0,4)||String(new Date().getFullYear());
+  const number=`HWBT-${year}-${String(finance.invoiceSeq).padStart(4,'0')}`;
+  finance.invoiceSeq+=1;
+  return number;
+}
+function paymentSession(payment){
+  return STATE.sessions.find(s=>s.id===Number(payment.sessionId))||null;
+}
+function paymentPlayer(payment){
+  return STATE.players.find(p=>p.id===Number(payment.playerId))||null;
+}
+function financeCompleteness(){
+  const s=financeState().settings;
+  const missing=[];
+  if(!s.companyName) missing.push('nom de l’académie');
+  if(!s.address||!s.postalCode||!s.city) missing.push('adresse HWBT');
+  if(!s.enterpriseNumber) missing.push('n° d’entreprise / TVA');
+  return missing;
+}
+function pagePayments(){
+  const finance=financeState();
+  const records=[...finance.payments].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||Number(b.id)-Number(a.id));
+  const billed=records.reduce((sum,p)=>sum+paymentTotal(p),0);
+  const paid=records.reduce((sum,p)=>sum+Math.min(paymentTotal(p),amountNumber(p.paidAmount)),0);
+  const court=records.reduce((sum,p)=>sum+amountNumber(p.courtCost),0);
+  const lessons=records.reduce((sum,p)=>sum+amountNumber(p.lessonCost),0);
+  const hours=records.reduce((sum,p)=>sum+paymentHours(p),0);
+  const missing=financeCompleteness();
+  return `<div class="content">
+    ${quoteBand()}
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px">
+      <div><div style="font-size:28px;font-weight:900;letter-spacing:1px">PAIEMENTS & FACTURES</div><div style="font-size:11px;color:var(--gray);font-family:var(--font-body);line-height:1.6;margin-top:6px">Une ligne par client et par cours · terrain + cours · date et heures réellement données.</div></div>
+      <button class="btn btn-primary" onclick="openModal('newPayment',{})">+ AJOUTER UN COURS / PAIEMENT</button>
+    </div>
+    ${missing.length?`<div class="card" style="border-color:var(--jaune);background:var(--jaune-dim)"><div style="font-size:11px;color:var(--jaune);font-weight:700">FACTURES À COMPLÉTER</div><div style="font-size:11px;color:var(--offwhite);font-family:var(--font-body);margin-top:6px">Il manque: ${esc(missing.join(', '))}. Complète les réglages en bas de cette page avant d’envoyer une facture.</div></div>`:''}
+    <div class="g4" style="margin-bottom:18px">
+      <div class="stat-card"><div class="stat-label">TOTAL FACTURÉ</div><div class="stat-value">${money(billed)}</div><div class="stat-sub">${records.length} ligne${records.length===1?'':'s'}</div></div>
+      <div class="stat-card"><div class="stat-label">ENCAISSÉ</div><div class="stat-value" style="color:var(--vert)">${money(paid)}</div><div class="stat-sub">Reste ${money(Math.max(0,billed-paid))}</div></div>
+      <div class="stat-card"><div class="stat-label">TERRAIN / COURS</div><div class="stat-value" style="font-size:20px">${money(court)} + ${money(lessons)}</div><div class="stat-sub">Calcul séparé</div></div>
+      <div class="stat-card"><div class="stat-label">HEURES DONNÉES</div><div class="stat-value">${hoursLabel(hours)}</div><div class="stat-sub">Selon début et fin</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title" style="margin:0">COURS & ENCAISSEMENTS</div><div style="font-size:10px;color:var(--gray3)">${records.filter(p=>paymentStatus(p)!=='paid').length} à suivre</div></div>
+      ${records.length?records.map(p=>{
+        const player=paymentPlayer(p);
+        const session=paymentSession(p);
+        const total=paymentTotal(p);
+        const balance=Math.max(0,total-amountNumber(p.paidAmount));
+        return `<div style="display:grid;grid-template-columns:minmax(170px,1.35fr) minmax(155px,1fr) minmax(170px,1fr) auto;gap:14px;align-items:center;padding:14px 0;border-top:1px solid var(--border)">
+          <div><div style="font-size:14px;font-weight:800">${esc(player?.name||p.billingSnapshot?.name||'Client supprimé')}</div><div style="font-size:9px;color:var(--gray3);letter-spacing:1px;margin-top:4px">${esc(formatShortDate(p.date)||p.date||'—')} · ${esc(p.startTime||'—')}${p.endTime?`–${esc(p.endTime)}`:''} · ${hoursLabel(paymentHours(p))}</div>${session?`<div style="font-size:9px;color:var(--bronze);margin-top:3px">Séance #${session.id} · ${esc(sessionTypeLabel(session.sessionType,session.sessionDuration))}</div>`:''}</div>
+          <div><div style="font-size:10px;color:var(--gray)">Terrain ${money(p.courtCost)}</div><div style="font-size:10px;color:var(--gray);margin-top:4px">Cours ${money(p.lessonCost)}</div><div style="font-size:16px;font-weight:900;margin-top:5px">${money(total)}</div></div>
+          <div>${paymentStatusBadge(p)}<div style="font-size:10px;color:var(--gray);margin-top:7px">Reçu ${money(p.paidAmount)}${balance?` · reste ${money(balance)}`:''}</div><div style="font-size:9px;color:var(--gray3);margin-top:4px">${esc(p.method||'Mode non défini')}${p.invoiceRequested?` · ${esc(p.invoiceNumber||'Facture')}`:' · sans facture'}</div></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${paymentStatus(p)!=='paid'?`<button class="btn btn-success btn-sm" onclick="markPaymentPaid(${p.id})">ENCAISSÉ</button>`:''}${p.invoiceRequested?`<button class="btn btn-primary btn-sm" onclick="openInvoice(${p.id})">FACTURE</button>`:''}<button class="btn btn-ghost btn-sm" onclick="openModal('editPayment',${p.id})">MODIFIER</button><button class="btn btn-danger btn-sm" onclick="deletePayment(${p.id})">SUPPRIMER</button></div>
+        </div>`;
+      }).join(''):`<div style="padding:22px 0;color:var(--gray);font-size:12px;font-family:var(--font-body)">Aucun cours facturé pour le moment. Ajoute une ligne depuis cette page ou depuis une séance.</div>`}
+    </div>
+    ${paymentSettingsHtml()}
+  </div>`;
+}
+function paymentSettingsHtml(){
+  const finance=financeState();
+  const s=finance.settings;
+  const d=finance.defaults;
+  return `<div class="card"><div class="card-title">RÉGLAGES FACTURES HWBT</div>
+    <div class="g2"><div class="form-group"><label class="form-label">NOM DE L’ACADÉMIE / ENTREPRISE</label><input class="form-input" id="fin_companyName" value="${esc(s.companyName||'')}"></div><div class="form-group"><label class="form-label">NOM DU RESPONSABLE</label><input class="form-input" id="fin_ownerName" value="${esc(s.ownerName||'')}"></div></div>
+    <div class="form-group"><label class="form-label">ADRESSE</label><input class="form-input" id="fin_address" value="${esc(s.address||'')}"></div>
+    <div class="g3"><div class="form-group"><label class="form-label">CODE POSTAL</label><input class="form-input" id="fin_postalCode" value="${esc(s.postalCode||'')}"></div><div class="form-group"><label class="form-label">VILLE</label><input class="form-input" id="fin_city" value="${esc(s.city||'')}"></div><div class="form-group"><label class="form-label">N° ENTREPRISE / TVA</label><input class="form-input" id="fin_enterpriseNumber" value="${esc(s.enterpriseNumber||'')}"></div></div>
+    <div class="g3"><div class="form-group"><label class="form-label">IBAN</label><input class="form-input" id="fin_iban" value="${esc(s.iban||'')}"></div><div class="form-group"><label class="form-label">E-MAIL</label><input class="form-input" id="fin_email" value="${esc(s.email||'')}"></div><div class="form-group"><label class="form-label">TÉLÉPHONE</label><input class="form-input" id="fin_phone" value="${esc(s.phone||'')}"></div></div>
+    <div class="form-group"><label class="form-label">MENTION LÉGALE / TVA</label><input class="form-input" id="fin_legalNote" value="${esc(s.legalNote||'')}" placeholder="Ex: régime de TVA applicable, conditions de paiement..."></div>
+    <div class="divider"></div><div class="card-title">MONTANTS PAR DÉFAUT</div>
+    <div class="g3"><div class="form-group"><label class="form-label">PART TERRAIN / CLIENT</label><input class="form-input" id="fin_courtCost" type="number" min="0" step="0.01" value="${esc(d.courtCost||0)}"></div><div class="form-group"><label class="form-label">COURS 1H</label><input class="form-input" id="fin_lessonCost60" type="number" min="0" step="0.01" value="${esc(d.lessonCost60||0)}"></div><div class="form-group"><label class="form-label">COURS 1H30</label><input class="form-input" id="fin_lessonCost90" type="number" min="0" step="0.01" value="${esc(d.lessonCost90||0)}"></div></div>
+    <div class="form-actions"><button class="btn btn-primary" onclick="savePaymentSettings()">ENREGISTRER LES RÉGLAGES</button></div>
+  </div>`;
+}
+function savePaymentSettings(){
+  const finance=financeState();
+  const value=id=>document.getElementById(id)?.value.trim()||'';
+  finance.settings={
+    companyName:value('fin_companyName'),ownerName:value('fin_ownerName'),address:value('fin_address'),postalCode:value('fin_postalCode'),city:value('fin_city'),
+    enterpriseNumber:value('fin_enterpriseNumber'),iban:value('fin_iban'),email:value('fin_email'),phone:value('fin_phone'),legalNote:value('fin_legalNote')
+  };
+  finance.defaults={courtCost:amountNumber(value('fin_courtCost')),lessonCost60:amountNumber(value('fin_lessonCost60')),lessonCost90:amountNumber(value('fin_lessonCost90'))};
+  saveState();showNotif('Réglages de facturation enregistrés');render();
+}
+function paymentFormHtml(input=null){
+  const finance=financeState();
+  const isEdit=!!(input&&input.id&&Object.prototype.hasOwnProperty.call(input,'courtCost'));
+  const config=isEdit?{}:(input||{});
+  const session=isEdit?paymentSession(input):STATE.sessions.find(s=>s.id===Number(config.sessionId));
+  const playerId=Number(isEdit?input.playerId:(config.playerId||sessionPlayerIds(session||{})[0]||STATE.players[0]?.id||0));
+  const duration=Number(sessionDuration(session)||60);
+  const date=isEdit?(input.date||todayIso()):(session?.date||config.date||todayIso());
+  const startTime=isEdit?(input.startTime||''):(session?.time||config.startTime||'');
+  const endTime=isEdit?(input.endTime||''):(config.endTime||addMinutesToTime(startTime,duration));
+  const courtCost=isEdit?amountNumber(input.courtCost):amountNumber(finance.defaults.courtCost);
+  const lessonCost=isEdit?amountNumber(input.lessonCost):amountNumber(duration===90?finance.defaults.lessonCost90:finance.defaults.lessonCost60);
+  const paidAmount=isEdit?amountNumber(input.paidAmount):0;
+  const selectedSessionId=Number(isEdit?input.sessionId:config.sessionId)||0;
+  return `<div class="modal-title">${isEdit?'MODIFIER LE COURS / PAIEMENT':'AJOUTER UN COURS / PAIEMENT'}</div><button class="modal-close" onclick="closeModal()">×</button>
+    <input type="hidden" id="pay_id" value="${isEdit?input.id:''}">
+    <div class="form-group"><label class="form-label">SÉANCE LIÉE (OPTIONNEL)</label><select class="form-select" id="pay_sessionId" onchange="fillPaymentFromSession(this.value)"><option value="">— Saisie libre —</option>${[...STATE.sessions].sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(s=>`<option value="${s.id}" ${selectedSessionId===s.id?'selected':''}>${esc(s.date)} · ${esc(s.time||'heure ?')} · ${esc(sessionTitle(s))}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">CLIENT</label><select class="form-select" id="pay_playerId">${STATE.players.map(p=>`<option value="${p.id}" ${playerId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>
+    <div class="g3"><div class="form-group"><label class="form-label">DATE DU COURS</label><input class="form-input" id="pay_date" type="date" value="${esc(date)}"></div><div class="form-group"><label class="form-label">HEURE DÉBUT</label><input class="form-input" id="pay_startTime" type="time" value="${esc(startTime)}" oninput="updatePaymentCalculation()"></div><div class="form-group"><label class="form-label">HEURE FIN</label><input class="form-input" id="pay_endTime" type="time" value="${esc(endTime)}" oninput="updatePaymentCalculation()"></div></div>
+    <div class="g2"><div class="form-group"><label class="form-label">PART TERRAIN (€)</label><input class="form-input" id="pay_courtCost" type="number" min="0" step="0.01" value="${courtCost}" oninput="updatePaymentCalculation()"></div><div class="form-group"><label class="form-label">COÛT DU COURS (€)</label><input class="form-input" id="pay_lessonCost" type="number" min="0" step="0.01" value="${lessonCost}" oninput="updatePaymentCalculation()"></div></div>
+    <div style="background:var(--bg4);border:1px solid var(--bronze-dim2);border-radius:8px;padding:14px;margin-bottom:14px;display:flex;justify-content:space-between;gap:14px;align-items:center"><div><div style="font-size:9px;color:var(--bronze);letter-spacing:1.5px">DURÉE DONNÉE</div><div id="pay_hours_preview" style="font-size:18px;font-weight:800;margin-top:4px">${hoursLabel(minutesBetweenTimes(startTime,endTime)/60)}</div></div><div style="text-align:right"><div style="font-size:9px;color:var(--bronze);letter-spacing:1.5px">TOTAL TERRAIN + COURS</div><div id="pay_total_preview" style="font-size:26px;font-weight:900;margin-top:4px">${money(courtCost+lessonCost)}</div></div></div>
+    <div class="g2"><div class="form-group"><label class="form-label">MONTANT DÉJÀ REÇU (€)</label><input class="form-input" id="pay_paidAmount" type="number" min="0" step="0.01" value="${paidAmount}"></div><div class="form-group"><label class="form-label">MODE DE PAIEMENT</label><select class="form-select" id="pay_method">${['','Cash','Virement','Payconiq','Carte','Autre'].map(m=>`<option value="${m}" ${(input?.method||'')===m?'selected':''}>${m||'— À définir —'}</option>`).join('')}</select></div></div>
+    <div class="form-group"><label class="session-player-choice"><input type="checkbox" id="pay_invoiceRequested" ${input?.invoiceRequested?'checked':''}><span><span class="session-player-name">LE CLIENT SOUHAITE UNE FACTURE</span><span class="session-player-meta">Un numéro de facture sera attribué et le document pourra être imprimé.</span></span></label></div>
+    <div class="form-group"><label class="form-label">NOTE</label><textarea class="form-input" id="pay_notes" rows="3" placeholder="Communication, précision sur le cours, acompte...">${esc(input?.notes||'')}</textarea></div>
+    <div class="form-actions">${isEdit?`<button class="btn btn-danger" onclick="deletePayment(${input.id})">SUPPRIMER</button>`:''}<button class="btn btn-ghost" onclick="closeModal()">ANNULER</button><button class="btn btn-primary" onclick="savePayment()">${isEdit?'ENREGISTRER':'AJOUTER'}</button></div>`;
+}
+function fillPaymentFromSession(sessionId){
+  const s=STATE.sessions.find(s=>s.id===Number(sessionId));
+  if(!s) return;
+  const player=document.getElementById('pay_playerId');
+  const date=document.getElementById('pay_date');
+  const start=document.getElementById('pay_startTime');
+  const end=document.getElementById('pay_endTime');
+  const lesson=document.getElementById('pay_lessonCost');
+  const first=sessionPlayerIds(s)[0];
+  if(player&&first) player.value=String(first);
+  if(date) date.value=s.date||todayIso();
+  if(start) start.value=s.time||'';
+  if(end) end.value=addMinutesToTime(s.time||'',Number(sessionDuration(s)||60));
+  if(lesson) lesson.value=String(amountNumber(Number(sessionDuration(s))===90?financeState().defaults.lessonCost90:financeState().defaults.lessonCost60));
+  updatePaymentCalculation();
+}
+function updatePaymentCalculation(){
+  const start=document.getElementById('pay_startTime')?.value||'';
+  const end=document.getElementById('pay_endTime')?.value||'';
+  const hours=minutesBetweenTimes(start,end)/60;
+  const total=amountNumber(document.getElementById('pay_courtCost')?.value)+amountNumber(document.getElementById('pay_lessonCost')?.value);
+  const hoursBox=document.getElementById('pay_hours_preview');
+  const totalBox=document.getElementById('pay_total_preview');
+  if(hoursBox) hoursBox.textContent=hoursLabel(hours);
+  if(totalBox) totalBox.textContent=money(total);
+}
+function savePayment(){
+  const finance=financeState();
+  const id=Number(document.getElementById('pay_id')?.value)||0;
+  const existing=finance.payments.find(p=>p.id===id)||null;
+  const playerId=Number(document.getElementById('pay_playerId')?.value)||0;
+  const player=STATE.players.find(p=>p.id===playerId);
+  const date=document.getElementById('pay_date')?.value||'';
+  const startTime=document.getElementById('pay_startTime')?.value||'';
+  const endTime=document.getElementById('pay_endTime')?.value||'';
+  if(!player||!date){showNotif('Choisis un client et une date');return;}
+  if(!startTime||!endTime){showNotif('Indique l’heure de début et l’heure de fin');return;}
+  if(startTime&&endTime&&!minutesBetweenTimes(startTime,endTime)){showNotif('Vérifie les heures de début et de fin');return;}
+  const invoiceRequested=!!document.getElementById('pay_invoiceRequested')?.checked;
+  const record={
+    ...(existing||{}),
+    id:existing?.id||Math.max(0,...finance.payments.map(p=>Number(p.id)||0))+1,
+    playerId,
+    sessionId:Number(document.getElementById('pay_sessionId')?.value)||null,
+    date,startTime,endTime,hours:minutesBetweenTimes(startTime,endTime)/60,
+    courtCost:amountNumber(document.getElementById('pay_courtCost')?.value),
+    lessonCost:amountNumber(document.getElementById('pay_lessonCost')?.value),
+    paidAmount:amountNumber(document.getElementById('pay_paidAmount')?.value),
+    method:document.getElementById('pay_method')?.value||'',
+    notes:document.getElementById('pay_notes')?.value.trim()||'',
+    invoiceRequested,
+    updatedAt:new Date().toISOString()
+  };
+  if(!existing) record.createdAt=new Date().toISOString();
+  if(invoiceRequested&&!record.invoiceNumber){
+    record.invoiceNumber=nextInvoiceNumber(date);
+    record.invoiceDate=todayIso();
+    record.billingSnapshot=playerBillingSnapshot(player);
+  }
+  if(invoiceRequested&&!record.billingSnapshot) record.billingSnapshot=playerBillingSnapshot(player);
+  if(existing) Object.assign(existing,record); else finance.payments.push(record);
+  saveState();closeModal();showNotif(existing?'Paiement mis à jour':'Cours ajouté aux paiements');setUI({page:'payments'});
+}
+function markPaymentPaid(id){
+  const payment=financeState().payments.find(p=>p.id===id);
+  if(!payment) return;
+  payment.paidAmount=paymentTotal(payment);
+  payment.paidAt=new Date().toISOString();
+  saveState();showNotif('Paiement marqué comme encaissé');render();
+}
+function deletePayment(id){
+  const finance=financeState();
+  const payment=finance.payments.find(p=>p.id===id);
+  if(!payment) return;
+  if(!confirm(`Supprimer cette ligne de paiement${payment.invoiceNumber?` et la facture ${payment.invoiceNumber}`:''} ?`)) return;
+  finance.payments=finance.payments.filter(p=>p.id!==id);
+  closeModal();saveState();showNotif('Ligne supprimée');setUI({page:'payments'});
+}
+function invoiceDocumentHtml(payment){
+  const finance=financeState();
+  const s=finance.settings;
+  const client=payment.billingSnapshot||playerBillingSnapshot(paymentPlayer(payment));
+  const total=paymentTotal(payment);
+  const paid=amountNumber(payment.paidAmount);
+  const balance=Math.max(0,total-paid);
+  const serviceDate=formatShortDate(payment.date)||payment.date||'—';
+  const invoiceDate=formatShortDate(payment.invoiceDate)||payment.invoiceDate||serviceDate;
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>${esc(payment.invoiceNumber||'Facture HWBT')}</title><style>
+    *{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#171717;margin:0;background:#eee}.sheet{width:210mm;min-height:297mm;margin:18px auto;background:white;padding:22mm 18mm;box-shadow:0 8px 35px #0002}.top{display:flex;justify-content:space-between;gap:30px;border-bottom:4px solid #A67C52;padding-bottom:18px}.brand{font-size:34px;font-weight:900;letter-spacing:5px}.tag{font-size:10px;color:#A67C52;letter-spacing:2px;margin-top:4px}.invoice-title{text-align:right}.invoice-title h1{font-size:28px;margin:0}.muted{color:#666;font-size:12px;line-height:1.55}.cols{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin:32px 0}.label{font-size:10px;color:#A67C52;letter-spacing:1.5px;font-weight:bold;margin-bottom:8px}.box{border:1px solid #ddd;border-radius:8px;padding:14px;min-height:105px;line-height:1.55;font-size:13px}table{width:100%;border-collapse:collapse;margin-top:25px}th{background:#171717;color:white;text-align:left;padding:11px;font-size:11px;letter-spacing:1px}td{padding:13px 11px;border-bottom:1px solid #ddd;font-size:13px}.num{text-align:right}.totals{margin-left:auto;margin-top:20px;width:310px}.total-line{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #ddd;font-size:13px}.grand{font-size:20px;font-weight:900;border-bottom:3px solid #A67C52}.foot{margin-top:48px;border-top:1px solid #ddd;padding-top:16px}.actions{width:210mm;margin:18px auto;text-align:right}button{background:#A67C52;color:white;border:0;border-radius:4px;padding:10px 18px;font-weight:bold;cursor:pointer}@media print{body{background:white}.sheet{margin:0;box-shadow:none}.actions{display:none}}
+  </style></head><body><div class="actions"><button onclick="window.print()">IMPRIMER / ENREGISTRER EN PDF</button></div><main class="sheet">
+    <div class="top"><div><div class="brand">HWBT</div><div class="tag">HARD WORK BEATS TALENT · PADEL ACADEMY</div></div><div class="invoice-title"><h1>FACTURE</h1><div class="muted"><b>${esc(payment.invoiceNumber||'—')}</b><br>Date: ${esc(invoiceDate)}</div></div></div>
+    <div class="cols"><div><div class="label">ÉMETTEUR</div><div class="box"><b>${esc(s.companyName||'HWBT Academy')}</b>${s.ownerName?`<br>${esc(s.ownerName)}`:''}${s.address?`<br>${esc(s.address)}`:''}${s.postalCode||s.city?`<br>${esc(`${s.postalCode||''} ${s.city||''}`.trim())}`:''}${s.enterpriseNumber?`<br>N° entreprise / TVA: ${esc(s.enterpriseNumber)}`:''}${s.email?`<br>${esc(s.email)}`:''}${s.phone?`<br>${esc(s.phone)}`:''}</div></div><div><div class="label">CLIENT</div><div class="box"><b>${esc(client.name||'Client à compléter')}</b>${client.address?`<br>${esc(client.address)}`:''}${client.postalCode||client.city?`<br>${esc(`${client.postalCode||''} ${client.city||''}`.trim())}`:''}${client.vat?`<br>N° entreprise / TVA: ${esc(client.vat)}`:''}${client.email?`<br>${esc(client.email)}`:''}</div></div></div>
+    <table><thead><tr><th>DESCRIPTION</th><th>DATE / HEURES</th><th class="num">MONTANT</th></tr></thead><tbody><tr><td>Part terrain</td><td>${esc(serviceDate)}${payment.startTime?` · ${esc(payment.startTime)}${payment.endTime?`–${esc(payment.endTime)}`:''}`:''}</td><td class="num">${money(payment.courtCost)}</td></tr><tr><td>Cours de padel HWBT${paymentHours(payment)?` · ${esc(hoursLabel(paymentHours(payment)))}`:''}</td><td>${esc(serviceDate)}</td><td class="num">${money(payment.lessonCost)}</td></tr></tbody></table>
+    <div class="totals"><div class="total-line grand"><span>TOTAL</span><span>${money(total)}</span></div><div class="total-line"><span>Déjà reçu</span><span>${money(paid)}</span></div><div class="total-line"><b>Solde à payer</b><b>${money(balance)}</b></div></div>
+    <div class="foot muted">${s.iban?`Paiement par virement: <b>${esc(s.iban)}</b><br>Communication: <b>${esc(payment.invoiceNumber||'')}</b><br><br>`:''}${s.legalNote?esc(s.legalNote):''}${payment.notes?`<br><br>Note: ${esc(payment.notes)}`:''}</div>
+  </main></body></html>`;
+}
+function openInvoice(id){
+  const payment=financeState().payments.find(p=>p.id===id);
+  if(!payment) return;
+  if(!payment.invoiceRequested){showNotif('Active d’abord la facture dans la ligne de paiement');return;}
+  if(!payment.invoiceNumber){payment.invoiceNumber=nextInvoiceNumber(payment.date);payment.invoiceDate=todayIso();payment.billingSnapshot=playerBillingSnapshot(paymentPlayer(payment));saveState();}
+  const win=window.open('','_blank');
+  if(!win){showNotif('Autorise les fenêtres contextuelles pour ouvrir la facture');return;}
+  win.document.open();win.document.write(invoiceDocumentHtml(payment));win.document.close();
 }
 
 // ══════════════════════════════════════════════════
@@ -4647,7 +4958,7 @@ function pageSessionDetail(sessionId){
   const tab=UI.sessionTab||defaultSessionTab(s);
   const tabs=[['briefing','Briefing'],['preparation','Préparation'],['terrain','Terrain'],['evaluation','Évaluation'],['retours','Retours'],['resume','Résumé']];
   return `<div class="content">${quoteBand()}
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:null,sessionMode:null,sessionTab:null})">← RETOUR</button><div style="flex:1"><div style="font-size:22px;font-weight:800;letter-spacing:1px;line-height:1.05">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2);margin-top:4px">${esc(sessionDateLine(s))} · ${sessionTypeLabel(s.sessionType,s.sessionDuration)} · ${statusBadge(s.status)}</div></div>${s.status==='planned'?`<button class="btn btn-primary" onclick="markSessionReady(${s.id})">COURS PRÊT</button>`:''}<button class="btn btn-ghost" onclick="downloadSessionCalendar(${s.id})">AJOUTER À L'AGENDA</button><button class="btn btn-primary" onclick="printSessionPdf(${s.id})">PDF SÉANCE</button>${s.status==='planned'||s.status==='ready'||s.status==='open'?`<button class="btn btn-ghost" onclick="enterFieldMode(${s.id})">MODE TERRAIN</button>`:''}${s.status==='closed_coach'||s.status==='completed'?`<button class="btn btn-ghost" onclick="toggleSessionEdit(${s.id})">${s.editMode?'TERMINER MODIF':'MODIFIER'}</button>`:''}<button class="btn btn-danger" onclick="deleteSession(${s.id})">SUPPRIMER</button></div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="setUI({page:'sessions',selectedSessionId:null,sessionMode:null,sessionTab:null})">← RETOUR</button><div style="flex:1"><div style="font-size:22px;font-weight:800;letter-spacing:1px;line-height:1.05">${esc(sessionTitle(s))}</div><div style="font-size:10px;color:var(--gray2);margin-top:4px">${esc(sessionDateLine(s))} · ${sessionTypeLabel(s.sessionType,s.sessionDuration)} · ${statusBadge(s.status)}</div></div>${s.status==='planned'?`<button class="btn btn-primary" onclick="markSessionReady(${s.id})">COURS PRÊT</button>`:''}<button class="btn btn-ghost" onclick="downloadSessionCalendar(${s.id})">AJOUTER À L'AGENDA</button><button class="btn btn-primary" onclick="printSessionPdf(${s.id})">PDF SÉANCE</button><button class="btn btn-ghost" onclick="openModal('newPayment',{sessionId:${s.id}})">€ PAIEMENT</button>${s.status==='planned'||s.status==='ready'||s.status==='open'?`<button class="btn btn-ghost" onclick="enterFieldMode(${s.id})">MODE TERRAIN</button>`:''}${s.status==='closed_coach'||s.status==='completed'?`<button class="btn btn-ghost" onclick="toggleSessionEdit(${s.id})">${s.editMode?'TERMINER MODIF':'MODIFIER'}</button>`:''}<button class="btn btn-danger" onclick="deleteSession(${s.id})">SUPPRIMER</button></div>
     <div class="tabs" style="margin-bottom:18px;overflow:auto">${tabs.map(t=>sessionDetailTabButton(t[0],t[1],tab)).join('')}</div>
     ${sessionDetailContent(s,tab,group,main,pr)}
   </div>`;
@@ -8633,6 +8944,12 @@ function playerFormHtml(p=null){
     <div class="g2"><div class="form-group"><label class="form-label">MAIN DOMINANTE</label><select class="form-select" id="m_hand">${['Droitier','Gaucher','Ambidextre','À définir'].map(v=>`<option value="${v}" ${(p?.hand||'À définir')===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">POSITION TERRAIN</label><select class="form-select" id="m_position">${['Gauche','Droite','Les deux côtés','À définir'].map(v=>`<option value="${v}" ${(p?.position||'À définir')===v?'selected':''}>${v}</option>`).join('')}</select></div></div>
     <div class="g2"><div class="form-group"><label class="form-label">CLASSEMENT AFT</label><input class="form-input" id="m_aftRanking" value="${esc(p?.aftRanking||'')}" placeholder="ex: P300, P500..."></div><div class="form-group"><label class="form-label">CLASSEMENT AFP</label><input class="form-input" id="m_afpRanking" value="${esc(p?.afpRanking||'')}" placeholder="ex: niveau / points"></div></div>
     <div class="g2"><div class="form-group"><label class="form-label">TÉLÉPHONE JOUEUR</label><input class="form-input" id="m_phone" type="tel" value="${esc(p?.phone||'')}"></div><div class="form-group"><label class="form-label">ADRESSE MAIL JOUEUR</label><input class="form-input" id="m_email" type="email" value="${esc(p?.email||'')}"></div></div>
+    <div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="font-size:10px;letter-spacing:1.5px;color:var(--bronze);margin-bottom:10px">COORDONNÉES DE FACTURATION (OPTIONNEL)</div>
+      <div class="g2"><div class="form-group"><label class="form-label">NOM / RAISON SOCIALE</label><input class="form-input" id="m_billingName" value="${esc(p?.billingName||p?.name||'')}"></div><div class="form-group"><label class="form-label">N° TVA / ENTREPRISE</label><input class="form-input" id="m_billingVat" value="${esc(p?.billingVat||'')}" placeholder="Ex: BE 0123.456.789"></div></div>
+      <div class="form-group"><label class="form-label">ADRESSE</label><input class="form-input" id="m_billingAddress" value="${esc(p?.billingAddress||'')}" placeholder="Rue et numéro"></div>
+      <div class="g2"><div class="form-group"><label class="form-label">CODE POSTAL</label><input class="form-input" id="m_billingPostalCode" value="${esc(p?.billingPostalCode||'')}"></div><div class="form-group"><label class="form-label">VILLE</label><input class="form-input" id="m_billingCity" value="${esc(p?.billingCity||'')}"></div></div>
+    </div>
     <div class="g2"><div class="form-group"><label class="form-label">COACH</label><input class="form-input" id="m_coach" value="${esc(p?.coach||'Thomas')}"></div><div class="form-group"><label class="form-label">CODE JOUEUR</label><input class="form-input" id="m_code" value="${esc(p?.code||'')}" placeholder="créé automatiquement si vide"></div></div>
     <div class="g2"><div class="form-group"><label class="form-label">MOT DE PASSE JOUEUR</label><input class="form-input" id="m_playerPassword" value="${esc(p?.playerPassword||(p?.code?String(p.code).toLowerCase():''))}" placeholder="ex: md300"></div><div class="form-group"><label class="form-label">ACCÈS JOUEUR</label><div class="muted-help" style="padding:12px;border:1px solid var(--border);border-radius:6px;background:var(--bg4)">Le joueur se connecte avec son code joueur et ce mot de passe. Si vide, le code en minuscule est utilisé.</div></div></div>
     <div class="form-group"><label class="form-label">PHOTO DU JOUEUR</label><div class="photo-picker"><div class="photo-preview" id="m_photoPreview" style="${photo?`background-image:url('${esc(photo)}')`:''}">${photo?'':'PHOTO'}</div><div style="flex:1"><input type="hidden" id="m_photo" value="${esc(photo)}"><input class="photo-input" id="m_photoFile" type="file" accept="image/*" onchange="handlePhotoFile(this,'m_photo','m_photoPreview')"><button type="button" class="btn btn-ghost" onclick="document.getElementById('m_photoFile').click()">CHOISIR UNE PHOTO</button><div class="muted-help">Sur GSM, tu peux choisir une photo de la galerie ou prendre une nouvelle photo. Elle est compressée automatiquement.</div></div></div></div>
@@ -8666,6 +8983,11 @@ function readPlayerForm(existing=null){
     afpRanking:document.getElementById('m_afpRanking')?.value.trim()||'',
     phone:document.getElementById('m_phone')?.value.trim()||'',
     email:document.getElementById('m_email')?.value.trim()||'',
+    billingName:document.getElementById('m_billingName')?.value.trim()||'',
+    billingVat:document.getElementById('m_billingVat')?.value.trim()||'',
+    billingAddress:document.getElementById('m_billingAddress')?.value.trim()||'',
+    billingPostalCode:document.getElementById('m_billingPostalCode')?.value.trim()||'',
+    billingCity:document.getElementById('m_billingCity')?.value.trim()||'',
     coach:document.getElementById('m_coach')?.value.trim()||'Thomas',
     code:baseCode||existing?.code||'',
     playerPassword:playerPassword||existing?.playerPassword||'',
@@ -8869,6 +9191,8 @@ function renderModal(type,extra){
   if(type==='addPlayer') return playerFormHtml();
   if(type==='editPlayer'){const p=STATE.players.find(p=>p.id===extra);return p?playerFormHtml(p):`<div class="modal-title">JOUEUR INTROUVABLE</div><button class="modal-close" onclick="closeModal()">×</button>`}
   if(type==='newSession') return newSessionModalHtml(extra);
+  if(type==='newPayment') return paymentFormHtml(extra);
+  if(type==='editPayment') return paymentFormHtml(STATE.finance?.payments?.find(p=>p.id===extra)||null);
   if(type==='newMatchAnalyst') return matchCreateModalHtml();
   if(type==='editExercise') return exerciseEditFormHtml(extra);
   if(type==='sessionExercisePicker') return sessionExercisePickerHtml(extra);
