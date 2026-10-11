@@ -1,46 +1,67 @@
-import { getStore } from "@netlify/blobs";
 import type { Config, Context } from "@netlify/functions";
-
-const STORE_NAME = "hwbt-academy";
-const STATE_KEY = "state/current.json";
-
-function dayKey(date = new Date()) {
-  return date.toISOString().slice(0, 10);
-}
-
-function json(data: unknown, init: ResponseInit = {}) {
-  return Response.json(data, {
-    ...init,
-    headers: {
-      "Cache-Control": "no-store",
-      ...(init.headers || {}),
-    },
-  });
-}
+import {
+  STATE_KEY,
+  audit,
+  currentVersion,
+  dataStore,
+  errorResponse,
+  json,
+  migrateLegacyPasswords,
+  readJson,
+  requireCsrf,
+  requireSession,
+  sanitizeState,
+  saveVersionedBackup,
+  stateForPlayer,
+} from "./_lib/security.mts";
 
 export default async (req: Request, _context: Context) => {
-  const store = getStore({ name: STORE_NAME, consistency: "strong" });
+  try {
+    const session = requireSession(req);
+    const store = dataStore();
 
-  if (req.method === "GET") {
-    const state = await store.get(STATE_KEY, { type: "json" });
-    return json({ state: state || null });
+    if (req.method === "GET") {
+      let state = await store.get(STATE_KEY, { type: "json" }) as any;
+      if (!state) return json({ state: null, version: 0 });
+      if (session.role === "coach" && await migrateLegacyPasswords(state)) {
+        state = sanitizeState(state);
+        state._version = currentVersion(state) + 1;
+        state.serverSavedAt = new Date().toISOString();
+        await store.setJSON(STATE_KEY, state);
+        await saveVersionedBackup(store, state, "credential-migration");
+        await audit("state.credentials_migrated", session);
+      }
+      const version = currentVersion(state);
+      const visibleState = session.role === "coach" ? sanitizeState(state) : stateForPlayer(state, Number(session.playerId));
+      delete (visibleState as any)._version;
+      return json({ state: visibleState, version });
+    }
+
+    if (req.method === "POST") {
+      requireCsrf(req, session);
+      if (session.role !== "coach") return json({ error: "Accès refusé" }, { status: 403 });
+      const body = await readJson<{ state?: unknown; expectedVersion?: number }>(req);
+      if (!body.state || typeof body.state !== "object" || Array.isArray(body.state)) {
+        return json({ error: "État invalide" }, { status: 400 });
+      }
+      const current = await store.get(STATE_KEY, { type: "json" }) as any;
+      const version = currentVersion(current);
+      if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) !== version) {
+        return json({ error: "Les données ont été modifiées ailleurs", version }, { status: 409 });
+      }
+      const payload = sanitizeState(body.state);
+      payload._version = version + 1;
+      payload.serverSavedAt = new Date().toISOString();
+      await store.setJSON(STATE_KEY, payload);
+      await saveVersionedBackup(store, payload, "state-save");
+      await audit("state.saved", session, { version: payload._version });
+      return json({ ok: true, serverSavedAt: payload.serverSavedAt, version: payload._version });
+    }
+
+    return json({ error: "Méthode refusée" }, { status: 405, headers: { Allow: "GET, POST" } });
+  } catch (error) {
+    return errorResponse(error);
   }
-
-  if (req.method === "POST") {
-    const state = await req.json();
-    const savedAt = new Date().toISOString();
-    const payload = {
-      ...state,
-      serverSavedAt: savedAt,
-    };
-
-    await store.setJSON(STATE_KEY, payload);
-    await store.setJSON(`state/backups/${dayKey()}.json`, payload);
-
-    return json({ ok: true, serverSavedAt: savedAt });
-  }
-
-  return json({ error: "Method not allowed" }, { status: 405 });
 };
 
 export const config: Config = {

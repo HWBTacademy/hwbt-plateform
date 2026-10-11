@@ -460,6 +460,8 @@ body{min-width:0}
         <button class="role-btn" id="rb-coach" onclick="setRole('coach')">COACH</button>
         <button class="role-btn active" id="rb-player" onclick="setRole('player')">PLAYER</button>
       </div>
+      <button class="btn btn-ghost btn-sm" id="securityButton" style="width:100%;margin-top:10px" onclick="openModal('security')">SÉCURITÉ</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:7px" onclick="logout()">DÉCONNEXION</button>
       <div class="hwbt-sig">Progress is measured.</div>
     </div>
   </div>
@@ -598,8 +600,14 @@ let UI = {page:'dashboard', subpage:'profil', pillarFilter:'T', selectedPlayerId
 const STORAGE_KEY='hwbt_academy_v3_state';
 let REMOTE_SAVE_TIMER=null;
 let REMOTE_READY=false;
+let REMOTE_VERSION=0;
+let REMOTE_SAVE_IN_FLIGHT=false;
+let REMOTE_SAVE_PENDING=false;
+let AUTH_CSRF='';
+let AUTHENTICATED=false;
 function statePayload(){
-  return {players:STATE.players,sessions:STATE.sessions,matches:STATE.matches,customExercises:STATE.customExercises||[],testResults:STATE.testResults,commandCenter:STATE.commandCenter||{},contentStudio:STATE.contentStudio||{},performanceLab:STATE.performanceLab||{},finance:STATE.finance||{},updatedAt:new Date().toISOString()};
+  const players=(STATE.players||[]).map(player=>{const clean={...player};delete clean.playerPassword;delete clean.password;delete clean.passwordHash;return clean;});
+  return {players,sessions:STATE.sessions,matches:STATE.matches,customExercises:STATE.customExercises||[],testResults:STATE.testResults,commandCenter:STATE.commandCenter||{},contentStudio:STATE.contentStudio||{},performanceLab:STATE.performanceLab||{},finance:STATE.finance||{},updatedAt:new Date().toISOString()};
 }
 function applySavedState(saved){
   if(!saved||typeof saved!=='object') return false;
@@ -636,8 +644,7 @@ function applySavedState(saved){
   return true;
 }
 function saveState(){
-  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(statePayload()));}catch(e){}
-  queueRemoteSave();
+  if(AUTHENTICATED&&STATE.role==='coach') queueRemoteSave();
 }
 let SAVE_STATE_DEBOUNCE_TIMER=null;
 function saveStateDebounced(delay=1500){
@@ -645,19 +652,28 @@ function saveStateDebounced(delay=1500){
   SAVE_STATE_DEBOUNCE_TIMER=setTimeout(saveState,delay);
 }
 function loadState(){
-  try{
-    const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');
-    applySavedState(saved);
-  }catch(e){}
+  try{localStorage.removeItem(STORAGE_KEY);}catch(e){}
+}
+async function apiJson(url,options={}){
+  const headers=new Headers(options.headers||{});
+  headers.set('Accept','application/json');
+  if(options.body&&!headers.has('Content-Type')) headers.set('Content-Type','application/json');
+  if(options.method&&options.method!=='GET'&&AUTH_CSRF) headers.set('X-CSRF-Token',AUTH_CSRF);
+  const res=await fetch(url,{...options,headers,credentials:'same-origin',cache:'no-store'});
+  let data={};
+  try{data=await res.json();}catch(e){}
+  if(res.status===401&&url!=='/api/auth/login'&&url!=='/api/auth/session'){
+    AUTHENTICATED=false;AUTH_CSRF='';REMOTE_READY=false;showLogin();
+  }
+  if(!res.ok){const error=new Error(data.error||`Erreur ${res.status}`);error.status=res.status;error.data=data;throw error;}
+  return data;
 }
 async function loadRemoteState(){
-  if(location.protocol==='file:') return false;
+  if(location.protocol==='file:'||!AUTHENTICATED) return false;
   try{
-    const res=await fetch('/api/state',{headers:{'Accept':'application/json'},cache:'no-store'});
-    if(!res.ok) return false;
-    const data=await res.json();
+    const data=await apiJson('/api/state');
+    REMOTE_VERSION=Number(data.version)||0;
     if(data&&data.state&&applySavedState(data.state)){
-      try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data.state));}catch(e){}
       REMOTE_READY=true;
       return true;
     }
@@ -666,19 +682,27 @@ async function loadRemoteState(){
   }catch(e){return false;}
 }
 function queueRemoteSave(){
-  if(location.protocol==='file:'||!REMOTE_READY) return;
+  if(location.protocol==='file:'||!REMOTE_READY||!AUTHENTICATED||STATE.role!=='coach') return;
   clearTimeout(REMOTE_SAVE_TIMER);
   REMOTE_SAVE_TIMER=setTimeout(saveRemoteState,650);
 }
 async function saveRemoteState(){
-  if(location.protocol==='file:') return;
+  if(location.protocol==='file:'||!AUTHENTICATED||STATE.role!=='coach'||!REMOTE_READY) return;
+  if(REMOTE_SAVE_IN_FLIGHT){REMOTE_SAVE_PENDING=true;return;}
+  REMOTE_SAVE_IN_FLIGHT=true;
   try{
-    await fetch('/api/state',{
+    const data=await apiJson('/api/state',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(statePayload())
+      body:JSON.stringify({state:statePayload(),expectedVersion:REMOTE_VERSION})
     });
-  }catch(e){}
+    REMOTE_VERSION=Number(data.version)||REMOTE_VERSION;
+  }catch(e){
+    if(e.status===409){REMOTE_READY=false;showNotif('Une autre version des données existe. Recharge la page avant de continuer.');}
+    else if(e.status!==401) showNotif('Sauvegarde serveur impossible. Réessaie dans un instant.');
+  }finally{
+    REMOTE_SAVE_IN_FLIGHT=false;
+    if(REMOTE_SAVE_PENDING){REMOTE_SAVE_PENDING=false;queueRemoteSave();}
+  }
 }
 
 // ══════════════════════════════════════════════════
@@ -1914,7 +1938,9 @@ function assetUrl(v){
   return raw;
 }
 function jsStr(v){
-  return String(v??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' ');
+  return String(v??'')
+    .replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,' ')
+    .replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 function aspectByName(name){
   for(const pl of PILLARS){
@@ -2273,8 +2299,7 @@ function playerPhoneForWhatsapp(p){
 }
 function whatsappFeedbackMessage(s,p){
   const link=sessionFeedbackLink(s,p);
-  const pass=p.playerPassword||String(p.code||'').toLowerCase();
-  return `Salut ${p.firstName||p.name}, peux-tu prendre 1 minute pour évaluer ta séance HWBT du ${s.date} ?\n\nLien: ${link}\nIdentifiant: ${p.code||p.name}\nMot de passe: ${pass}\n\nTu choisis ton ressenti et ce que tu veux retravailler. Merci !`;
+  return `Salut ${p.firstName||p.name}, peux-tu prendre 1 minute pour évaluer ta séance HWBT du ${s.date} ?\n\nLien: ${link}\nIdentifiant: ${p.code||p.name}\n\nUtilise le mot de passe qui t’a été communiqué séparément. Tu choisis ton ressenti et ce que tu veux retravailler. Merci !`;
 }
 function whatsappFeedbackUrl(s,p){
   const text=encodeURIComponent(whatsappFeedbackMessage(s,p));
@@ -3430,6 +3455,7 @@ function render(){
   document.getElementById('rb-coach').classList.toggle('active',STATE.role==='coach');
   document.getElementById('rb-player').classList.toggle('active',STATE.role==='player');
   document.getElementById('roleTag').textContent=tr(STATE.role==='coach'?'COACH':'JOUEUR');
+  const securityButton=document.getElementById('securityButton');if(securityButton)securityButton.style.display=STATE.role==='coach'?'block':'none';
   const nav=document.querySelectorAll('.nav-item');
   nav.forEach(n=>{
     const coachOnly=['exercises','aspectsLibrary','payments','commandCenter','contentStudio','matchAnalyst'].includes(n.dataset.page);
@@ -4060,7 +4086,6 @@ function playerMissingData(player){
   const items=[];
   if(!player.profileId) items.push('test mental');
   if(!player.photo) items.push('photo');
-  if(!player.playerPassword) items.push('mot de passe');
   if(!player.birthDate&&!player.birthYear) items.push('naissance');
   if(!player.hand||player.hand==='À définir') items.push('main');
   if(!player.position||player.position==='À définir') items.push('position');
@@ -4512,7 +4537,7 @@ function playerAdminInfoHtml(player){
     ['Mail joueur',player.email||'—'],
     ['Coach',player.coach||'—'],
     ['Code joueur',player.code||'—'],
-    ['Mot de passe joueur',player.playerPassword||(player.code?String(player.code).toLowerCase():'—')]
+    ['Accès joueur','Mot de passe protégé sur le serveur']
   ];
   const parentRows=player.isJunior?[
     ['Parent 1',`${player.parentFirstName||''} ${player.parentLastName||''}`.trim()||'—'],
@@ -9063,7 +9088,7 @@ function playerFormHtml(p=null){
       <div class="g2"><div class="form-group"><label class="form-label">CODE POSTAL</label><input class="form-input" id="m_billingPostalCode" value="${esc(p?.billingPostalCode||'')}"></div><div class="form-group"><label class="form-label">VILLE</label><input class="form-input" id="m_billingCity" value="${esc(p?.billingCity||'')}"></div></div>
     </div>
     <div class="g2"><div class="form-group"><label class="form-label">COACH</label><input class="form-input" id="m_coach" value="${esc(p?.coach||'Thomas')}"></div><div class="form-group"><label class="form-label">CODE JOUEUR</label><input class="form-input" id="m_code" value="${esc(p?.code||'')}" placeholder="créé automatiquement si vide"></div></div>
-    <div class="g2"><div class="form-group"><label class="form-label">MOT DE PASSE JOUEUR</label><input class="form-input" id="m_playerPassword" value="${esc(p?.playerPassword||(p?.code?String(p.code).toLowerCase():''))}" placeholder="ex: md300"></div><div class="form-group"><label class="form-label">ACCÈS JOUEUR</label><div class="muted-help" style="padding:12px;border:1px solid var(--border);border-radius:6px;background:var(--bg4)">Le joueur se connecte avec son code joueur et ce mot de passe. Si vide, le code en minuscule est utilisé.</div></div></div>
+    <div class="g2"><div class="form-group"><label class="form-label">${isEdit?'NOUVEAU MOT DE PASSE (OPTIONNEL)':'MOT DE PASSE JOUEUR'}</label><input class="form-input" id="m_playerPassword" type="password" autocomplete="new-password" minlength="12" value="" placeholder="12 caractères minimum"></div><div class="form-group"><label class="form-label">ACCÈS JOUEUR SÉCURISÉ</label><div class="muted-help" style="padding:12px;border:1px solid var(--border);border-radius:6px;background:var(--bg4)">${isEdit?'Laisse vide pour conserver le mot de passe actuel. Le mot de passe existant ne peut plus être affiché.':'Crée un mot de passe unique de 12 caractères minimum et communique-le séparément au joueur.'}</div></div></div>
     <div class="form-group"><label class="form-label">PHOTO DU JOUEUR</label><div class="photo-picker"><div class="photo-preview" id="m_photoPreview" style="${photo?`background-image:url('${esc(photo)}')`:''}">${photo?'':'PHOTO'}</div><div style="flex:1"><input type="hidden" id="m_photo" value="${esc(photo)}"><input class="photo-input" id="m_photoFile" type="file" accept="image/*" onchange="handlePhotoFile(this,'m_photo','m_photoPreview')"><button type="button" class="btn btn-ghost" onclick="document.getElementById('m_photoFile').click()">CHOISIR UNE PHOTO</button><div class="muted-help">Sur GSM, tu peux choisir une photo de la galerie ou prendre une nouvelle photo. Elle est compressée automatiquement.</div></div></div></div>
     <div class="form-group"><label class="session-player-choice" style="display:inline-flex;width:auto"><input type="checkbox" id="m_isJunior" ${junior?'checked':''} onchange="toggleJuniorFields()"><span><span class="session-player-name">JOUEUR JUNIOR</span><span class="session-player-meta">Afficher les données parents</span></span></label></div>
     <div id="juniorFields" style="${junior?'':'display:none'}">
@@ -9073,6 +9098,23 @@ function playerFormHtml(p=null){
       <div class="g2"><div class="form-group"><label class="form-label">TÉLÉPHONE PARENT 2</label><input class="form-input" id="m_parent2Phone" type="tel" value="${esc(p?.parent2Phone||'')}"></div><div class="form-group"><label class="form-label">MAIL PARENT 2</label><input class="form-input" id="m_parent2Email" type="email" value="${esc(p?.parent2Email||'')}"></div></div>
     </div>
     <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">ANNULER</button><button class="btn btn-primary" onclick="${isEdit?`savePlayer(${p.id})`:'addPlayer()'}">${isEdit?'ENREGISTRER':'CRÉER'}</button></div>`;
+}
+function securityModalHtml(){
+  return `<div class="modal-title">SÉCURITÉ DU COMPTE COACH</div><button class="modal-close" onclick="closeModal()">×</button>
+    <div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.65;margin-bottom:16px">Modifie régulièrement le mot de passe coach. Il est haché sur le serveur et ne peut plus être affiché.</div>
+    <div class="form-group"><label class="form-label">MOT DE PASSE ACTUEL</label><input class="form-input" id="m_currentCoachPassword" type="password" autocomplete="current-password"></div>
+    <div class="form-group"><label class="form-label">NOUVEAU MOT DE PASSE</label><input class="form-input" id="m_newCoachPassword" type="password" minlength="12" autocomplete="new-password" placeholder="12 caractères minimum"></div>
+    <div class="form-group"><label class="form-label">CONFIRMER LE NOUVEAU MOT DE PASSE</label><input class="form-input" id="m_confirmCoachPassword" type="password" minlength="12" autocomplete="new-password"></div>
+    <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">ANNULER</button><button class="btn btn-primary" onclick="changeCoachPassword()">MODIFIER LE MOT DE PASSE</button></div>`;
+}
+async function changeCoachPassword(){
+  const currentPassword=document.getElementById('m_currentCoachPassword')?.value||'';
+  const newPassword=document.getElementById('m_newCoachPassword')?.value||'';
+  const confirmation=document.getElementById('m_confirmCoachPassword')?.value||'';
+  if(newPassword.length<12){showNotif('Le nouveau mot de passe doit contenir au moins 12 caractères');return;}
+  if(newPassword!==confirmation){showNotif('Les deux nouveaux mots de passe sont différents');return;}
+  try{await apiJson('/api/auth/coach-password',{method:'POST',body:JSON.stringify({currentPassword,newPassword})});closeModal();showNotif('Mot de passe coach modifié');}
+  catch(e){showNotif(e.message||'Modification impossible');}
 }
 function toggleJuniorFields(){
   const box=document.getElementById('juniorFields');
@@ -9102,7 +9144,7 @@ function readPlayerForm(existing=null){
     billingCity:document.getElementById('m_billingCity')?.value.trim()||'',
     coach:document.getElementById('m_coach')?.value.trim()||'Thomas',
     code:baseCode||existing?.code||'',
-    playerPassword:playerPassword||existing?.playerPassword||'',
+    playerPassword,
     photo:document.getElementById('m_photo')?.value.trim()||'',
     isJunior:!!document.getElementById('m_isJunior')?.checked,
     parentFirstName:document.getElementById('m_parentFirstName')?.value.trim()||'',
@@ -9344,6 +9386,7 @@ function saveSessionSchedule(sessionId){
   render();
 }
 function renderModal(type,extra){
+  if(type==='security') return securityModalHtml();
   if(type==='addPlayer') return playerFormHtml();
   if(type==='editPlayer'){const p=STATE.players.find(p=>p.id===extra);return p?playerFormHtml(p):`<div class="modal-title">JOUEUR INTROUVABLE</div><button class="modal-close" onclick="closeModal()">×</button>`}
   if(type==='newSession') return newSessionModalHtml(extra);
@@ -9355,8 +9398,32 @@ function renderModal(type,extra){
   if(type==='sessionExercisePicker') return sessionExercisePickerHtml(extra);
   return `<div class="modal-title">—</div><button class="modal-close" onclick="closeModal()">×</button>`;
 }
-function addPlayer(){const data=readPlayerForm();if(!data.firstName||!data.lastName){showNotif('Prénom et nom requis');return;}const id=Math.max(0,...STATE.players.map(p=>p.id))+1;if(!data.code)data.code=(data.firstName[0]+data.lastName[0]+String(id).padStart(3,'0')).toUpperCase();if(!data.playerPassword)data.playerPassword=String(data.code).toLowerCase();STATE.players.push({...data,id,profileId:null,level:null,levelManual:false,scores:{T:0,TA:0,P:0,M:0},aspects:{},futureAspects:[],sessions:[]});closeModal();showNotif('Fiche joueur créée');setUI({page:'players',selectedPlayerId:id,subpage:'profil'});}
-function savePlayer(id){const p=STATE.players.find(p=>p.id===id);if(!p)return;const data=readPlayerForm(p);if(!data.firstName||!data.lastName){showNotif('Prénom et nom requis');return;}if(!data.playerPassword)data.playerPassword=p.playerPassword||String(data.code||p.code||'').toLowerCase();Object.assign(p,data);closeModal();showNotif('Fiche joueur modifiée');render();}
+async function setPlayerPasswordSecure(playerId,password){
+  if(!password) return true;
+  await apiJson('/api/auth/player-password',{method:'POST',body:JSON.stringify({playerId,password})});
+  return true;
+}
+async function addPlayer(){
+  const data=readPlayerForm();
+  if(!data.firstName||!data.lastName){showNotif('Prénom et nom requis');return;}
+  if(!data.playerPassword||data.playerPassword.length<12){showNotif('Choisis un mot de passe joueur de 12 caractères minimum');return;}
+  const password=data.playerPassword;delete data.playerPassword;
+  const id=Math.max(0,...STATE.players.map(p=>p.id))+1;
+  if(!data.code)data.code=(data.firstName[0]+data.lastName[0]+String(id).padStart(3,'0')).toUpperCase();
+  STATE.players.push({...data,id,profileId:null,level:null,levelManual:false,scores:{T:0,TA:0,P:0,M:0},aspects:{},futureAspects:[],sessions:[]});
+  closeModal();setUI({page:'players',selectedPlayerId:id,subpage:'profil'});
+  try{await saveRemoteState();await setPlayerPasswordSecure(id,password);showNotif('Fiche joueur et accès sécurisé créés');}
+  catch(e){showNotif(e.message||'Fiche créée, mais le mot de passe doit être redéfini');}
+}
+async function savePlayer(id){
+  const p=STATE.players.find(p=>p.id===id);if(!p)return;
+  const data=readPlayerForm(p);if(!data.firstName||!data.lastName){showNotif('Prénom et nom requis');return;}
+  const password=data.playerPassword;delete data.playerPassword;
+  if(password&&password.length<12){showNotif('Le nouveau mot de passe doit contenir au moins 12 caractères');return;}
+  Object.assign(p,data);closeModal();render();
+  try{await saveRemoteState();if(password)await setPlayerPasswordSecure(id,password);showNotif(password?'Fiche et mot de passe modifiés':'Fiche joueur modifiée');}
+  catch(e){showNotif(e.message||'La modification n’a pas pu être enregistrée');}
+}
 function deletePlayer(id){const p=STATE.players.find(p=>p.id===id);if(!p)return;const ok=confirm(`Supprimer ${p.name} ?\n\nSes matchs seront supprimés. Les séances de groupe garderont les autres joueurs. Les séances où il était seul seront supprimées.`);if(!ok)return;STATE.players=STATE.players.filter(x=>x.id!==id);STATE.matches=STATE.matches.filter(m=>m.playerId!==id);STATE.sessions=STATE.sessions.map(s=>{const ids=sessionPlayerIds(s).filter(pid=>pid!==id);return {...s,playerIds:ids,playerId:ids[0]||null};}).filter(s=>sessionPlayerIds(s).length>0);if(STATE.activePlayerId===id)STATE.activePlayerId=null;showNotif('Joueur supprimé');setUI({page:'players',selectedPlayerId:null,subpage:'profil'});}
 function setPlayerManualProfile(id,profileId){const p=STATE.players.find(p=>p.id===id);if(!p)return;const pid=parseInt(profileId);if(pid&&PROFILES.find(pr=>pr.id===pid)){p.profileId=pid;p.profileSource='manual';p.profileAssignedAt=new Date().toISOString();showNotif(`Profil attribué: ${PROFILES.find(pr=>pr.id===pid).name}`);}else{p.profileId=null;p.profileSource='';p.profileAssignedAt='';showNotif('Profil retiré de la fiche');}saveState();render();}
 function deleteSession(id){
@@ -10238,16 +10305,63 @@ function closeSessionCoach(id){
 function setPlayerFeel(id,val){const s=STATE.sessions.find(s=>s.id===id);if(!s)return;const pid=STATE.activePlayerId||sessionPlayerIds(s)[0];const pf=playerSessionFeedback(s,pid);pf.feeling=val;render();}
 function togglePlayerFeedbackOption(id,group,value){const s=STATE.sessions.find(s=>s.id===id);if(!s)return;const pid=STATE.activePlayerId||sessionPlayerIds(s)[0];const pf=playerSessionFeedback(s,pid);pf[group]=Array.isArray(pf[group])?pf[group]:[];const i=pf[group].indexOf(value);if(i>-1)pf[group].splice(i,1);else pf[group].push(value);render();}
 function setPlayerFeedbackNote(id,value){const s=STATE.sessions.find(s=>s.id===id);if(!s)return;const pid=STATE.activePlayerId||sessionPlayerIds(s)[0];const pf=playerSessionFeedback(s,pid);pf.note=value;}
-function submitPlayerFeedback(id){const s=STATE.sessions.find(s=>s.id===id);if(!s)return;const pid=STATE.activePlayerId||sessionPlayerIds(s)[0];const pf=playerSessionFeedback(s,pid);if(!pf.feeling){showNotif('Indique ton ressenti global');return;}const count=['helped','difficult','wantNext'].reduce((n,k)=>n+(Array.isArray(pf[k])?pf[k].length:0),0);if(!count){showNotif('Choisis au moins un ressenti prédéfini');return;}pf.submitted=true;pf.submittedAt=new Date().toISOString();if(allSessionPlayersGaveFeedback(s))s.status='completed';showNotif(allSessionPlayersGaveFeedback(s)?'Avis enregistré · séance clôturée':'Avis enregistré · attente des autres joueurs');setUI({page:'dashboard',selectedSessionId:null});}
+async function submitPlayerFeedback(id){
+  const s=STATE.sessions.find(s=>s.id===id);if(!s)return;
+  const pid=STATE.activePlayerId||sessionPlayerIds(s)[0];const pf=playerSessionFeedback(s,pid);
+  if(!pf.feeling){showNotif('Indique ton ressenti global');return;}
+  const count=['helped','difficult','wantNext'].reduce((n,k)=>n+(Array.isArray(pf[k])?pf[k].length:0),0);
+  if(!count){showNotif('Choisis au moins un ressenti prédéfini');return;}
+  try{
+    await apiJson('/api/player-feedback',{method:'POST',body:JSON.stringify({sessionId:id,feeling:pf.feeling,helped:pf.helped||[],difficult:pf.difficult||[],wantNext:pf.wantNext||[],note:pf.note||''})});
+    await loadRemoteState();showNotif('Avis enregistré en sécurité');setUI({page:'dashboard',selectedSessionId:null});
+  }catch(e){showNotif(e.message||'Le retour n’a pas pu être enregistré');}
+}
 
 function norm(v){return String(v||'').trim().toLowerCase().replace(/\s+/g,'');}
 function playerLoginMatches(p,u){const n=norm(u);return [p.code,p.name,p.firstName,p.lastName].filter(Boolean).some(v=>norm(v)===n);}
 function showLogin(){document.getElementById('authOverlay').style.display='flex';}
 function hideLogin(){document.getElementById('authOverlay').style.display='none';}
-function loginCoach(){const u=document.getElementById('loginUser').value;const p=document.getElementById('loginPass').value;if(norm(u)==='coach'&&(norm(p)==='hwbt'||norm(p)==='coach')){STATE.coachUnlocked=true;STATE.role='coach';STATE.activePlayerId=null;hideLogin();setUI({page:'dashboard',selectedPlayerId:null,selectedSessionId:null});}else showNotif('Accès coach: coach / hwbt');}
-function loginPlayer(){const u=document.getElementById('loginUser').value;const pass=document.getElementById('loginPass').value;const p=STATE.players.find(pl=>playerLoginMatches(pl,u));if(!p){showNotif('Joueur introuvable. Essaie le code joueur, ex: MD300');return;}const expected=p.playerPassword||p.code||'';if(!expected||norm(pass)!==norm(expected)){showNotif('Mot de passe joueur incorrect');return;}STATE.coachUnlocked=false;STATE.role='player';STATE.activePlayerId=p.id;hideLogin();const targetId=feedbackSessionFromUrl();const target=targetId?STATE.sessions.find(s=>s.id===targetId&&playerInSession(s,p.id)):null;if(target)setUI({page:'sessions',selectedPlayerId:p.id,selectedSessionId:target.id});else setUI({page:'dashboard',selectedPlayerId:p.id,selectedSessionId:null});}
-function logout(){showLogin();}
-async function initApp(){loadState();await loadRemoteState();document.documentElement.lang=STATE.lang;document.getElementById('mainContent').innerHTML='';document.getElementById('pageTitle').textContent='';document.getElementById('roleTag').textContent='';if(!document.getElementById('authOverlay')){document.body.insertAdjacentHTML('beforeend',`<div id="authOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px"><div class="card" style="width:min(460px,94vw);margin:0"><div style="font-size:34px;font-weight:700;letter-spacing:5px;margin-bottom:4px">HWBT</div><div class="card-title">ACCÈS PLATEFORME</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7;margin-bottom:16px">Entre ton identifiant et ton mot de passe personnel. Les accès sont fournis par le coach.</div><div class="form-group"><label class="form-label">NOM D'UTILISATEUR / CODE JOUEUR</label><input class="form-input" id="loginUser" placeholder="Code joueur ou accès coach"></div><div class="form-group"><label class="form-label">MOT DE PASSE</label><input class="form-input" id="loginPass" type="password" placeholder="Mot de passe"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="loginPlayer()">ENTRER JOUEUR</button><button class="btn btn-ghost" onclick="loginCoach()">ENTRER COACH</button><button class="btn btn-ghost" onclick="setLang(STATE.lang==='fr'?'en':'fr')">FR / EN</button></div><div style="font-size:10px;color:var(--bronze);margin-top:14px;font-family:var(--font-body);letter-spacing:.6px">Login à demander au coach.</div></div></div>`);}render();showLogin();const prefill=feedbackUserFromUrl();if(prefill){const el=document.getElementById('loginUser');if(el)el.value=prefill;}}
+async function loginWithRole(role){
+  const username=document.getElementById('loginUser')?.value||'';
+  const password=document.getElementById('loginPass')?.value||'';
+  if(!username||!password){showNotif('Entre ton identifiant et ton mot de passe');return;}
+  try{
+    const data=await apiJson('/api/auth/login',{method:'POST',body:JSON.stringify({username,password,role})});
+    AUTH_CSRF=data.csrfToken||'';AUTHENTICATED=true;REMOTE_READY=false;
+    STATE.role=data.user.role;STATE.coachUnlocked=data.user.role==='coach';STATE.activePlayerId=data.user.playerId||null;
+    await loadRemoteState();hideLogin();
+    const targetId=feedbackSessionFromUrl();
+    const target=data.user.role==='player'&&targetId?STATE.sessions.find(s=>s.id===targetId&&playerInSession(s,STATE.activePlayerId)):null;
+    if(target)setUI({page:'sessions',selectedPlayerId:STATE.activePlayerId,selectedSessionId:target.id});
+    else setUI({page:'dashboard',selectedPlayerId:data.user.playerId||null,selectedSessionId:null});
+    if(data.user.role==='coach'&&data.mustChangePassword){openModal('security');showNotif('Remplace maintenant le mot de passe coach temporaire');}
+    const passInput=document.getElementById('loginPass');if(passInput)passInput.value='';
+  }catch(e){showNotif(e.message||'Connexion impossible');}
+}
+function loginCoach(){return loginWithRole('coach');}
+function loginPlayer(){return loginWithRole('player');}
+function clearSensitiveClientState(){
+  STATE.players=[];STATE.sessions=[];STATE.matches=[];STATE.customExercises=[];STATE.testResults={};STATE.commandCenter={};STATE.contentStudio={};STATE.performanceLab={players:{},notes:[]};STATE.finance={payments:[],invoiceSeq:1,settings:{},defaults:{courtCost:0,lessonCost60:0,lessonCost90:0}};STATE.coachUnlocked=false;STATE.activePlayerId=null;STATE.role='player';
+}
+async function logout(){
+  try{if(AUTHENTICATED)await apiJson('/api/auth/logout',{method:'POST',body:'{}'});}catch(e){}
+  AUTHENTICATED=false;AUTH_CSRF='';REMOTE_READY=false;REMOTE_VERSION=0;clearSensitiveClientState();render();showLogin();showNotif('Déconnexion effectuée');
+}
+async function resumeSecureSession(){
+  try{
+    const data=await apiJson('/api/auth/session');
+    AUTH_CSRF=data.csrfToken||'';AUTHENTICATED=!!data.authenticated;
+    if(!AUTHENTICATED)return false;
+    STATE.role=data.user.role;STATE.coachUnlocked=data.user.role==='coach';STATE.activePlayerId=data.user.playerId||null;
+    await loadRemoteState();return true;
+  }catch(e){AUTHENTICATED=false;AUTH_CSRF='';return false;}
+}
+async function initApp(){
+  loadState();document.documentElement.lang=STATE.lang;document.getElementById('mainContent').innerHTML='';document.getElementById('pageTitle').textContent='';document.getElementById('roleTag').textContent='';
+  if(!document.getElementById('authOverlay')){document.body.insertAdjacentHTML('beforeend',`<div id="authOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.96);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px"><div class="card" style="width:min(460px,94vw);margin:0"><div style="font-size:34px;font-weight:700;letter-spacing:5px;margin-bottom:4px">HWBT</div><div class="card-title">ACCÈS SÉCURISÉ</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7;margin-bottom:16px">La connexion est vérifiée par le serveur. Entre ton identifiant et ton mot de passe personnel.</div><div class="form-group"><label class="form-label">NOM D'UTILISATEUR / CODE JOUEUR</label><input class="form-input" id="loginUser" autocomplete="username" placeholder="Code joueur ou accès coach"></div><div class="form-group"><label class="form-label">MOT DE PASSE</label><input class="form-input" id="loginPass" type="password" autocomplete="current-password" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')loginPlayer()"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="loginPlayer()">ENTRER JOUEUR</button><button class="btn btn-ghost" onclick="loginCoach()">ENTRER COACH</button><button class="btn btn-ghost" onclick="setLang(STATE.lang==='fr'?'en':'fr')">FR / EN</button></div><div style="font-size:10px;color:var(--bronze);margin-top:14px;font-family:var(--font-body);letter-spacing:.6px">Les mots de passe ne sont jamais affichés ni envoyés dans les messages.</div></div></div>`);}
+  showLogin();const resumed=await resumeSecureSession();render();if(resumed)hideLogin();
+  const prefill=feedbackUserFromUrl();if(prefill){const el=document.getElementById('loginUser');if(el)el.value=prefill;}
+}
 window.addEventListener('DOMContentLoaded',initApp);
 </script>
 </body>
