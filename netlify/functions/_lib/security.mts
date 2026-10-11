@@ -11,6 +11,7 @@ export const DATA_STORE = "hwbt-academy";
 export const AUTH_STORE = "hwbt-auth";
 export const STATE_KEY = "state/current.json";
 export const SESSION_COOKIE = "__Host-hwbt_session";
+export const PRIVACY_NOTICE_VERSION = "2026-10-11";
 export const MAX_JSON_BYTES = 5 * 1024 * 1024;
 
 export type Role = "coach" | "player";
@@ -190,6 +191,40 @@ export function validateNewPassword(password: unknown) {
   return value;
 }
 
+export function isMinorPlayer(player: any, now = new Date()) {
+  if (player?.isJunior === true) return true;
+  const birthDate = typeof player?.birthDate === "string" ? player.birthDate : "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
+    const born = new Date(`${birthDate}T00:00:00Z`);
+    if (!Number.isNaN(born.getTime())) {
+      let age = now.getUTCFullYear() - born.getUTCFullYear();
+      const month = now.getUTCMonth() - born.getUTCMonth();
+      if (month < 0 || (month === 0 && now.getUTCDate() < born.getUTCDate())) age -= 1;
+      return age < 18;
+    }
+  }
+  const year = Number(player?.birthYear);
+  return Number.isInteger(year) && year > now.getUTCFullYear() - 18;
+}
+
+export function minorPlatformApproved(player: any) {
+  if (!isMinorPlayer(player)) return true;
+  const compliance = player?.minorCompliance;
+  return !!(
+    compliance
+    && compliance.platformApproved === true
+    && typeof compliance.guardianName === "string"
+    && compliance.guardianName.trim()
+    && typeof compliance.guardianEmail === "string"
+    && compliance.guardianEmail.includes("@")
+    && typeof compliance.approvedAt === "string"
+    && compliance.approvedAt
+    && ["signed_form", "email", "in_person"].includes(String(compliance.verificationMethod || ""))
+    && compliance.noticeVersion === PRIVACY_NOTICE_VERSION
+    && !compliance.withdrawnAt
+  );
+}
+
 export function dataStore() {
   return getStore({ name: DATA_STORE, consistency: "strong" });
 }
@@ -210,6 +245,8 @@ export function sanitizeState(input: any) {
         delete clean.playerPassword;
         delete clean.password;
         delete clean.passwordHash;
+        clean.isJunior = isMinorPlayer(clean);
+        if (clean.isJunior && clean.minorCompliance?.photoApproved !== true) clean.photo = "";
         return clean;
       })
     : [];
@@ -308,6 +345,16 @@ export function stateForPlayer(rawState: any, playerId: number) {
     "parentFirstName", "parentLastName", "parentPhone", "parentEmail", "parent2FirstName", "parent2LastName",
     "parent2Phone", "parent2Email",
   ]) delete ownPlayer[key];
+  if (ownPlayer.minorCompliance && typeof ownPlayer.minorCompliance === "object") {
+    const compliance = ownPlayer.minorCompliance as Record<string, unknown>;
+    ownPlayer.minorCompliance = {
+      platformApproved: compliance.platformApproved === true,
+      photoApproved: compliance.photoApproved === true,
+      profilingApproved: compliance.profilingApproved === true,
+      approvedAt: typeof compliance.approvedAt === "string" ? compliance.approvedAt : "",
+      noticeVersion: typeof compliance.noticeVersion === "string" ? compliance.noticeVersion : "",
+    };
+  }
   const ownSessions = state.sessions
     .filter((session: any) => sessionHasPlayer(session, playerId))
     .map((session: any) => sessionForPlayer(session, playerId));

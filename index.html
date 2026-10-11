@@ -442,6 +442,7 @@ body{min-width:0}
       <div class="nav-item" data-page="matchAnalyst" onclick="setUI({page:'matchAnalyst',matchAnalystTab:'coach'})" style="display: flex;"><span class="nav-icon">◇</span>MATCH ANALYST</div>
       <div class="nav-item" data-page="test" onclick="setUI({page:'test'})" style="display: flex;"><span class="nav-icon">◎</span>PERSONALITY TEST</div>
       <div class="nav-item" data-page="nutrition" onclick="setUI({page:'nutrition',nutritionTab:'basics',nutritionFilter:'all',nutritionSearch:'',nutritionPackFilter:null})" style="display: flex;"><span class="nav-icon">◍</span>NUTRITION</div>
+      <div class="nav-item" data-page="compliance" onclick="setUI({page:'compliance'})" style="display: flex;"><span class="nav-icon">◈</span>PROTECTION MINEURS</div>
     </div>
     <div class="nav-section">
       <div class="nav-label">BUSINESS</div>
@@ -590,7 +591,8 @@ let STATE = {
     invoiceSeq: 1,
     settings: {
       companyName: 'HWBT Academy', ownerName: '', address: '', postalCode: '', city: '',
-      enterpriseNumber: '', iban: '', email: '', phone: '', legalNote: '', venueName: "L'Argayon"
+      enterpriseNumber: '', iban: '', email: '', privacyEmail: '', phone: '', legalNote: '', venueName: "L'Argayon",
+      privacyNoticeVersion: '2026-10-11', coachingRetentionMonths: 24, inactiveAccountRetentionMonths: 24, securityLogRetentionMonths: 12, backupRetentionDays: 90
     },
     defaults: {courtCost:0, lessonCost60:0, lessonCost90:0}
   }
@@ -605,6 +607,8 @@ let REMOTE_SAVE_IN_FLIGHT=false;
 let REMOTE_SAVE_PENDING=false;
 let AUTH_CSRF='';
 let AUTHENTICATED=false;
+const PRIVACY_NOTICE_VERSION='2026-10-11';
+let PUBLIC_PRIVACY={version:PRIVACY_NOTICE_VERSION,controller:{companyName:'HWBT Academy',ownerName:'',address:'',postalCode:'',city:'',enterpriseNumber:'',email:'',phone:''},retention:{coachingMonths:24,inactiveAccountMonths:24,securityLogMonths:12,backupDays:90}};
 function statePayload(){
   const players=(STATE.players||[]).map(player=>{const clean={...player};delete clean.playerPassword;delete clean.password;delete clean.passwordHash;return clean;});
   return {players,sessions:STATE.sessions,matches:STATE.matches,customExercises:STATE.customExercises||[],testResults:STATE.testResults,commandCenter:STATE.commandCenter||{},contentStudio:STATE.contentStudio||{},performanceLab:STATE.performanceLab||{},finance:STATE.finance||{},updatedAt:new Date().toISOString()};
@@ -667,6 +671,50 @@ async function apiJson(url,options={}){
   }
   if(!res.ok){const error=new Error(data.error||`Erreur ${res.status}`);error.status=res.status;error.data=data;throw error;}
   return data;
+}
+async function loadPublicPrivacy(){
+  if(location.protocol==='file:') return PUBLIC_PRIVACY;
+  try{
+    const res=await fetch('/api/privacy',{headers:{Accept:'application/json'},cache:'no-store'});
+    if(res.ok){const data=await res.json();if(data&&data.controller)PUBLIC_PRIVACY=data;}
+  }catch(e){}
+  return PUBLIC_PRIVACY;
+}
+function privacyControllerText(){
+  const c=PUBLIC_PRIVACY.controller||{};
+  const address=[c.address,[c.postalCode,c.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  return [c.companyName||'HWBT Academy',c.ownerName,address,c.enterpriseNumber?`N° entreprise ${c.enterpriseNumber}`:'',c.email,c.phone].filter(Boolean).join(' · ');
+}
+function privacyNoticeContent(){
+  const c=PUBLIC_PRIVACY.controller||{};
+  const retention=PUBLIC_PRIVACY.retention||{};
+  const contact=c.email||'le coach HWBT';
+  return `<h1>Vie privée et protection des mineurs</h1>
+    <p class="lead"><b>Version ${esc(PUBLIC_PRIVACY.version||PRIVACY_NOTICE_VERSION)}</b> — Cette notice explique simplement ce que HWBT Academy conserve et pourquoi.</p>
+    <h2>Résumé pour le jeune joueur</h2>
+    <p>Ton espace est privé. Tu vois uniquement tes informations et tes matchs. Le coach utilise tes données pour organiser les entraînements, suivre ta progression et sécuriser ton compte. Tes données ne sont pas vendues et la plateforme n’affiche pas de publicité ciblée.</p>
+    <p>Tu peux demander au coach ou à ton parent de corriger une erreur, obtenir une copie de tes données ou demander leur suppression lorsqu’aucune obligation légale ne nécessite leur conservation.</p>
+    <h2>Responsable du traitement</h2>
+    <p>${esc(privacyControllerText()||'HWBT Academy')}</p>
+    <h2>Données utilisées</h2>
+    <ul><li>identité, année ou date de naissance, coordonnées du joueur et des responsables parentaux;</li><li>photo privée uniquement si une autorisation distincte a été donnée;</li><li>séances, matchs, scores, évaluations sportives et retours du joueur;</li><li>profil de communication ou test de personnalité uniquement avec autorisation pour un mineur;</li><li>données de connexion et journal de sécurité;</li><li>paiements et informations nécessaires aux factures.</li></ul>
+    <h2>Pourquoi et sur quelle base</h2>
+    <ul><li>exécuter l’accompagnement sportif et gérer les séances;</li><li>respecter les obligations comptables et administratives;</li><li>protéger les comptes et prévenir les accès abusifs;</li><li>utiliser une photo privée ou un profil comportemental seulement lorsqu’une autorisation spécifique le permet.</li></ul>
+    <h2>Mineurs et autorisations</h2>
+    <p>L’accès d’un mineur est bloqué tant que le coach n’a pas vérifié une autorisation parentale. L’autorisation générale, la photo et le profil comportemental sont des choix séparés. Un retrait est possible à tout moment; le retrait de l’accès entraîne la désactivation du compte.</p>
+    <h2>Destinataires et hébergement</h2>
+    <p>Les données sont accessibles au coach autorisé et aux prestataires techniques nécessaires, notamment Netlify pour l’hébergement. D’éventuels transferts internationaux du prestataire doivent être couverts par ses garanties contractuelles applicables. Aucune donnée de joueur n’est rendue publique par cette plateforme.</p>
+    <h2>Durées</h2>
+    <p>Les données d’accompagnement et les comptes inactifs sont revus après environ ${esc(retention.coachingMonths||24)} et ${esc(retention.inactiveAccountMonths||24)} mois. Les journaux de sécurité et sauvegardes techniques sont limités à environ ${esc(retention.securityLogMonths||12)} mois et ${esc(retention.backupDays||90)} jours. Les factures restent conservées pendant la durée imposée par la loi. Les données devenues inutiles doivent être supprimées ou anonymisées.</p>
+    <h2>Vos droits</h2>
+    <p>Pour demander l’accès, la correction, la limitation, l’opposition, la portabilité ou l’effacement, contactez ${esc(contact)}. Une réclamation peut aussi être introduite auprès de l’Autorité de protection des données belge.</p>`;
+}
+function openPrivacyNotice(){
+  const win=window.open('','_blank');
+  if(!win){showNotif('Autorise les fenêtres pour ouvrir la notice');return;}
+  win.document.open();
+  win.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Vie privée HWBT</title><style>body{font-family:Arial,sans-serif;color:#171717;max-width:850px;margin:0 auto;padding:32px;line-height:1.65}h1{font-size:30px}h2{font-size:18px;margin-top:28px;border-bottom:1px solid #ddd;padding-bottom:6px}.lead{background:#f5f0e8;border-left:4px solid #a67c52;padding:14px}li{margin:7px 0}.print{position:fixed;right:18px;top:18px;padding:10px 14px}@media print{.print{display:none}body{padding:0}}</style></head><body><button class="print" onclick="window.print()">Imprimer / PDF</button>${privacyNoticeContent()}</body></html>`);
+  win.document.close();
 }
 async function loadRemoteState(){
   if(location.protocol==='file:'||!AUTHENTICATED) return false;
@@ -3421,7 +3469,7 @@ function setLang(lang){
   render();
 }
 function updateChromeText(){
-  const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',payments:'PAIEMENTS',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
+  const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',payments:'PAIEMENTS',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION',compliance:'PROTECTION MINEURS'};
   document.querySelectorAll('.nav-item').forEach(n=>{
     const icon=n.querySelector('.nav-icon')?.textContent||'';
     const playerNames={dashboard:'MES INFOS',players:'MES MATCHS'};
@@ -3471,7 +3519,7 @@ function render(){
   });
   const roleSwitcher=document.querySelector('.role-switcher');
   if(roleSwitcher) roleSwitcher.style.display=STATE.role==='player'?'none':'flex';
-  const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',payments:'PAIEMENTS',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
+  const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',payments:'PAIEMENTS',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION',compliance:'PROTECTION MINEURS'};
   const playerTitles={dashboard:'MES INFORMATIONS',players:'MES MATCHS',sessions:'MON RETOUR DE SÉANCE'};
   document.getElementById('pageTitle').textContent=tr(STATE.role==='player'?(playerTitles[UI.page]||'MON ESPACE'):(titles[UI.page]||UI.page.toUpperCase()));
   const mc=document.getElementById('mainContent');
@@ -3490,6 +3538,7 @@ function render(){
   else if(UI.page==='matchAnalyst') mc.innerHTML=pageMatchAnalyst();
   else if(UI.page==='test') mc.innerHTML=pageTest();
   else if(UI.page==='nutrition') mc.innerHTML=pageNutrition();
+  else if(UI.page==='compliance') mc.innerHTML=pageCompliance();
   translateDom(mc);
   saveState();
 }
@@ -3712,7 +3761,7 @@ function paymentSettingsHtml(){
 function savePaymentSettings(){
   const finance=financeState();
   const value=id=>document.getElementById(id)?.value.trim()||'';
-  finance.settings={
+  finance.settings={...finance.settings,
     companyName:value('fin_companyName'),ownerName:value('fin_ownerName'),address:value('fin_address'),postalCode:value('fin_postalCode'),city:value('fin_city'),
     enterpriseNumber:value('fin_enterpriseNumber'),iban:value('fin_iban'),email:value('fin_email'),phone:value('fin_phone'),legalNote:value('fin_legalNote'),venueName:value('fin_venueName')||"L'Argayon"
   };
@@ -3899,6 +3948,76 @@ function openInvoice(id){
   win.document.open();win.document.write(invoiceDocumentHtml(payment));win.document.close();
 }
 
+function isPlayerMinorClient(player){
+  if(player?.isJunior===true) return true;
+  const birth=String(player?.birthDate||'');
+  if(/^\d{4}-\d{2}-\d{2}$/.test(birth)){
+    const born=new Date(`${birth}T00:00:00`);const now=new Date();let age=now.getFullYear()-born.getFullYear();
+    if(now.getMonth()<born.getMonth()||(now.getMonth()===born.getMonth()&&now.getDate()<born.getDate()))age--;
+    return age<18;
+  }
+  const year=Number(player?.birthYear);return Number.isInteger(year)&&year>new Date().getFullYear()-18;
+}
+function minorComplianceOk(player){
+  const c=player?.minorCompliance||{};
+  return !isPlayerMinorClient(player)||(c.platformApproved===true&&!!c.guardianName&&String(c.guardianEmail||'').includes('@')&&!!c.approvedAt&&['signed_form','email','in_person'].includes(c.verificationMethod)&&c.noticeVersion===PRIVACY_NOTICE_VERSION&&!c.withdrawnAt);
+}
+function complianceBadge(ok,yes='VALIDÉ',no='À COMPLÉTER'){
+  return `<span style="font-size:8px;letter-spacing:1px;border:1px solid ${ok?'var(--vert)':'var(--rouge)'};color:${ok?'var(--vert)':'var(--rouge)'};border-radius:4px;padding:4px 7px">${ok?yes:no}</span>`;
+}
+function pageCompliance(){
+  if(STATE.role!=='coach') return pagePlayerInfoSimple();
+  const s=financeState().settings;
+  const minors=STATE.players.filter(isPlayerMinorClient);
+  const blocked=minors.filter(p=>!minorComplianceOk(p));
+  const identityMissing=[['Nom entreprise',s.companyName],['Responsable',s.ownerName],['Adresse',s.address],['Code postal',s.postalCode],['Ville',s.city],['E-mail vie privée',s.privacyEmail||s.email]].filter(([,v])=>!String(v||'').trim()).map(([k])=>k);
+  return `<div class="content">
+    <div class="card" style="border-color:${blocked.length||identityMissing.length?'var(--jaune)':'var(--vert)'}"><div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap"><div><div class="card-title">RGPD & PROTECTION DES MINEURS</div><div style="font-size:28px;font-weight:900">${blocked.length+identityMissing.length?`${blocked.length+identityMissing.length} ACTION${blocked.length+identityMissing.length>1?'S':''} À TERMINER`:'DOSSIERS À JOUR'}</div><div class="muted-help" style="margin-top:8px">Version de la notice : ${PRIVACY_NOTICE_VERSION}. Les accès mineurs sans autorisation sont automatiquement bloqués.</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost" onclick="openPrivacyNotice()">NOTICE VIE PRIVÉE</button><button class="btn btn-ghost" onclick="openProcessingRegister()">REGISTRE RGPD</button></div></div></div>
+    ${identityMissing.length?`<div class="card" style="border-color:var(--jaune)"><div class="card-title">IDENTITÉ DU RESPONSABLE INCOMPLÈTE</div><div class="muted-help">À compléter : ${esc(identityMissing.join(', '))}. Ces informations doivent apparaître dans la notice destinée aux familles.</div></div>`:''}
+    <div class="card"><div class="card-title">RESPONSABLE DU TRAITEMENT</div>
+      <div class="g2"><div class="form-group"><label class="form-label">NOM DE L’ENTREPRISE / ACADÉMIE</label><input class="form-input" id="cmp_companyName" value="${esc(s.companyName||'HWBT Academy')}"></div><div class="form-group"><label class="form-label">NOM DU RESPONSABLE</label><input class="form-input" id="cmp_ownerName" value="${esc(s.ownerName||'')}"></div></div>
+      <div class="form-group"><label class="form-label">ADRESSE</label><input class="form-input" id="cmp_address" value="${esc(s.address||'')}"></div>
+      <div class="g2"><div class="form-group"><label class="form-label">CODE POSTAL</label><input class="form-input" id="cmp_postalCode" value="${esc(s.postalCode||'')}"></div><div class="form-group"><label class="form-label">VILLE</label><input class="form-input" id="cmp_city" value="${esc(s.city||'')}"></div></div>
+      <div class="g2"><div class="form-group"><label class="form-label">N° D’ENTREPRISE</label><input class="form-input" id="cmp_enterpriseNumber" value="${esc(s.enterpriseNumber||'')}"></div><div class="form-group"><label class="form-label">E-MAIL VIE PRIVÉE</label><input class="form-input" id="cmp_privacyEmail" type="email" value="${esc(s.privacyEmail||s.email||'')}"></div></div>
+      <div class="g2"><div class="form-group"><label class="form-label">REVUE DES DONNÉES COACHING APRÈS</label><input class="form-input" id="cmp_coachingRetention" type="number" min="1" max="120" value="${esc(s.coachingRetentionMonths||24)}"><div class="muted-help">Mois après la dernière activité.</div></div><div class="form-group"><label class="form-label">REVUE D’UN COMPTE INACTIF APRÈS</label><input class="form-input" id="cmp_accountRetention" type="number" min="1" max="120" value="${esc(s.inactiveAccountRetentionMonths||24)}"><div class="muted-help">Mois sans utilisation.</div></div></div>
+      <div class="g2"><div class="form-group"><label class="form-label">JOURNAUX DE SÉCURITÉ</label><input class="form-input" id="cmp_securityRetention" type="number" min="1" max="36" value="${esc(s.securityLogRetentionMonths||12)}"><div class="muted-help">Conservation automatique en mois.</div></div><div class="form-group"><label class="form-label">SAUVEGARDES TECHNIQUES</label><input class="form-input" id="cmp_backupRetention" type="number" min="7" max="365" value="${esc(s.backupRetentionDays||90)}"><div class="muted-help">Conservation automatique en jours.</div></div></div>
+      <div style="display:flex;justify-content:flex-end"><button class="btn btn-primary" onclick="saveComplianceSettings()">ENREGISTRER LES RÉGLAGES</button></div>
+    </div>
+    <div class="card"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><div class="card-title">DOSSIERS DES JOUEURS MINEURS</div><div class="muted-help">${minors.length} mineur${minors.length>1?'s':''} · ${blocked.length} accès bloqué${blocked.length>1?'s':''}</div></div></div>
+      ${minors.length?minors.map(p=>{const c=p.minorCompliance||{};return `<div style="display:grid;grid-template-columns:minmax(150px,1fr) repeat(3,auto) auto;gap:10px;align-items:center;padding:13px 0;border-top:1px solid var(--border)"><div><div style="font-size:13px;font-weight:800">${esc(p.name)}</div><div class="muted-help">${esc(p.birthDate||p.birthYear||'âge à vérifier')} · ${esc(c.guardianName||'responsable non indiqué')}</div></div>${complianceBadge(minorComplianceOk(p),'ACCÈS AUTORISÉ','ACCÈS BLOQUÉ')}${complianceBadge(c.photoApproved===true,'PHOTO OUI','PHOTO NON')}${complianceBadge(c.profilingApproved===true,'PROFIL OUI','PROFIL NON')}<div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="printGuardianConsent(${p.id})">FORMULAIRE</button><button class="btn btn-primary btn-sm" onclick="openModal('editPlayer',${p.id})">GÉRER</button></div></div>`}).join(''):`<div class="muted-help" style="padding:18px 0">Aucun joueur mineur enregistré.</div>`}
+    </div>
+    <div class="g2"><div class="card"><div class="card-title">EN CAS DE DEMANDE D’EFFACEMENT</div><div class="muted-help">Le bouton Supprimer d’une fiche efface maintenant le compte, le mot de passe, les données sportives et les copies de sauvegarde. Les factures restent séparées lorsqu’une conservation légale est nécessaire.</div></div><div class="card"><div class="card-title">EN CAS DE FUITE DE DONNÉES</div><div class="muted-help">Note immédiatement la date, les données concernées et les personnes touchées. Une notification à l’Autorité de protection des données peut être nécessaire dans les 72 heures si la fuite présente un risque.</div></div></div>
+  </div>`;
+}
+function saveComplianceSettings(){
+  const value=id=>document.getElementById(id)?.value.trim()||'';
+  const s=financeState().settings;
+  s.companyName=value('cmp_companyName')||'HWBT Academy';s.ownerName=value('cmp_ownerName');s.address=value('cmp_address');s.postalCode=value('cmp_postalCode');s.city=value('cmp_city');s.enterpriseNumber=value('cmp_enterpriseNumber');s.privacyEmail=value('cmp_privacyEmail');
+  s.privacyNoticeVersion=PRIVACY_NOTICE_VERSION;s.coachingRetentionMonths=Math.max(1,Math.min(120,Number(value('cmp_coachingRetention'))||24));s.inactiveAccountRetentionMonths=Math.max(1,Math.min(120,Number(value('cmp_accountRetention'))||24));s.securityLogRetentionMonths=Math.max(1,Math.min(36,Number(value('cmp_securityRetention'))||12));s.backupRetentionDays=Math.max(7,Math.min(365,Number(value('cmp_backupRetention'))||90));
+  PUBLIC_PRIVACY={version:PRIVACY_NOTICE_VERSION,controller:{companyName:s.companyName,ownerName:s.ownerName,address:s.address,postalCode:s.postalCode,city:s.city,enterpriseNumber:s.enterpriseNumber,email:s.privacyEmail||s.email||'',phone:s.phone||''},retention:{coachingMonths:s.coachingRetentionMonths,inactiveAccountMonths:s.inactiveAccountRetentionMonths,securityLogMonths:s.securityLogRetentionMonths,backupDays:s.backupRetentionDays}};
+  saveState();render();showNotif('Réglages de confidentialité enregistrés');
+}
+function openProcessingRegister(){
+  const s=financeState().settings;const win=window.open('','_blank');if(!win)return showNotif('Autorise les fenêtres pour ouvrir le registre');
+  const controller=[s.companyName||'HWBT Academy',s.ownerName,s.address,[s.postalCode,s.city].filter(Boolean).join(' '),s.privacyEmail||s.email].filter(Boolean).join(' · ');
+  const rows=[
+    ['Gestion des joueurs et séances','Joueurs, parents et responsables','Identité, contact, âge, séances, évaluations sportives','Exécution de l’accompagnement sportif / intérêt légitime','Coach autorisé, hébergeur Netlify',`${s.coachingRetentionMonths||24} mois avant revue après dernière activité`],
+    ['Accès numérique et sécurité','Coach et joueurs','Identifiant, mot de passe haché, événements de connexion','Exécution du service / intérêt légitime de sécurité','Coach autorisé, hébergeur Netlify',`${s.securityLogRetentionMonths||12} mois pour les journaux`],
+    ['Autorisation des mineurs','Mineurs et responsables parentaux','Identité du responsable, date, méthode, choix enregistrés','Consentement et preuve de conformité','Coach autorisé','Durée du compte puis durée nécessaire à la preuve'],
+    ['Photo privée','Joueurs ayant accepté','Photo de profil','Consentement distinct','Coach et joueur concerné','Jusqu’au retrait ou à la suppression du compte'],
+    ['Profil comportemental sportif','Joueurs ayant accepté','Réponses au test, profil et recommandations','Consentement pour les mineurs / accompagnement sportif','Coach et joueur concerné','Jusqu’au retrait ou à la suppression du compte'],
+    ['Paiements et factures','Clients et payeurs','Identité de facturation, montants, dates, paiements','Contrat et obligation légale','Coach, comptable et autorités si requis','Durée comptable légalement applicable'],
+    ['Sauvegardes techniques','Personnes présentes dans la plateforme','Copie chiffrée par les protections de l’hébergeur','Intérêt légitime de continuité et sécurité','Hébergeur Netlify',`${s.backupRetentionDays||90} jours`],
+  ];
+  win.document.open();win.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Registre RGPD HWBT</title><style>body{font-family:Arial,sans-serif;color:#111;margin:22px;line-height:1.4}h1{font-size:24px}table{width:100%;border-collapse:collapse;font-size:10px}th,td{border:1px solid #999;padding:7px;vertical-align:top}th{background:#eee}.small{font-size:11px;color:#444}.print{position:fixed;right:16px;top:16px}@media print{.print{display:none}@page{size:A4 landscape;margin:8mm}body{margin:0}}</style></head><body><button class="print" onclick="window.print()">Imprimer / PDF</button><h1>Registre des activités de traitement — HWBT</h1><p class="small"><b>Responsable :</b> ${esc(controller)}<br><b>Mise à jour :</b> ${esc(new Date().toLocaleDateString('fr-BE'))}<br><b>Notice :</b> ${PRIVACY_NOTICE_VERSION}</p><table><thead><tr><th>Traitement</th><th>Personnes</th><th>Données</th><th>Finalité / base</th><th>Destinataires</th><th>Durée</th></tr></thead><tbody>${rows.map(row=>`<tr>${row.map(cell=>`<td>${esc(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table><h2>Mesures de sécurité</h2><p class="small">Authentification serveur, mots de passe hachés, cookies HttpOnly/Secure/SameSite, contrôle des rôles, protection CSRF, limitation des tentatives, filtrage des données par joueur, journal d’audit, sauvegardes versionnées et en-têtes de sécurité.</p><h2>Sous-traitants à vérifier</h2><p class="small">Netlify (hébergement, fonctions et stockage). Conserver le contrat de sous-traitance/DPA applicable et vérifier périodiquement les lieux de traitement et mécanismes de transfert.</p></body></html>`);win.document.close();
+}
+function printGuardianConsent(playerId){
+  const p=STATE.players.find(x=>x.id===playerId);if(!p)return;
+  const c=financeState().settings;const win=window.open('','_blank');if(!win)return showNotif('Autorise les fenêtres pour créer le formulaire');
+  const controller=[c.companyName||'HWBT Academy',c.ownerName,c.address,[c.postalCode,c.city].filter(Boolean).join(' '),c.privacyEmail||c.email].filter(Boolean).join(' · ');
+  win.document.open();win.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Autorisation parentale</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:auto;padding:30px;line-height:1.55;color:#111}h1{font-size:25px}h2{font-size:17px;margin-top:24px}.box{border:1px solid #999;padding:14px;margin:12px 0}.check{font-size:15px;margin:15px 0}.line{display:inline-block;border-bottom:1px solid #111;min-width:260px;height:20px}.small{font-size:12px;color:#444}.print{position:fixed;right:16px;top:16px}@media print{.print{display:none}}</style></head><body><button class="print" onclick="window.print()">Imprimer / PDF</button><h1>Autorisation parentale — espace numérique HWBT</h1><p class="small">Notice de confidentialité version ${PRIVACY_NOTICE_VERSION}</p><div class="box"><b>Responsable :</b> ${esc(controller)}<br><b>Joueur :</b> ${esc(p.name)}<br><b>Date/année de naissance :</b> ${esc(p.birthDate||p.birthYear||'à compléter')}</div><p>Je soussigné(e), <span class="line"></span>, titulaire de l’autorité parentale, confirme avoir reçu et compris la notice de confidentialité HWBT.</p><div class="check">☐ J’autorise la création et l’utilisation de l’espace privé du joueur pour la gestion sportive, les séances, les matchs et la sécurité du compte.</div><div class="check">☐ <b>Choix séparé :</b> j’autorise la conservation d’une photo du joueur dans son dossier privé.</div><div class="check">☐ <b>Choix séparé :</b> j’autorise le test de profil et les recommandations comportementales destinées à adapter la communication sportive. Je comprends qu’aucune décision juridique ou médicale n’est prise automatiquement.</div><p>Je peux retirer les autorisations optionnelles et exercer les droits d’accès, correction ou effacement en contactant ${esc(c.privacyEmail||c.email||'le coach HWBT')}.</p><h2>Signatures</h2><p>Date : <span class="line"></span></p><p>Signature du responsable parental : <span class="line"></span></p><p>Signature du jeune joueur s’il est en âge de comprendre : <span class="line"></span></p><p class="small">Le coach conserve uniquement la preuve et les informations nécessaires à la vérification de cette autorisation.</p></body></html>`);win.document.close();
+}
+
 // ══════════════════════════════════════════════════
 // DASHBOARD
 // ══════════════════════════════════════════════════
@@ -4032,7 +4151,7 @@ function pagePlayerInfoSimple(){
           <div style="font-size:28px;font-weight:900;line-height:1.05">${esc(player.name)}</div>
           <div class="muted-help" style="margin-top:8px">Tu vois uniquement tes propres informations et tes propres matchs.</div>
         </div>
-        <button class="btn btn-primary" onclick="setUI({page:'players',selectedPlayerId:${player.id},subpage:'matchs'})">VOIR MES MATCHS</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost" onclick="openPrivacyNotice()">VIE PRIVÉE</button><button class="btn btn-primary" onclick="setUI({page:'players',selectedPlayerId:${player.id},subpage:'matchs'})">VOIR MES MATCHS</button></div>
       </div>
     </div>
     ${pending?`<div class="card" style="border-color:var(--bronze)"><div class="card-title">RETOUR DE SÉANCE À COMPLÉTER</div><div class="muted-help" style="margin-bottom:12px">Séance du ${esc(formatShortDate(pending.date)||pending.date)}. Ton retour est personnel et envoyé directement au coach.</div><button class="btn btn-primary btn-sm" onclick="setUI({page:'sessions',selectedSessionId:${pending.id}})">DONNER MON RETOUR</button></div>`:''}
@@ -9092,6 +9211,8 @@ function pageTest(){
 }
 function startTest(playerId=null){
   const selected=playerId||null;
+  const player=selected?STATE.players.find(p=>p.id===selected):null;
+  if(player&&isPlayerMinorClient(player)&&player.minorCompliance?.profilingApproved!==true){showNotif('Le test de profil est bloqué tant que l’autorisation parentale spécifique n’est pas enregistrée');return;}
   UI.testState={
     playerId:selected||null,
     questions:buildPersonalityTest(),
@@ -9157,7 +9278,8 @@ function playerFormHtml(p=null){
   const photo=p?.photo||'';
   const birthDate=p?.birthDate||'';
   const birthYear=p?.birthYear||'';
-  const junior=!!p?.isJunior;
+  const junior=!!p&&isPlayerMinorClient(p);
+  const compliance=p?.minorCompliance||{};
   return `<div class="modal-title">${isEdit?'MODIFIER FICHE JOUEUR':'NOUVEAU JOUEUR'}</div><button class="modal-close" onclick="closeModal()">×</button>
     <div class="g2"><div class="form-group"><label class="form-label">PRÉNOM</label><input class="form-input" id="m_firstName" value="${esc(first)}"></div><div class="form-group"><label class="form-label">NOM</label><input class="form-input" id="m_lastName" value="${esc(last)}"></div></div>
     <div class="g2"><div class="form-group"><label class="form-label">DATE D'ANNIVERSAIRE</label><input class="form-input" id="m_birthDate" type="date" value="${esc(birthDate)}"></div><div class="form-group"><label class="form-label">ANNÉE DE NAISSANCE</label><input class="form-input" id="m_birthYear" type="number" value="${esc(birthYear)}" placeholder="si date complète inconnue"></div></div>
@@ -9179,6 +9301,16 @@ function playerFormHtml(p=null){
       <div class="g2"><div class="form-group"><label class="form-label">TÉLÉPHONE PARENT 1</label><input class="form-input" id="m_parentPhone" type="tel" value="${esc(p?.parentPhone||'')}"></div><div class="form-group"><label class="form-label">MAIL PARENT 1</label><input class="form-input" id="m_parentEmail" type="email" value="${esc(p?.parentEmail||'')}"></div></div>
       <div class="g2"><div class="form-group"><label class="form-label">PRÉNOM PARENT 2</label><input class="form-input" id="m_parent2FirstName" value="${esc(p?.parent2FirstName||'')}"></div><div class="form-group"><label class="form-label">NOM PARENT 2</label><input class="form-input" id="m_parent2LastName" value="${esc(p?.parent2LastName||'')}"></div></div>
       <div class="g2"><div class="form-group"><label class="form-label">TÉLÉPHONE PARENT 2</label><input class="form-input" id="m_parent2Phone" type="tel" value="${esc(p?.parent2Phone||'')}"></div><div class="form-group"><label class="form-label">MAIL PARENT 2</label><input class="form-input" id="m_parent2Email" type="email" value="${esc(p?.parent2Email||'')}"></div></div>
+      <div style="background:var(--bg4);border:1px solid var(--bronze-dim2);border-radius:8px;padding:14px;margin:10px 0 16px">
+        <div class="card-title">AUTORISATION PARENTALE VÉRIFIÉE</div>
+        <div class="muted-help" style="margin-bottom:12px">Ne coche ces autorisations qu’après avoir reçu le formulaire signé ou une confirmation écrite claire. Notice version ${PRIVACY_NOTICE_VERSION}.</div>
+        <div class="g2"><div class="form-group"><label class="form-label">NOM DU RESPONSABLE QUI AUTORISE</label><input class="form-input" id="m_guardianName" value="${esc(compliance.guardianName||`${p?.parentFirstName||''} ${p?.parentLastName||''}`.trim())}"></div><div class="form-group"><label class="form-label">E-MAIL DU RESPONSABLE</label><input class="form-input" id="m_guardianEmail" type="email" value="${esc(compliance.guardianEmail||p?.parentEmail||'')}"></div></div>
+        <div class="g2"><div class="form-group"><label class="form-label">DATE DE L’AUTORISATION</label><input class="form-input" id="m_guardianApprovedAt" type="date" value="${esc(String(compliance.approvedAt||'').slice(0,10))}"></div><div class="form-group"><label class="form-label">MÉTHODE DE VÉRIFICATION</label><select class="form-select" id="m_guardianMethod">${[['','— Choisir —'],['signed_form','Formulaire signé'],['email','Confirmation par e-mail'],['in_person','Signature en personne']].map(([v,l])=>`<option value="${v}" ${compliance.verificationMethod===v?'selected':''}>${l}</option>`).join('')}</select></div></div>
+        <label class="session-player-choice" style="margin-bottom:8px"><input type="checkbox" id="m_platformApproved" ${compliance.platformApproved?'checked':''}><span><span class="session-player-name">ACCÈS À LA PLATEFORME AUTORISÉ</span><span class="session-player-meta">Obligatoire pour permettre la connexion du mineur</span></span></label>
+        <label class="session-player-choice" style="margin-bottom:8px"><input type="checkbox" id="m_photoApproved" ${compliance.photoApproved?'checked':''}><span><span class="session-player-name">PHOTO PRIVÉE AUTORISÉE</span><span class="session-player-meta">Choix séparé — non obligatoire pour utiliser la plateforme</span></span></label>
+        <label class="session-player-choice"><input type="checkbox" id="m_profilingApproved" ${compliance.profilingApproved?'checked':''}><span><span class="session-player-name">TEST DE PROFIL AUTORISÉ</span><span class="session-player-meta">Choix séparé — adaptation de la communication sportive</span></span></label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button type="button" class="btn btn-ghost btn-sm" onclick="openPrivacyNotice()">LIRE LA NOTICE</button>${isEdit?`<button type="button" class="btn btn-ghost btn-sm" onclick="printGuardianConsent(${p.id})">IMPRIMER LE FORMULAIRE</button>`:''}</div>
+      </div>
     </div>
     <div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">ANNULER</button><button class="btn btn-primary" onclick="${isEdit?`savePlayer(${p.id})`:'addPlayer()'}">${isEdit?'ENREGISTRER':'CRÉER'}</button></div>`;
 }
@@ -9211,6 +9343,27 @@ function readPlayerForm(existing=null){
   const birthYear=document.getElementById('m_birthYear')?.value|| (birthDate?birthDate.slice(0,4):'');
   const baseCode=document.getElementById('m_code')?.value.trim();
   const playerPassword=document.getElementById('m_playerPassword')?.value.trim();
+  const declaredJunior=!!document.getElementById('m_isJunior')?.checked;
+  const isJunior=declaredJunior||isPlayerMinorClient({birthDate,birthYear,isJunior:false});
+  const previous=existing?.minorCompliance||{};
+  const platformApproved=isJunior&&!!document.getElementById('m_platformApproved')?.checked;
+  const photoApproved=isJunior&&!!document.getElementById('m_photoApproved')?.checked;
+  const profilingApproved=isJunior&&!!document.getElementById('m_profilingApproved')?.checked;
+  const now=new Date().toISOString();
+  const minorCompliance=isJunior?{
+    platformApproved,
+    photoApproved,
+    profilingApproved,
+    guardianName:document.getElementById('m_guardianName')?.value.trim()||'',
+    guardianEmail:document.getElementById('m_guardianEmail')?.value.trim()||'',
+    approvedAt:document.getElementById('m_guardianApprovedAt')?.value||'',
+    verificationMethod:document.getElementById('m_guardianMethod')?.value||'',
+    noticeVersion:PRIVACY_NOTICE_VERSION,
+    verifiedAt:platformApproved?(previous.verifiedAt||now):'',
+    photoApprovedAt:photoApproved?(previous.photoApprovedAt||now):'',
+    profilingApprovedAt:profilingApproved?(previous.profilingApprovedAt||now):'',
+    withdrawnAt:previous.platformApproved&&!platformApproved?now:'',
+  }:{};
   return {
     firstName,lastName,name:`${firstName} ${lastName}`.trim(),
     birthDate,birthYear,
@@ -9229,7 +9382,8 @@ function readPlayerForm(existing=null){
     code:baseCode||existing?.code||'',
     playerPassword,
     photo:document.getElementById('m_photo')?.value.trim()||'',
-    isJunior:!!document.getElementById('m_isJunior')?.checked,
+    isJunior,
+    minorCompliance,
     parentFirstName:document.getElementById('m_parentFirstName')?.value.trim()||'',
     parentLastName:document.getElementById('m_parentLastName')?.value.trim()||'',
     parentPhone:document.getElementById('m_parentPhone')?.value.trim()||'',
@@ -9486,10 +9640,25 @@ async function setPlayerPasswordSecure(playerId,password){
   await apiJson('/api/auth/player-password',{method:'POST',body:JSON.stringify({playerId,password})});
   return true;
 }
+function validateMinorComplianceData(data,existing=null){
+  if(!data.isJunior) return '';
+  const c=data.minorCompliance||{};
+  if((c.photoApproved||c.profilingApproved)&&!c.platformApproved) return 'Autorise d’abord l’accès général à la plateforme';
+  if(c.platformApproved){
+    if(!c.guardianName) return 'Indique le nom du responsable parental qui a autorisé l’accès';
+    if(!c.guardianEmail||!c.guardianEmail.includes('@')) return 'Indique une adresse e-mail valable pour le responsable parental';
+    if(!c.approvedAt) return 'Indique la date de l’autorisation parentale';
+    if(!c.verificationMethod) return 'Indique comment l’autorisation parentale a été vérifiée';
+  }
+  if(data.photo&&!c.photoApproved&&!existing?.photo) return 'Coche l’autorisation photo avant d’ajouter une photo à un dossier de mineur';
+  return '';
+}
 async function addPlayer(){
   const data=readPlayerForm();
   if(!data.firstName||!data.lastName){showNotif('Prénom et nom requis');return;}
   if(!data.playerPassword||data.playerPassword.length<12){showNotif('Choisis un mot de passe joueur de 12 caractères minimum');return;}
+  const complianceError=validateMinorComplianceData(data);if(complianceError){showNotif(complianceError);return;}
+  if(data.isJunior&&!data.minorCompliance.photoApproved)data.photo='';
   const password=data.playerPassword;delete data.playerPassword;
   const id=Math.max(0,...STATE.players.map(p=>p.id))+1;
   if(!data.code)data.code=(data.firstName[0]+data.lastName[0]+String(id).padStart(3,'0')).toUpperCase();
@@ -9501,14 +9670,25 @@ async function addPlayer(){
 async function savePlayer(id){
   const p=STATE.players.find(p=>p.id===id);if(!p)return;
   const data=readPlayerForm(p);if(!data.firstName||!data.lastName){showNotif('Prénom et nom requis');return;}
+  const complianceError=validateMinorComplianceData(data,p);if(complianceError){showNotif(complianceError);return;}
+  if(data.isJunior&&!data.minorCompliance.photoApproved)data.photo='';
   const password=data.playerPassword;delete data.playerPassword;
   if(password&&password.length<12){showNotif('Le nouveau mot de passe doit contenir au moins 12 caractères');return;}
-  Object.assign(p,data);closeModal();render();
+  Object.assign(p,data);
+  if(data.isJunior&&!data.minorCompliance.profilingApproved){p.profileId=null;p.profileSource='';p.profileAssignedAt='';delete STATE.testResults[String(id)];delete STATE.testResults[`player-${id}`];}
+  closeModal();render();
   try{await saveRemoteState();if(password)await setPlayerPasswordSecure(id,password);showNotif(password?'Fiche et mot de passe modifiés':'Fiche joueur modifiée');}
   catch(e){showNotif(e.message||'La modification n’a pas pu être enregistrée');}
 }
-function deletePlayer(id){const p=STATE.players.find(p=>p.id===id);if(!p)return;const ok=confirm(`Supprimer ${p.name} ?\n\nSes matchs seront supprimés. Les séances de groupe garderont les autres joueurs. Les séances où il était seul seront supprimées.`);if(!ok)return;STATE.players=STATE.players.filter(x=>x.id!==id);STATE.matches=STATE.matches.filter(m=>m.playerId!==id);STATE.sessions=STATE.sessions.map(s=>{const ids=sessionPlayerIds(s).filter(pid=>pid!==id);return {...s,playerIds:ids,playerId:ids[0]||null};}).filter(s=>sessionPlayerIds(s).length>0);if(STATE.activePlayerId===id)STATE.activePlayerId=null;showNotif('Joueur supprimé');setUI({page:'players',selectedPlayerId:null,subpage:'profil'});}
-function setPlayerManualProfile(id,profileId){const p=STATE.players.find(p=>p.id===id);if(!p)return;const pid=parseInt(profileId);if(pid&&PROFILES.find(pr=>pr.id===pid)){p.profileId=pid;p.profileSource='manual';p.profileAssignedAt=new Date().toISOString();showNotif(`Profil attribué: ${PROFILES.find(pr=>pr.id===pid).name}`);}else{p.profileId=null;p.profileSource='';p.profileAssignedAt='';showNotif('Profil retiré de la fiche');}saveState();render();}
+async function deletePlayer(id){
+  const p=STATE.players.find(p=>p.id===id);if(!p)return;
+  const ok=confirm(`Effacer définitivement ${p.name} ?\n\nLe compte, le mot de passe, les données sportives et les copies de sauvegarde seront nettoyés. Les informations de facture légalement nécessaires resteront conservées séparément.`);if(!ok)return;
+  try{
+    const result=await apiJson('/api/auth/delete-player',{method:'POST',body:JSON.stringify({playerId:id,expectedVersion:REMOTE_VERSION})});
+    REMOTE_VERSION=Number(result.version)||REMOTE_VERSION;await loadRemoteState();if(STATE.activePlayerId===id)STATE.activePlayerId=null;showNotif('Compte joueur et données personnelles effacés');setUI({page:'players',selectedPlayerId:null,subpage:'profil'});
+  }catch(e){showNotif(e.message||'L’effacement n’a pas pu être terminé');}
+}
+function setPlayerManualProfile(id,profileId){const p=STATE.players.find(p=>p.id===id);if(!p)return;const pid=parseInt(profileId);if(pid&&isPlayerMinorClient(p)&&p.minorCompliance?.profilingApproved!==true){showNotif('Le profil est bloqué sans autorisation parentale spécifique');return;}if(pid&&PROFILES.find(pr=>pr.id===pid)){p.profileId=pid;p.profileSource='manual';p.profileAssignedAt=new Date().toISOString();showNotif(`Profil attribué: ${PROFILES.find(pr=>pr.id===pid).name}`);}else{p.profileId=null;p.profileSource='';p.profileAssignedAt='';showNotif('Profil retiré de la fiche');}saveState();render();}
 function deleteSession(id){
   if(STATE.role!=='coach') return;
   const s=STATE.sessions.find(s=>s.id===id);
@@ -10440,8 +10620,8 @@ async function resumeSecureSession(){
   }catch(e){AUTHENTICATED=false;AUTH_CSRF='';return false;}
 }
 async function initApp(){
-  loadState();document.documentElement.lang=STATE.lang;document.getElementById('mainContent').innerHTML='';document.getElementById('pageTitle').textContent='';document.getElementById('roleTag').textContent='';
-  if(!document.getElementById('authOverlay')){document.body.insertAdjacentHTML('beforeend',`<div id="authOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.96);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px"><div class="card" style="width:min(460px,94vw);margin:0"><div style="font-size:34px;font-weight:700;letter-spacing:5px;margin-bottom:4px">HWBT</div><div class="card-title">ACCÈS SÉCURISÉ</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7;margin-bottom:16px">La connexion est vérifiée par le serveur. Entre ton identifiant et ton mot de passe personnel.</div><div class="form-group"><label class="form-label">NOM D'UTILISATEUR / CODE JOUEUR</label><input class="form-input" id="loginUser" autocomplete="username" placeholder="Code joueur ou accès coach"></div><div class="form-group"><label class="form-label">MOT DE PASSE</label><input class="form-input" id="loginPass" type="password" autocomplete="current-password" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')loginPlayer()"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="loginPlayer()">ENTRER JOUEUR</button><button class="btn btn-ghost" onclick="loginCoach()">ENTRER COACH</button><button class="btn btn-ghost" onclick="setLang(STATE.lang==='fr'?'en':'fr')">FR / EN</button></div><div style="font-size:10px;color:var(--bronze);margin-top:14px;font-family:var(--font-body);letter-spacing:.6px">Les mots de passe ne sont jamais affichés ni envoyés dans les messages.</div></div></div>`);}
+  loadState();await loadPublicPrivacy();document.documentElement.lang=STATE.lang;document.getElementById('mainContent').innerHTML='';document.getElementById('pageTitle').textContent='';document.getElementById('roleTag').textContent='';
+  if(!document.getElementById('authOverlay')){document.body.insertAdjacentHTML('beforeend',`<div id="authOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.96);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px"><div class="card" style="width:min(500px,94vw);margin:0"><div style="font-size:34px;font-weight:700;letter-spacing:5px;margin-bottom:4px">HWBT</div><div class="card-title">ACCÈS SÉCURISÉ</div><div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7;margin-bottom:16px">La connexion est vérifiée par le serveur. Entre ton identifiant et ton mot de passe personnel. L’accès d’un joueur mineur nécessite une autorisation parentale enregistrée.</div><div class="form-group"><label class="form-label">NOM D'UTILISATEUR / CODE JOUEUR</label><input class="form-input" id="loginUser" autocomplete="username" placeholder="Code joueur ou accès coach"></div><div class="form-group"><label class="form-label">MOT DE PASSE</label><input class="form-input" id="loginPass" type="password" autocomplete="current-password" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')loginPlayer()"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="loginPlayer()">ENTRER JOUEUR</button><button class="btn btn-ghost" onclick="loginCoach()">ENTRER COACH</button><button class="btn btn-ghost" onclick="setLang(STATE.lang==='fr'?'en':'fr')">FR / EN</button></div><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px"><div style="font-size:10px;color:var(--bronze);font-family:var(--font-body);letter-spacing:.5px">Espace privé · aucune publicité ciblée</div><button class="btn btn-ghost btn-sm" onclick="openPrivacyNotice()">VIE PRIVÉE / PARENTS</button></div></div></div>`);}
   showLogin();const resumed=await resumeSecureSession();render();if(resumed)hideLogin();
   const prefill=feedbackUserFromUrl();if(prefill){const el=document.getElementById('loginUser');if(el)el.value=prefill;}
 }

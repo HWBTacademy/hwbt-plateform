@@ -11,6 +11,7 @@ import {
   enforceLoginRateLimit,
   errorResponse,
   hashPassword,
+  minorPlatformApproved,
   json,
   migrateLegacyPasswords,
   normalizeLogin,
@@ -76,6 +77,11 @@ async function login(req: Request) {
     throw new Error("AUTH_FAILED");
   }
 
+  if (!minorPlatformApproved(player)) {
+    await audit("auth.minor_consent_required", { role: "player", sub: `player:${Number(player.id)}` }, { playerId: Number(player.id) });
+    return json({ error: "Accès mineur en attente de l’autorisation parentale" }, { status: 403 });
+  }
+
   if (await migrateLegacyPasswords(state)) {
     const clean = sanitizeState(state);
     clean._version = currentVersion(state) + 1;
@@ -137,6 +143,114 @@ async function coachPassword(req: Request) {
   return json({ ok: true });
 }
 
+function playerIds(value: any): number[] {
+  return (Array.isArray(value?.playerIds) ? value.playerIds : [value?.playerId]).map(Number).filter(Number.isInteger);
+}
+
+function deleteObjectKeys(value: any, playerId: number) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const copy = { ...value };
+  delete copy[String(playerId)];
+  delete copy[`player-${playerId}`];
+  return copy;
+}
+
+function redactValue(value: any, terms: string[]): any {
+  if (typeof value === "string") {
+    let result = value;
+    for (const term of terms.filter(Boolean)) result = result.split(term).join("Joueur supprimé");
+    return result;
+  }
+  if (Array.isArray(value)) return value.map(item => redactValue(item, terms));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, redactValue(item, terms)]));
+  }
+  return value;
+}
+
+function prunePlayerData(rawState: any, playerId: number) {
+  const state = sanitizeState(rawState);
+  const player = state.players.find((item: any) => Number(item?.id) === playerId);
+  const terms = player
+    ? [String(player.name || ""), String(player.code || ""), String(player.email || ""), String(player.phone || "")].filter(value => value.length >= 3)
+    : [];
+  state.players = state.players.filter((item: any) => Number(item?.id) !== playerId);
+  state.matches = state.matches.filter((match: any) => !playerIds(match).includes(playerId));
+  state.sessions = state.sessions
+    .map((session: any) => {
+      const ids = playerIds(session).filter(id => id !== playerId);
+      if (!ids.length) return null;
+      const copy = redactValue({ ...session, playerIds: ids, playerId: ids[0] }, terms);
+      if (copy.playerFeedbackByPlayer && typeof copy.playerFeedbackByPlayer === "object") delete copy.playerFeedbackByPlayer[String(playerId)];
+      return copy;
+    })
+    .filter(Boolean);
+  state.customExercises = redactValue(state.customExercises, terms);
+  state.testResults = deleteObjectKeys(redactValue(state.testResults, terms), playerId);
+  state.commandCenter = redactValue(state.commandCenter, terms);
+  state.contentStudio = redactValue(state.contentStudio, terms);
+  state.performanceLab = redactValue(state.performanceLab, terms);
+  if (state.performanceLab?.players) state.performanceLab.players = deleteObjectKeys(state.performanceLab.players, playerId);
+  return state;
+}
+
+async function anonymizeAuditForPlayer(playerId: number) {
+  const store = authStore();
+  for await (const page of store.list({ prefix: "audit/", paginate: true })) {
+    for (let index = 0; index < page.blobs.length; index += 20) {
+      await Promise.all(page.blobs.slice(index, index + 20).map(async blob => {
+        const entry = await store.get(blob.key, { type: "json" }) as any;
+        if (!entry || typeof entry !== "object") return;
+        if (entry.actor !== `player:${playerId}` && Number(entry.playerId) !== playerId) return;
+        const clean = { ...entry, actor: entry.actor === `player:${playerId}` ? "erased-player" : entry.actor };
+        delete clean.playerId;
+        await store.setJSON(blob.key, clean);
+      }));
+    }
+  }
+}
+
+async function rewriteBackupsWithoutPlayer(playerId: number) {
+  const store = dataStore();
+  for await (const page of store.list({ prefix: "state/backups/", paginate: true })) {
+    for (let index = 0; index < page.blobs.length; index += 20) {
+      await Promise.all(page.blobs.slice(index, index + 20).map(async blob => {
+        const backup = await store.get(blob.key, { type: "json" }) as any;
+        if (!backup || typeof backup !== "object") return;
+        const cleaned = prunePlayerData(backup, playerId);
+        await store.setJSON(blob.key, cleaned);
+      }));
+    }
+  }
+}
+
+async function deletePlayer(req: Request) {
+  const current = requireSession(req, ["coach"]);
+  requireCsrf(req, current);
+  const body = await readJson<{ playerId?: number; expectedVersion?: number }>(req, 8 * 1024);
+  const playerId = Number(body.playerId);
+  if (!Number.isInteger(playerId)) return json({ error: "Joueur invalide" }, { status: 400 });
+  const store = dataStore();
+  const state = await store.get(STATE_KEY, { type: "json" }) as any;
+  if (!Array.isArray(state?.players) || !state.players.some((player: any) => Number(player?.id) === playerId)) {
+    return json({ error: "Joueur introuvable" }, { status: 404 });
+  }
+  const version = currentVersion(state);
+  if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) !== version) {
+    return json({ error: "Les données ont été modifiées ailleurs", version }, { status: 409 });
+  }
+  const cleaned = prunePlayerData(state, playerId);
+  cleaned._version = version + 1;
+  cleaned.serverSavedAt = new Date().toISOString();
+  await rewriteBackupsWithoutPlayer(playerId);
+  await anonymizeAuditForPlayer(playerId);
+  await store.setJSON(STATE_KEY, cleaned);
+  await authStore().delete(`users/player-${playerId}.json`);
+  await saveVersionedBackup(store, cleaned, "player-erasure");
+  await audit("player.erased", current, { erasedRecord: true, version: cleaned._version });
+  return json({ ok: true, version: cleaned._version });
+}
+
 export default async (req: Request, _context: Context) => {
   try {
     const action = new URL(req.url).pathname.split("/").filter(Boolean).pop();
@@ -152,6 +266,7 @@ export default async (req: Request, _context: Context) => {
     if (action === "logout" && req.method === "POST") return await logout(req);
     if (action === "player-password" && req.method === "POST") return await playerPassword(req);
     if (action === "coach-password" && req.method === "POST") return await coachPassword(req);
+    if (action === "delete-player" && req.method === "POST") return await deletePlayer(req);
     return json({ error: "Route introuvable" }, { status: 404 });
   } catch (error) {
     return errorResponse(error);
