@@ -429,7 +429,7 @@ body{min-width:0}
     <div class="nav-section">
       <div class="nav-label">COACH</div>
       <div class="nav-item" data-page="dashboard" onclick="setUI({page:'dashboard'})" style="display: flex;"><span class="nav-icon">◈</span>DASHBOARD</div>
-      <div class="nav-item active" data-page="players" onclick="setUI({page:'players',selectedPlayerId:null,subpage:'profil'})" style="display: flex;"><span class="nav-icon">◉</span>PLAYERS</div>
+      <div class="nav-item active" data-page="players" onclick="STATE.role==='player'?setUI({page:'players',selectedPlayerId:STATE.activePlayerId,subpage:'matchs'}):setUI({page:'players',selectedPlayerId:null,subpage:'profil'})" style="display: flex;"><span class="nav-icon">◉</span>PLAYERS</div>
       <div class="nav-item" data-page="sessions" onclick="setUI({page:'sessions',sessionView:'agenda'})" style="display: flex;"><span class="nav-icon">▦</span>SESSIONS</div>
       <div class="nav-item" data-page="exercises" onclick="setUI({page:'exercises'})" style="display: flex;"><span class="nav-icon">▤</span>EXERCISES</div>
     </div>
@@ -3404,7 +3404,7 @@ function setRole(r){
   if(r==='player'&&!STATE.activePlayerId&&!STATE.coachUnlocked){showLogin();return;}
   STATE.role=r;
   if(r==='player'&&!STATE.activePlayerId) STATE.activePlayerId=STATE.players[0]?.id||null;
-  if(r==='player'&&!['dashboard','players','sessions','profiles','communication','performanceLab','nutrition','shop'].includes(UI.page)) UI.page='dashboard';
+  if(r==='player'&&!['dashboard','players'].includes(UI.page)) UI.page='dashboard';
   document.getElementById('rb-coach').classList.toggle('active',r==='coach');
   document.getElementById('rb-player').classList.toggle('active',r==='player');
   document.getElementById('roleTag').textContent=tr(r==='coach'?'COACH':'JOUEUR');
@@ -3424,7 +3424,8 @@ function updateChromeText(){
   const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',payments:'PAIEMENTS',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
   document.querySelectorAll('.nav-item').forEach(n=>{
     const icon=n.querySelector('.nav-icon')?.textContent||'';
-    const label=navNames[n.dataset.page]||n.dataset.page;
+    const playerNames={dashboard:'MES INFOS',players:'MES MATCHS'};
+    const label=STATE.role==='player'?(playerNames[n.dataset.page]||navNames[n.dataset.page]):(navNames[n.dataset.page]||n.dataset.page);
     n.innerHTML=`<span class="nav-icon">${icon}</span>${tr(label)}`;
   });
   const labels=document.querySelectorAll('.nav-label');
@@ -3445,9 +3446,9 @@ function setUI(obj){
 function render(){
   if(STATE.role==='player'){
     if(!STATE.activePlayerId) STATE.activePlayerId=STATE.players[0]?.id||null;
-    const linkedPlayerTest=UI.page==='test'&&UI.testState&&UI.testState.playerId===STATE.activePlayerId;
-    if(['exercises','aspectsLibrary','commandCenter','contentStudio','matchAnalyst'].includes(UI.page)||(UI.page==='test'&&!linkedPlayerTest)) UI.page='dashboard';
-    if(UI.page==='players') UI.selectedPlayerId=STATE.activePlayerId;
+    const ownFeedbackSession=UI.page==='sessions'&&UI.selectedSessionId&&STATE.sessions.some(s=>s.id===UI.selectedSessionId&&playerInSession(s,STATE.activePlayerId));
+    if(!['dashboard','players'].includes(UI.page)&&!ownFeedbackSession) UI.page='dashboard';
+    if(UI.page==='players'){UI.selectedPlayerId=STATE.activePlayerId;UI.subpage='matchs';}
   }
   document.getElementById('lb-fr').classList.toggle('active',STATE.lang==='fr');
   document.getElementById('lb-en').classList.toggle('active',STATE.lang==='en');
@@ -3458,16 +3459,24 @@ function render(){
   const securityButton=document.getElementById('securityButton');if(securityButton)securityButton.style.display=STATE.role==='coach'?'block':'none';
   const nav=document.querySelectorAll('.nav-item');
   nav.forEach(n=>{
-    const coachOnly=['exercises','aspectsLibrary','payments','commandCenter','contentStudio','matchAnalyst'].includes(n.dataset.page);
-    const playerHidden=['test'].includes(n.dataset.page);
-    n.style.display=STATE.role==='player'&&(coachOnly||playerHidden)?'none':'flex';
+    const playerAllowed=['dashboard','players'].includes(n.dataset.page);
+    n.style.display=STATE.role==='player'&&!playerAllowed?'none':'flex';
     n.classList.toggle('active',n.dataset.page===UI.page);
   });
+  document.querySelectorAll('.nav-section').forEach(section=>{
+    const hasVisible=[...section.querySelectorAll('.nav-item')].some(item=>item.style.display!=='none');
+    section.style.display=STATE.role==='player'&&!hasVisible?'none':'block';
+    const label=section.querySelector('.nav-label');
+    if(label&&STATE.role==='player'&&hasVisible) label.textContent=tr('MON ESPACE');
+  });
+  const roleSwitcher=document.querySelector('.role-switcher');
+  if(roleSwitcher) roleSwitcher.style.display=STATE.role==='player'?'none':'flex';
   const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',payments:'PAIEMENTS',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION'};
-  document.getElementById('pageTitle').textContent=tr(STATE.role==='player'&&UI.page==='dashboard'?'MON CARNET JOUEUR':(titles[UI.page]||UI.page.toUpperCase()));
+  const playerTitles={dashboard:'MES INFORMATIONS',players:'MES MATCHS',sessions:'MON RETOUR DE SÉANCE'};
+  document.getElementById('pageTitle').textContent=tr(STATE.role==='player'?(playerTitles[UI.page]||'MON ESPACE'):(titles[UI.page]||UI.page.toUpperCase()));
   const mc=document.getElementById('mainContent');
-  if(UI.page==='dashboard') mc.innerHTML=STATE.role==='player'?pagePlayerPortal():pageDashboard();
-  else if(UI.page==='players') mc.innerHTML=UI.selectedPlayerId?pagePlayerDetail(UI.selectedPlayerId):pagePlayersList();
+  if(UI.page==='dashboard') mc.innerHTML=STATE.role==='player'?pagePlayerInfoSimple():pageDashboard();
+  else if(UI.page==='players') mc.innerHTML=STATE.role==='player'?pagePlayerMatchesSimple():(UI.selectedPlayerId?pagePlayerDetail(UI.selectedPlayerId):pagePlayersList());
   else if(UI.page==='sessions') mc.innerHTML=UI.selectedSessionId?pageSessionDetail(UI.selectedSessionId):pageSessionsList();
   else if(UI.page==='payments') mc.innerHTML=pagePayments();
   else if(UI.page==='commandCenter') mc.innerHTML=pageCommandCenter();
@@ -3994,6 +4003,80 @@ function pagePlayerPortal(){
         ${pr?`<div style="font-size:20px;font-weight:800;line-height:1.05;margin-bottom:8px">${esc(pr.name)}</div><div style="font-size:12px;color:var(--bronze);font-weight:700;margin-bottom:10px">${esc(pr.sub||'')}</div><div style="font-size:12px;color:var(--offwhite);font-family:var(--font-body);line-height:1.75">${esc(pr.howToCoach||pr.commPressure||pr.story||'Ton profil aide le coach à mieux adapter les consignes.')}</div><div style="margin-top:14px"><button class="btn btn-ghost btn-sm" onclick="setUI({page:'players',selectedPlayerId:${player.id},subpage:'profil'})">VOIR MON PROFIL</button></div>`:`<div style="font-size:12px;color:var(--gray);font-family:var(--font-body);line-height:1.7;margin-bottom:12px">Tu n’as pas encore de couleur de personnalité. Fais le test pour découvrir ton profil joueur.</div><button class="btn btn-primary" onclick="setUI({page:'players',selectedPlayerId:${player.id},subpage:'profil'})">COMMENCER LE TEST</button>`}
       </div>
     </div>
+  </div>`;
+}
+
+function pagePlayerInfoSimple(){
+  const player=STATE.players.find(p=>p.id===STATE.activePlayerId)||STATE.players[0];
+  if(!player) return `<div class="content"><div class="card">Aucune information joueur disponible.</div></div>`;
+  const profile=PROFILES.find(p=>p.id===player.profileId);
+  const measured=playerMeasuredProfile(player);
+  const photo=assetUrl(player.photo);
+  const pending=STATE.sessions.find(s=>playerInSession(s,player.id)&&s.status==='closed_coach'&&!s.playerFeedbackByPlayer?.[player.id]?.submitted);
+  const rows=[
+    ['CODE JOUEUR',player.code||'—'],
+    ['ANNÉE DE NAISSANCE',player.birthDate?String(player.birthDate).slice(0,4):(player.birthYear||'—')],
+    ['MAIN',player.hand||'—'],
+    ['POSITION',player.position||'—'],
+    ['CLASSEMENT AFT',player.aftRanking||'—'],
+    ['CLASSEMENT AFP',player.afpRanking||'—'],
+    ['COACH',player.coach||'—'],
+    ['PROFIL',profile?.name||'À définir'],
+  ];
+  return `<div class="content">
+    <div class="card" style="border-color:var(--bronze-dim2);overflow:hidden">
+      <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+        ${photo?`<div style="width:86px;height:86px;border-radius:10px;background:url('${esc(photo)}') center/cover;border:2px solid var(--bronze-dim2)"></div>`:avatar(player.name,'av72')}
+        <div style="flex:1;min-width:220px">
+          <div class="card-title">MON ESPACE HWBT</div>
+          <div style="font-size:28px;font-weight:900;line-height:1.05">${esc(player.name)}</div>
+          <div class="muted-help" style="margin-top:8px">Tu vois uniquement tes propres informations et tes propres matchs.</div>
+        </div>
+        <button class="btn btn-primary" onclick="setUI({page:'players',selectedPlayerId:${player.id},subpage:'matchs'})">VOIR MES MATCHS</button>
+      </div>
+    </div>
+    ${pending?`<div class="card" style="border-color:var(--bronze)"><div class="card-title">RETOUR DE SÉANCE À COMPLÉTER</div><div class="muted-help" style="margin-bottom:12px">Séance du ${esc(formatShortDate(pending.date)||pending.date)}. Ton retour est personnel et envoyé directement au coach.</div><button class="btn btn-primary btn-sm" onclick="setUI({page:'sessions',selectedSessionId:${pending.id}})">DONNER MON RETOUR</button></div>`:''}
+    <div class="g2">
+      <div class="card">
+        <div class="card-title">MES INFORMATIONS</div>
+        ${rows.map(([label,value])=>`<div style="display:flex;justify-content:space-between;gap:14px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:9px;color:var(--gray3);letter-spacing:1.2px">${esc(label)}</span><strong style="font-size:12px;text-align:right">${esc(value)}</strong></div>`).join('')}
+      </div>
+      <div class="card">
+        <div class="card-title">MA PROGRESSION</div>
+        <div style="display:flex;align-items:end;gap:8px;margin-bottom:18px"><div style="font-size:46px;font-weight:900;line-height:1">${measured.level?formatScore(measured.level):'—'}</div><div class="muted-help" style="padding-bottom:5px">${measured.level?'niveau évalué /20':'pas encore évalué'}</div></div>
+        ${[['T','Technique','#c0392b'],['TA','Tactique','#d4a017'],['P','Physique','#27ae60'],['M','Mental','#2980b9']].map(([key,label,color])=>{const value=Number(measured.scores?.[key]||0);return `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:10px;font-size:11px"><span>${label}</span><strong style="color:${color}">${value?formatScore(value)+'/20':'À évaluer'}</strong></div><div class="bar-bg" style="margin-top:6px"><div class="bar-fill" style="width:${Math.max(0,Math.min(100,value*5))}%;background:${color}"></div></div></div>`}).join('')}
+      </div>
+    </div>
+    <div class="card" style="border-color:var(--border2)"><div class="card-title">CONFIDENTIALITÉ</div><div class="muted-help">Cet espace est privé. Il ne montre ni les coordonnées des parents, ni les paiements, ni les factures, ni les informations des autres joueurs. Déconnecte-toi lorsque tu utilises un appareil partagé.</div></div>
+  </div>`;
+}
+
+function pagePlayerMatchesSimple(){
+  const player=STATE.players.find(p=>p.id===STATE.activePlayerId)||STATE.players[0];
+  if(!player) return `<div class="content"><div class="card">Aucun joueur disponible.</div></div>`;
+  const matches=STATE.matches
+    .filter(m=>Number(m.playerId)===Number(player.id)||(Array.isArray(m.playerIds)&&m.playerIds.map(Number).includes(Number(player.id))))
+    .sort((a,b)=>String(b.date||b.finishedAt||'').localeCompare(String(a.date||a.finishedAt||'')));
+  const analyses=(Array.isArray(player.matchAnalyses)?player.matchAnalyses:[])
+    .slice()
+    .sort((a,b)=>String(b.date||b.pushedAt||'').localeCompare(String(a.date||a.pushedAt||'')));
+  const matchCards=matches.map(m=>`<div class="card" style="margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap">
+      <div><div class="card-title">${esc(formatShortDate(m.date)||m.date||'DATE À DÉFINIR')} · ${esc(m.club||m.location||'Lieu à définir')}</div><div style="font-size:20px;font-weight:900">${esc(m.title||m.name||'Match HWBT')}</div>${m.opponents?`<div class="muted-help" style="margin-top:5px">Adversaires : ${esc(m.opponents)}</div>`:''}</div>
+      <div style="font-size:22px;font-weight:900;color:var(--bronze)">${esc(m.score||m.currentScore||m.result||'Score à venir')}</div>
+    </div>
+  </div>`).join('');
+  const analysisCards=analyses.map(a=>`<div class="card" style="border-color:var(--bronze-dim2);margin-bottom:12px">
+    <div class="card-title">ANALYSE DU COACH · ${esc(formatShortDate(a.date)||a.date||'')}</div>
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap"><div style="font-size:20px;font-weight:900">${esc(a.title||'Match HWBT')}</div><div style="font-size:18px;font-weight:900;color:var(--bronze)">${esc(a.score||`${a.won||0}-${a.lost||0}`)}</div></div>
+    ${a.workAxis?`<div style="margin-top:12px;background:var(--bg4);border-left:3px solid var(--bronze);padding:11px;border-radius:0 6px 6px 0"><div style="font-size:9px;color:var(--bronze);letter-spacing:1.2px;margin-bottom:5px">PROCHAIN AXE</div><div class="muted-help">${esc(a.workAxis)}</div></div>`:''}
+    ${a.positives?.length?`<div style="margin-top:12px">${a.positives.slice(0,4).map(x=>`<div class="strength"><span class="plus">+</span>${esc(x)}</div>`).join('')}</div>`:''}
+    ${a.coachNote?`<div class="muted-help" style="margin-top:10px"><strong>Message du coach :</strong> ${esc(a.coachNote)}</div>`:''}
+  </div>`).join('');
+  return `<div class="content">
+    <div style="display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:18px"><div><div class="card-title">MON ESPACE HWBT</div><div style="font-size:28px;font-weight:900">MES MATCHS</div><div class="muted-help" style="margin-top:6px">Seuls les matchs liés à ton compte apparaissent ici.</div></div><button class="btn btn-ghost" onclick="setUI({page:'dashboard'})">← MES INFORMATIONS</button></div>
+    ${analysisCards}
+    ${matchCards||(!analysisCards?`<div class="card" style="text-align:center;padding:34px"><div style="font-size:20px;font-weight:900;margin-bottom:8px">Aucun match enregistré</div><div class="muted-help">Le coach ajoutera ici tes prochains matchs et leurs analyses.</div></div>`:'')}
   </div>`;
 }
 

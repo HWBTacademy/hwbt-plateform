@@ -234,6 +234,61 @@ function sessionHasPlayer(session: any, playerId: number) {
   return ids.map(Number).includes(playerId);
 }
 
+function matchHasPlayer(match: any, playerId: number) {
+  const ids = Array.isArray(match?.playerIds) ? match.playerIds : [match?.playerId];
+  return ids.map(Number).includes(playerId);
+}
+
+function sessionForPlayer(session: any, playerId: number) {
+  const ownFeedback = session?.playerFeedbackByPlayer?.[playerId]
+    ?? session?.playerFeedbackByPlayer?.[String(playerId)]
+    ?? session?.playerFeedback
+    ?? {};
+  return {
+    id: session?.id,
+    playerId,
+    playerIds: [playerId],
+    date: typeof session?.date === "string" ? session.date.slice(0, 32) : "",
+    time: typeof session?.time === "string" ? session.time.slice(0, 16) : "",
+    location: typeof session?.location === "string" ? session.location.slice(0, 160) : "",
+    status: typeof session?.status === "string" ? session.status.slice(0, 32) : "planned",
+    sessionType: typeof session?.sessionType === "string" ? session.sessionType.slice(0, 32) : "",
+    sessionDuration: typeof session?.sessionDuration === "string" || typeof session?.sessionDuration === "number"
+      ? session.sessionDuration
+      : "",
+    goal: typeof session?.goal === "string" ? session.goal.slice(0, 500) : "",
+    blocks: Array.isArray(session?.blocks)
+      ? session.blocks.slice(0, 12).map((block: any) => ({
+          pillar: typeof block?.pillar === "string" ? block.pillar.slice(0, 8) : "",
+          aspect: typeof block?.aspect === "string" ? block.aspect.slice(0, 160) : "",
+        }))
+      : [],
+    playerFeedbackByPlayer: { [playerId]: ownFeedback },
+  };
+}
+
+function matchForPlayer(match: any, playerId: number) {
+  const scalar = (key: string, max = 200) => typeof match?.[key] === "string" ? match[key].slice(0, max) : "";
+  return {
+    id: match?.id,
+    playerId,
+    playerIds: [playerId],
+    title: scalar("title"),
+    name: scalar("name"),
+    date: scalar("date", 32),
+    club: scalar("club"),
+    location: scalar("location"),
+    opponents: scalar("opponents"),
+    score: scalar("score", 80),
+    currentScore: scalar("currentScore", 80),
+    result: scalar("result", 80),
+    status: scalar("status", 64),
+    format: scalar("format", 64),
+    finishedAt: scalar("finishedAt", 64),
+    closedAt: scalar("closedAt", 64),
+  };
+}
+
 function ownKeyedObject(value: any, playerId: number) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const result: Record<string, unknown> = {};
@@ -253,8 +308,12 @@ export function stateForPlayer(rawState: any, playerId: number) {
     "parentFirstName", "parentLastName", "parentPhone", "parentEmail", "parent2FirstName", "parent2LastName",
     "parent2Phone", "parent2Email",
   ]) delete ownPlayer[key];
-  const ownSessions = state.sessions.filter((session: any) => sessionHasPlayer(session, playerId));
-  const ownMatches = state.matches.filter((match: any) => Number(match?.playerId) === playerId);
+  const ownSessions = state.sessions
+    .filter((session: any) => sessionHasPlayer(session, playerId))
+    .map((session: any) => sessionForPlayer(session, playerId));
+  const ownMatches = state.matches
+    .filter((match: any) => matchHasPlayer(match, playerId))
+    .map((match: any) => matchForPlayer(match, playerId));
   const performance = state.performanceLab && typeof state.performanceLab === "object" ? state.performanceLab as any : {};
   return {
     players: [ownPlayer],
