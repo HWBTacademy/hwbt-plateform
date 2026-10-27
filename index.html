@@ -448,8 +448,7 @@ body{min-width:0}
       <div class="nav-label">BUSINESS</div>
       <div class="nav-item" data-page="payments" onclick="setUI({page:'payments'})" style="display: flex;"><span class="nav-icon">€</span>PAIEMENTS</div>
       <div class="nav-item" data-page="shop" onclick="setUI({page:'shop'})" style="display: flex;"><span class="nav-icon">◫</span>SHOP</div>
-      <div class="nav-item" data-page="contentStudio" onclick="setUI({page:'contentStudio',contentTab:'dashboard'})" style="display: flex;"><span class="nav-icon">▣</span>CONTENT STUDIO</div>
-      <div class="nav-item" data-page="commandCenter" onclick="setUI({page:'commandCenter',commandTab:'brief'})" style="display: flex;"><span class="nav-icon">◆</span>COMMAND CENTER</div>
+      <div class="nav-item" data-page="marketingAgent" onclick="setUI({page:'marketingAgent'})" style="display: flex;"><span class="nav-icon">✦</span>AGENT MARKETING</div>
       <div class="nav-note">CEO · contenu · ventes</div>
     </div>
     <div class="sidebar-footer">
@@ -3469,7 +3468,7 @@ function setLang(lang){
   render();
 }
 function updateChromeText(){
-  const navNames={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',payments:'PAIEMENTS',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION',compliance:'PROTECTION MINEURS'};
+  const navNames={marketingAgent:'AGENT MARKETING',dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',payments:'PAIEMENTS',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION',compliance:'PROTECTION MINEURS'};
   document.querySelectorAll('.nav-item').forEach(n=>{
     const icon=n.querySelector('.nav-icon')?.textContent||'';
     const playerNames={dashboard:'MES INFOS',players:'MES MATCHS'};
@@ -3490,6 +3489,7 @@ function setUI(obj){
   if(obj.page==='sessions'&&!Object.prototype.hasOwnProperty.call(obj,'selectedSessionId')) obj.selectedSessionId=null;
   Object.assign(UI,obj);
   render();
+  if(obj.page==='marketingAgent' && AUTHENTICATED && STATE.role==='coach') marketingLoadMorning();
 }
 function render(){
   if(STATE.role==='player'){
@@ -3519,7 +3519,7 @@ function render(){
   });
   const roleSwitcher=document.querySelector('.role-switcher');
   if(roleSwitcher) roleSwitcher.style.display=STATE.role==='player'?'none':'flex';
-  const titles={dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',payments:'PAIEMENTS',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION',compliance:'PROTECTION MINEURS'};
+  const titles={marketingAgent:'AGENT MARKETING',dashboard:'TABLEAU DE BORD',players:'JOUEURS',sessions:'SÉANCES',payments:'PAIEMENTS',commandCenter:'COMMAND CENTER',contentStudio:'CONTENT STUDIO',shop:'SHOP',exercises:'EXERCICES',profiles:'12 PROFILS',aspectsLibrary:'ASPECTS & SCORING',communication:'COMMUNICATION',performanceLab:'PERFORMANCE LAB',matchAnalyst:'MATCH ANALYST',test:'TEST PERSONNALITÉ',nutrition:'NUTRITION',compliance:'PROTECTION MINEURS'};
   const playerTitles={dashboard:'MES INFORMATIONS',players:'MES MATCHS',sessions:'MON RETOUR DE SÉANCE'};
   document.getElementById('pageTitle').textContent=tr(STATE.role==='player'?(playerTitles[UI.page]||'MON ESPACE'):(titles[UI.page]||UI.page.toUpperCase()));
   const mc=document.getElementById('mainContent');
@@ -3527,8 +3527,7 @@ function render(){
   else if(UI.page==='players') mc.innerHTML=STATE.role==='player'?pagePlayerMatchesSimple():(UI.selectedPlayerId?pagePlayerDetail(UI.selectedPlayerId):pagePlayersList());
   else if(UI.page==='sessions') mc.innerHTML=UI.selectedSessionId?pageSessionDetail(UI.selectedSessionId):pageSessionsList();
   else if(UI.page==='payments') mc.innerHTML=pagePayments();
-  else if(UI.page==='commandCenter') mc.innerHTML=pageCommandCenter();
-  else if(UI.page==='contentStudio') mc.innerHTML=pageContentStudio();
+  else if(['marketingAgent','commandCenter','contentStudio'].includes(UI.page)) mc.innerHTML=pageMarketingAgent();
   else if(UI.page==='shop') mc.innerHTML=pageShop();
   else if(UI.page==='exercises') mc.innerHTML=pageExercises();
   else if(UI.page==='profiles') mc.innerHTML=UI.selectedProfileId?pageProfileDetail(UI.selectedProfileId):pageProfilesList();
@@ -8433,6 +8432,81 @@ function perfCardHead(title){return `<div class="perf-kicker">${esc(title).toUpp
 function perfCategoryCard(title,label,value,text,color){
   const v=Math.round(Number(value)||0);
   return `<div class="perf-card">${perfCardHead(title)}<div class="perf-big" style="color:${color}">${v}</div><div class="perf-muted">${esc(label)}</div>${perfMetricRow('Progress',v,100,color)}${perfTrendBars(v,color)}<div class="perf-muted" style="margin-top:10px">${text}</div></div>`;
+}
+
+// Marketing workspace: agenda-based suggestions. No external publication or AI service.
+function marketingStore(){
+  STATE.contentStudio=STATE.contentStudio||{posts:[],ideas:[]};
+  const cs=STATE.contentStudio;
+  if(!cs.marketing||typeof cs.marketing!=='object') cs.marketing={drafts:[]};
+  if(!Array.isArray(cs.marketing.drafts)) cs.marketing.drafts=[];
+  return cs.marketing;
+}
+function marketingLocalDate(){
+  return new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Brussels',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+}
+function marketingActivities(){
+  const today=marketingLocalDate();
+  const sessions=(STATE.sessions||[]).filter(s=>s.date&&s.date>=today&&!['cancelled','canceled','annule','annulée'].includes(String(s.status||'').toLowerCase())).map(s=>({key:'s:'+s.id,date:s.date,time:s.time||'',place:s.location||'',title:sessionTitle(s),kind:'Séance',goal:s.goal||''}));
+  const matches=(STATE.matches||[]).filter(m=>m.date&&m.date>=today&&(m.agendaPlanned||String(m.status||'').toUpperCase()==='PLANIFIE')).map(m=>({key:'m:'+m.id,date:m.date,time:m.time||'',place:matchClubLabel(m),title:m.title||agendaMatchPlayers(m).join(' + ')||'Match',kind:matchAgendaActivityLabel(m),goal:''}));
+  return [...sessions,...matches].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).slice(0,12);
+}
+let MARKETING_BUSY=false;
+async function marketingLoadMorning(){
+  const target=document.getElementById('marketing-morning');if(!target)return;
+  try {
+    const data=await apiJson('/api/marketing-briefing');
+    if(!document.getElementById('marketing-morning'))return;
+    const p=data.briefing?.proposal;
+    target.innerHTML=p?`<div class="card" style="border-color:var(--bronze-dim2)"><div class="card-title">BRIEFING AUTOMATIQUE · ${esc(data.date)}</div><div style="font-size:20px;font-weight:800">${esc(p.title)}</div><p class="muted-help" style="margin-top:8px">${esc(p.briefing)}</p><p class="muted-help"><b>Accroche :</b> ${esc(p.hook)}<br><b>Plans à filmer :</b> ${esc((p.shots||[]).join(' · '))}<br><b>À mesurer :</b> ${esc(p.measure)}</p><p class="muted-help">Brouillon à vérifier. Aucune publication n’a été effectuée.</p></div>`:'<div class="muted-help" style="margin-bottom:14px">Aucun briefing automatique disponible aujourd’hui. Prépare un briefing manuellement ci-dessous.</div>';
+  } catch {target.textContent='Le briefing automatique est indisponible. Tu peux réessayer plus tard.';}
+}
+function marketingSelection(key){
+  if(typeof key!=='string'||!/^([sm]):.+$/.test(key))return undefined;
+  return {type:key[0]==='s'?'session':'match',id:key.slice(2)};
+}
+async function marketingGenerate(mode,index){
+  if(MARKETING_BUSY){showNotif('Une demande est déjà en cours');return;}
+  let d=null, item=null, request='', draft='';
+  if(mode==='draft'){
+    item=marketingActivities()[index];if(!item)return;
+    request=`Prépare une proposition de contenu pour cette ${item.key.startsWith('m:')?'rencontre':'séance'}. Donne les plans à filmer et une légende à valider.`;
+  } else if(mode==='revise'){
+    d=marketingStore().drafts[index]; if(!d)return;
+    const root=document.getElementById('marketing-draft-'+index);if(!root)return;
+    request=root.querySelector('[data-field="feedback"]').value.trim();
+    draft=root.querySelector('[data-field="caption"]').value;
+    if(!request){showNotif('Indique ce que tu veux modifier');return;}
+  } else {request='Prépare mon briefing marketing du jour à partir de l’agenda et indique quoi filmer.';}
+  const activity=marketingSelection(item?.key||d?.activityKey);
+  MARKETING_BUSY=true;
+  const indicator=document.getElementById('marketing-progress');if(indicator)indicator.textContent='Préparation en cours…';
+  try{
+    const result=await apiJson('/api/marketing-agent',{method:'POST',body:JSON.stringify({mode,request,draft,...(activity?{activity}: {})})});
+    const p=result.proposal;if(!p||typeof p.caption!=='string'||!Array.isArray(p.shots))throw new Error('Réponse de l’agent invalide');
+    const next={id:'mkt-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),activityKey:item?.key||d?.activityKey||'',createdAt:new Date().toISOString(),date:item?.date||d?.date||result.agenda_as_of,title:p.title,status:'À préparer',shots:p.shots.join('\n'),caption:p.caption,feedback:'',briefing:p.briefing,format:p.format,hook:p.hook,overlay:p.overlay,editPlan:p.edit_plan,callToAction:p.call_to_action,measure:p.measure,missing:p.missing_information,approvalNote:p.approval_note,source:'IA'};
+    // Keep the original draft when revised so that the coach can compare and recover it.
+    marketingStore().drafts.unshift(next);saveState();render();showNotif('Proposition créée : relis-la avant validation');
+  }catch(e){if(indicator)indicator.textContent='';showNotif(e.message||'La proposition n’a pas pu être préparée');}
+  finally{MARKETING_BUSY=false;}
+}
+function marketingUpdate(index){
+  const d=marketingStore().drafts[index];if(!d)return;
+  const root=document.getElementById('marketing-draft-'+index);if(!root)return;
+  d.caption=root.querySelector('[data-field="caption"]').value;
+  d.shots=root.querySelector('[data-field="shots"]').value;
+  d.feedback=root.querySelector('[data-field="feedback"]').value;
+  d.status=root.querySelector('[data-field="status"]').value;
+  d.updatedAt=new Date().toISOString();saveState();showNotif('Enregistrement demandé');
+}
+function pageMarketingAgent(){
+  const activities=marketingActivities(), drafts=marketingStore().drafts;
+  const today=marketingLocalDate();
+  return `<div class="notebook-cover" style="min-height:0"><div class="card-title">HWBT / MEDIA STUDIO</div><div style="font-size:30px;font-weight:900;letter-spacing:1px">AGENT MARKETING</div><div style="color:var(--offwhite);font:14px Inter,sans-serif;margin-top:10px;max-width:700px;line-height:1.6">Ton agenda devient un plan de contenu. Prépare les images, ajuste la proposition et valide quand elle te convient.</div></div>
+  <div id="marketing-morning" role="status"></div>
+  <div class="card" style="border-color:var(--bronze-dim2)"><div class="card-title">BRIEFING · ${esc(today)}</div><div style="font-size:18px;font-weight:800">${activities.length?`Bonjour Thomas, ${activities.filter(a=>a.date===today).length?"voici tes activités du jour et les prochaines étapes.":"voici les prochaines occasions de créer du contenu."}`:'Bonjour Thomas, aucune activité à venir trouvée dans l’agenda.'}</div><p class="muted-help" style="margin-top:8px">L’agent prépare une proposition à partir de l’agenda enregistré. Vérifie les faits et les autorisations avant diffusion.</p><div class="muted-help" style="margin-top:8px">L’IA nécessite une configuration serveur. Le briefing automatique doit être configuré. Notifications et publication ne sont pas activées. Aucune publication n’est envoyée depuis cet écran.</div><div style="margin-top:14px"><button class="btn btn-primary btn-sm" onclick="marketingGenerate('brief',0)">PRÉPARER MON BRIEFING</button> <span id="marketing-progress" class="muted-help" role="status"></span></div></div>
+  <div class="card"><div class="card-title">PROCHAINES ACTIVITÉS</div>${activities.length?activities.map((a,i)=>`<div style="padding:12px 0;border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div style="color:var(--bronze);font-size:11px">${esc(a.date)} · ${esc(a.time||'Heure à préciser')} · ${esc(a.kind)}</div><div style="font-size:16px;font-weight:700;margin-top:4px">${esc(a.title)}</div><div class="muted-help">${esc(a.place||'Lieu à préciser')}</div></div><button class="btn btn-primary btn-sm" onclick="marketingGenerate('draft',${i})">PRÉPARER LE CONTENU</button></div>`).join(''):'<div class="muted-help">Ajoute une séance ou un match dans l’agenda pour préparer du contenu.</div>'}</div>
+  <div class="card"><div class="card-title">PROPOSITIONS À TRAVAILLER</div>${drafts.length?drafts.map((d,i)=>`<div id="marketing-draft-${i}" style="padding:18px 0;border-bottom:1px solid var(--border2)"><div style="font-size:19px;font-weight:800">${esc(d.title)}</div><div class="muted-help">${esc(d.date)} · ${esc(d.source||"Modèle")} · Relis les faits et vérifie les autorisations d’image avant toute diffusion.</div>${d.briefing?`<p class="muted-help" style="margin-top:10px">${esc(d.briefing)}</p>`:""}${d.missing?.length?`<p class="muted-help">À préciser : ${esc(d.missing.join(" · "))}</p>`:""}${d.hook?`<div style="padding:12px;background:var(--bg4);border-left:3px solid var(--bronze);margin-top:12px;font:13px/1.6 Inter,sans-serif"><b>Accroche :</b> ${esc(d.hook)}<br><b>Texte à l’écran :</b> ${esc(d.overlay)}<br><b>Montage :</b> ${esc(d.editPlan)}<br><b>Appel à l’action :</b> ${esc(d.callToAction)}<br><b>À mesurer :</b> ${esc(d.measure)}</div>`:''}<label class="card-title" style="display:block;margin:16px 0 6px">PLANS À FILMER</label><textarea data-field="shots" style="width:100%;min-height:95px;background:var(--bg4);color:white;border:1px solid var(--border2);padding:10px">${esc(d.shots||'')}</textarea><label class="card-title" style="display:block;margin:16px 0 6px">TEXTE À MODIFIER</label><textarea data-field="caption" style="width:100%;min-height:130px;background:var(--bg4);color:white;border:1px solid var(--border2);padding:10px">${esc(d.caption||'')}</textarea><label class="card-title" style="display:block;margin:16px 0 6px">TES REMARQUES</label><textarea data-field="feedback" placeholder="Ce que tu souhaites changer ou ajouter" style="width:100%;min-height:55px;background:var(--bg4);color:white;border:1px solid var(--border2);padding:10px">${esc(d.feedback||'')}</textarea><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px"><select data-field="status" style="background:var(--bg4);color:white;padding:8px;border:1px solid var(--border2)">${['À préparer','À modifier','Validé'].map(x=>`<option ${x===d.status?'selected':''}>${esc(x)}</option>`).join('')}</select><button class="btn btn-primary btn-sm" onclick="marketingUpdate(${i})">ENREGISTRER</button><button class="btn btn-ghost btn-sm" onclick="marketingGenerate('revise',${i})">DEMANDER UNE MODIFICATION</button><span class="muted-help">Validé ne publie pas le contenu.</span></div></div>`).join(''):'<div class="muted-help">Aucune proposition pour le moment. Choisis une activité ci-dessus.</div>'}</div>`;
 }
 
 function generateAIBrief(context={}){
