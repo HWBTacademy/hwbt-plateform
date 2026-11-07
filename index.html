@@ -145,22 +145,35 @@ body{min-width:0}
 .asp-desc{font-size:10px;color:var(--gray3);font-family:var(--font-body);line-height:1.4}
 
 .match-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px}
-.match-live-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
-.match-live-main{border:1px solid var(--border2);border-radius:10px;padding:18px 16px;min-height:112px;text-align:left;font-family:var(--font-title);cursor:pointer;background:var(--bg2);color:var(--white);transition:all .15s}
-.match-live-main span{display:block;font-size:18px;font-weight:800;letter-spacing:1.2px}
-.match-live-main b{display:block;font-size:22px;line-height:1.15;margin-top:10px;color:var(--bronze)}
-.match-live-main.won{background:linear-gradient(135deg,var(--bronze-dim),var(--bg2));border-color:var(--bronze-dim2)}
-.match-live-main.lost{background:linear-gradient(135deg,#ffffff08,var(--bg2))}
-.match-live-main.active{box-shadow:0 0 0 2px var(--bronze);border-color:var(--bronze)}
 .match-live-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
 .match-action-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
 .match-action-group{border:1px solid var(--border);border-radius:9px;background:rgba(255,255,255,.025);padding:10px}
 .match-action-group-title{font-family:var(--font-title);font-size:10px;letter-spacing:1.3px;color:var(--bronze);margin-bottom:8px;text-transform:uppercase}
 .match-action-group .match-live-options{grid-template-columns:repeat(auto-fit,minmax(98px,1fr))}
-.match-live-advice{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:10px;margin-top:14px}
+.match-direct-encode{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;margin-top:12px}
+.match-direct-side{border:1px solid var(--border2);border-radius:11px;background:var(--bg2);padding:13px;min-width:0}
+.match-direct-side.won{border-color:var(--bronze-dim2);background:linear-gradient(135deg,var(--bronze-dim),var(--bg2))}
+.match-direct-side.lost{background:linear-gradient(135deg,#ffffff07,var(--bg2))}
+.match-direct-title{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:11px}
+.match-direct-title h3{font-family:var(--font-title);font-size:17px;letter-spacing:.7px;color:var(--white);margin:0}
+.match-direct-title span{font-size:9px;letter-spacing:1px;color:var(--bronze);font-weight:900}
+.match-direct-side .match-action-groups{grid-template-columns:1fr 1fr;gap:8px}
+.match-direct-side .match-action-group{padding:8px}
+.match-direct-side .match-live-mini{min-height:42px;font-size:9px;padding:7px 5px}
+.match-live-advice{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
 .match-live-advice-box{border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.025);padding:12px}
 .match-live-advice-box b{display:block;font-family:var(--font-title);font-size:10px;letter-spacing:1.3px;color:var(--bronze);margin-bottom:7px;text-transform:uppercase}
 .match-live-advice-box span{display:block;font-size:13px;line-height:1.45;color:var(--offwhite)}
+.match-live-coach-plan{grid-column:1/-1;border:1px solid var(--bronze-dim2);border-radius:10px;background:linear-gradient(135deg,rgba(184,137,53,.13),rgba(255,255,255,.025));padding:15px}
+.match-live-coach-plan h3{font-family:var(--font-title);font-size:18px;letter-spacing:.6px;color:var(--white);margin:3px 0 8px}
+.match-live-coach-plan p{font-size:13px;line-height:1.65;color:var(--offwhite);margin:0}
+.match-live-plan-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:13px}
+.match-live-plan-step{border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,.2);padding:11px}
+.match-live-plan-step b{display:block;font-family:var(--font-title);font-size:9px;letter-spacing:1.2px;color:var(--bronze);margin-bottom:6px;text-transform:uppercase}
+.match-live-plan-step span{display:block;font-size:12px;line-height:1.55;color:var(--offwhite)}
+.match-live-plan-check{margin-top:10px;border-left:3px solid var(--bronze);padding:9px 11px;background:rgba(0,0,0,.2);font-size:12px;line-height:1.55;color:var(--offwhite)}
+.match-method-note{font-size:10px;line-height:1.55;color:var(--gray);margin-top:10px}
+.match-method-note a{color:var(--bronze);text-decoration:none}
 .match-live-mini{min-height:48px;border-radius:7px;border:1px solid var(--border2);background:var(--bg4);color:var(--offwhite);font-family:var(--font-title);font-size:11px;letter-spacing:.8px;font-weight:700;cursor:pointer;padding:9px 8px;transition:all .15s}
 .match-live-mini.won{border-color:var(--bronze-dim2);color:var(--white)}
 .match-live-mini.lost{color:var(--gray);background:transparent}
@@ -392,15 +405,15 @@ body{min-width:0}
   .card{padding:14px;margin-bottom:12px}.card-header{align-items:flex-start;gap:10px;flex-direction:column}
   .tabs{overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px}.tab{flex:0 0 auto}
   .score-row{gap:7px}.score-label{width:86px}.bar-bg{min-width:54px}
-  .match-live-grid{grid-template-columns:1fr 1fr;gap:8px}
-  .match-live-main{min-height:72px;padding:11px 10px;border-radius:8px}
-  .match-live-main span{font-size:12px;letter-spacing:.8px}
-  .match-live-main b{font-size:13px;margin-top:6px}
   .match-action-groups{grid-template-columns:1fr;gap:8px}
   .match-action-group{padding:8px}
+  .match-direct-encode{grid-template-columns:1fr}
+  .match-direct-side .match-action-groups{grid-template-columns:1fr 1fr}
   .match-live-advice{grid-template-columns:1fr;gap:8px}
   .match-live-advice-box{padding:10px}
   .match-live-advice-box span{font-size:12px}
+  .match-live-coach-plan{grid-column:1;padding:12px}
+  .match-live-plan-grid{grid-template-columns:1fr}
   .match-live-options{grid-template-columns:repeat(2,1fr);gap:7px}
   .match-live-mini{min-height:38px;font-size:9px;padding:7px 6px}
   .match-scoreboard{grid-template-columns:1fr auto 1fr;padding:11px;gap:6px}
@@ -6536,30 +6549,30 @@ function matchPadelFamilyLabel(k){
 }
 function matchPadelAdvice(family,type='work'){
   const work={
-    SERVICE:'Sécuriser la première intention: servir avec une zone claire, puis préparer la balle suivante.',
-    RETOUR:'Reprendre le retour simple: remettre en jeu profond, éviter le cadeau rapide, puis organiser le duo.',
-    FOND:'Stabiliser le fond: longueur, patience, moins de balle neutre courte qui donne l’attaque adverse.',
-    FILET:'Clarifier le filet: fermer le centre, jouer la première volée de contrôle avant de vouloir finir.',
-    HAUT_TETE:'Mieux gérer les balles hautes: choisir entre bandeja de contrôle, vibora agressive ou remise simple.',
-    CONSTRUCTION:'Garder le plan plus longtemps: construire le point avant d’accélérer.',
-    TRANSITION:'Travailler la montée: avancer ensemble, pas un joueur seul qui laisse une zone ouverte.',
-    DEFENSE:'Défendre plus haut et plus profond: accepter une balle de plus avant de tenter la sortie.',
-    DECISION:'Réduire le mauvais choix: reconnaître balle neutre, balle d’attaque et balle de survie avant de frapper.',
-    PRESSION:'Transformer la pression en point construit: provoquer la faute sans chercher trop vite le winner.',
-    AUTRE:'Rendre l’encodage plus précis sur les prochains matchs pour lire la tendance.'
+    SERVICE:'Sécuriser la première intention avec une zone annoncée avant de servir, puis jouer la balle suivante dans la continuité de ce choix. L’objectif n’est pas seulement de mettre le service, mais d’obtenir une première volée contrôlable et de prendre le filet ensemble.',
+    RETOUR:'Reprendre un retour simple, bas ou profond, qui empêche les serveurs de jouer immédiatement vers le bas. Après la frappe, le duo doit se replacer sur la même ligne et préparer le lob ou la balle basse qui permettra de disputer le filet.',
+    FOND:'Stabiliser le fond avec plus de hauteur utile, de longueur et de patience, surtout lorsque la balle arrive sous le niveau du filet. Éviter la balle neutre courte qui offre l’attaque, puis utiliser la vitre pour gagner du temps lorsque la trajectoire le permet.',
+    FILET:'Clarifier l’occupation du filet: les deux joueurs avancent, ferment d’abord le centre et jouent une première volée de contrôle. La finition vient seulement après une balle réellement favorable; sinon, conserver la position reste la priorité.',
+    HAUT_TETE:'Choisir le coup au-dessus de la tête selon la position et l’équilibre, plutôt que de smasher par automatisme. Utiliser la bandeja pour conserver le filet, la vibora pour augmenter la pression et une remise simple si le corps est en retard.',
+    CONSTRUCTION:'Garder le plan une frappe de plus et faire déplacer les adversaires avant d’accélérer. Chercher une balle plus facile à jouer vers le bas, puis attaquer ensemble afin que la finition soit la conséquence de la construction.',
+    TRANSITION:'Travailler une montée coordonnée déclenchée par une balle profonde, basse ou un lob réussi. Les deux joueurs avancent et s’arrêtent ensemble avant la frappe adverse afin d’éviter qu’un espace s’ouvre entre eux.',
+    DEFENSE:'Accepter une balle supplémentaire en défense et privilégier une trajectoire haute ou profonde qui redonne du temps au duo. Utiliser les vitres quand elles facilitent la lecture, puis choisir le lob seulement avec assez de contrôle pour récupérer le filet.',
+    DECISION:'Classer la balle avant de frapper: survie, neutre ou attaque. Sur une balle difficile, sécuriser hauteur et zone; sur une balle neutre, construire; sur une balle favorable, accélérer vers l’espace créé plutôt que forcer sans avantage.',
+    PRESSION:'Transformer la pression en point construit en demandant une frappe supplémentaire aux adversaires. Maintenir une balle basse, profonde ou au centre avant de chercher le winner réduit le risque de rendre l’initiative trop tôt.',
+    AUTRE:'Préciser davantage la zone, le type de coup et l’origine des prochains points. Une observation plus complète permettra de distinguer une erreur technique, une mauvaise décision et une difficulté de placement.'
   };
   const strength={
-    SERVICE:'Le service crée déjà de l’avantage: garder cette zone et préparer le coup suivant.',
-    RETOUR:'Le retour met l’adversaire sous pression: continuer à démarrer les points avec intention.',
-    FOND:'Le fond rapporte: rester patient et continuer à construire depuis la longueur.',
-    FILET:'Le filet rapporte: garder cette présence, surtout à deux joueurs sur la même ligne.',
-    HAUT_TETE:'Les coups haut tête rapportent: continuer, mais seulement quand le corps est bien placé.',
-    CONSTRUCTION:'La paire gagne quand elle construit: ne pas brûler les étapes.',
-    TRANSITION:'La transition fonctionne: continuer à monter ensemble après la balle qui pousse.',
-    DEFENSE:'La défense rapporte: utiliser cette solidité pour récupérer l’attaque.',
-    DECISION:'Les choix tactiques rapportent: garder cette lecture simple et la répéter dans les moments chauds.',
-    PRESSION:'La paire force des fautes: continuer à mettre l’adversaire dans une balle de plus à jouer.',
-    AUTRE:'Il y a une tendance positive, mais elle doit être mieux précisée à l’encodage.'
+    SERVICE:'Le service crée déjà de l’avantage. Conserver la zone qui rapporte et observer surtout si la paire transforme cet avantage en contrôle du filet sur les deux frappes suivantes.',
+    RETOUR:'Le retour met déjà les adversaires sous pression. Répéter la même intention tout en gardant une marge au-dessus du filet pour que la qualité du retour reste stable dans les points importants.',
+    FOND:'Le jeu de fond rapporte parce que la paire accepte de construire. Garder cette longueur et utiliser la patience comme moyen de préparer la récupération du filet, pas comme une position définitive.',
+    FILET:'La présence au filet produit des points. Maintenir les deux joueurs sur la même ligne, fermer le centre et continuer à privilégier la qualité de la première volée avant la finition.',
+    HAUT_TETE:'Les coups au-dessus de la tête rapportent lorsque le placement est bon. Continuer à choisir le coup selon la balle reçue et récupérer immédiatement la position de filet après l’impact.',
+    CONSTRUCTION:'La paire gagne lorsqu’elle construit au lieu de chercher trop tôt la fin du point. Conserver ce rythme et identifier la balle précise qui autorise l’accélération.',
+    TRANSITION:'La transition fonctionne parce que le duo avance sur une balle favorable. Garder ce déclencheur commun et vérifier que les deux joueurs arrivent alignés avant la frappe adverse.',
+    DEFENSE:'La défense rapporte et crée du temps. Utiliser cette solidité pour obtenir une balle de transition, puis récupérer l’attaque ensemble plutôt que rester durablement derrière.',
+    DECISION:'Les choix tactiques produisent un bilan positif. Répéter la lecture balle difficile, neutre ou favorable, particulièrement lorsque le score augmente la pression.',
+    PRESSION:'La paire provoque des fautes sans devoir finir immédiatement. Continuer à contrôler hauteur, profondeur et centre pour faire jouer une balle de plus dans une position inconfortable.',
+    AUTRE:'Une tendance positive apparaît mais l’encodage reste trop général. Qualifier les prochains points permettra de transformer ce ressenti en levier tactique précis.'
   };
   return (type==='strength'?strength:work)[family]||work.AUTRE;
 }
@@ -7345,12 +7358,6 @@ function matchUpcomingImportanceHtml(m,scoreState){
   const side=info.importanceFor?` · opportunité ${info.importanceFor==='HWBT'?'HWBT':'ADV'}`:'';
   return `<div style="margin:10px auto 0;max-width:560px;text-align:center;border:1px solid var(--bronze-dim2);background:rgba(184,137,53,.14);color:var(--bronze);border-radius:8px;padding:8px 10px;font-size:11px;font-weight:900;letter-spacing:1.4px">${esc(label)}${esc(side)}</div>`;
 }
-function setMatchPointResult(result){
-  const m=currentMatchForEncoding();
-  UI.matchPointResult=result||null;
-  if(m) updateMatchEncoder(m,{actions:true});
-  else render();
-}
 function matchActionChoiceHtml(m,result){
   const scoreState=ensureMatchScore(m);
   const slots=matchPlayerSlots(m);
@@ -7358,200 +7365,60 @@ function matchActionChoiceHtml(m,result){
   const hwbtServing=scoreState.servingTeam==='HWBT';
   const servingPlayerOrigin=scoreState.server==='J2'?'JOUEUR_2':'JOUEUR_1';
   const servingPlayerName=scoreState.server==='J2'?p2:p1;
-  const serviceWonOptions=hwbtServing?[
-    [servingPlayerOrigin,'service gagnant vitre','service',`${servingPlayerName} · Service vitre`,'Service gagnant'],
-    [servingPlayerOrigin,'service gagnant corps','service',`${servingPlayerName} · Service corps`,'Service gagnant'],
-    [servingPlayerOrigin,'service gagnant T','service',`${servingPlayerName} · Service T`,'Service gagnant'],
-    [servingPlayerOrigin,'point facile après service','service +1',`${servingPlayerName} · Point facile après service`,'Service gagnant']
-  ]:[];
-  const serviceLostOptions=hwbtServing?[
-    [servingPlayerOrigin,'double faute','service',`${servingPlayerName} · Double faute`,'Service donné']
-  ]:[];
-  const returnWonOptions=!hwbtServing?[
-    ['JOUEUR_1','retour +1','retour',`${p1} · Retour`,p1],
-    ['JOUEUR_2','retour +1','retour',`${p2} · Retour`,p2]
-  ]:[];
-  const returnLostOptions=!hwbtServing?[
-    ['JOUEUR_1','retour faute','retour',`${p1} · Retour`,p1],
-    ['JOUEUR_2','retour faute','retour',`${p2} · Retour`,p2]
-  ]:[];
+  const opt=(origin,cause,phase,label,group,forced=false)=>[origin,cause,phase,label,group,forced];
+  const contextWon=hwbtServing
+    ?[opt(servingPlayerOrigin,'service + première balle gagnée','service',`${servingPlayerName} · Service +1`,servingPlayerOrigin==='JOUEUR_1'?p1:p2,true)]
+    :[opt('JOUEUR_1','retour +1','retour',`${p1} · Retour`,p1,true),opt('JOUEUR_2','retour +1','retour',`${p2} · Retour`,p2,true)];
+  const contextLost=hwbtServing
+    ?[opt(servingPlayerOrigin,'double faute','service',`${servingPlayerName} · Double faute`,servingPlayerOrigin==='JOUEUR_1'?p1:p2,false)]
+    :[opt('JOUEUR_1','retour faute','retour',`${p1} · Retour`,p1,false),opt('JOUEUR_2','retour faute','retour',`${p2} · Retour`,p2,false)];
   const optionsWon=[
-    ...serviceWonOptions,
-    ...returnWonOptions,
-    ['JOUEUR_1','fond +1','fond',`${p1} · Fond`,p1],
-    ['JOUEUR_1','filet +1','filet',`${p1} · Filet`,p1],
-    ['JOUEUR_1','bandeja gagnante','attaque haut tête',`${p1} · Bandeja`,p1],
-    ['JOUEUR_1','vibora gagnante','attaque haut tête',`${p1} · Víbora`,p1],
-    ['JOUEUR_1','smash gagnant','attaque haut tête',`${p1} · Smash`,p1],
-    ['JOUEUR_1','par 3 / par 4','attaque haut tête',`${p1} · Par 3/4`,p1],
-    ['JOUEUR_1','lob défense +1','défense lob',`${p1} · Lob/défense`,p1],
-    ['JOUEUR_2','fond +1','fond',`${p2} · Fond`,p2],
-    ['JOUEUR_2','filet +1','filet',`${p2} · Filet`,p2],
-    ['JOUEUR_2','bandeja gagnante','attaque haut tête',`${p2} · Bandeja`,p2],
-    ['JOUEUR_2','vibora gagnante','attaque haut tête',`${p2} · Víbora`,p2],
-    ['JOUEUR_2','smash gagnant','attaque haut tête',`${p2} · Smash`,p2],
-    ['JOUEUR_2','par 3 / par 4','attaque haut tête',`${p2} · Par 3/4`,p2],
-    ['JOUEUR_2','lob défense +1','défense lob',`${p2} · Lob/défense`,p2],
-    ['COLLECTIF','construction duo +1','construction','Duo · Construction','Duo HWBT'],
-    ['COLLECTIF','transition filet +1','transition','Duo · Transition','Duo HWBT'],
-    ['COLLECTIF','zone libre trouvée +1','placement','Duo · Zone libre','Duo HWBT'],
-    ['ADVERSAIRES','faute adv gauche','faute adverse',`ADV G · Faute`,'Faute adverse'],
-    ['ADVERSAIRES','faute adv droite','faute adverse',`ADV D · Faute`,'Faute adverse']
+    ...contextWon,
+    opt('JOUEUR_1','fond +1','fond',`${p1} · Fond`,p1,true),
+    opt('JOUEUR_1','filet +1','filet',`${p1} · Filet`,p1,true),
+    opt('JOUEUR_1','haut tête +1','attaque haut tête',`${p1} · Haut tête`,p1,true),
+    opt('JOUEUR_1','lob défense +1','défense lob',`${p1} · Lob/défense`,p1,true),
+    opt('JOUEUR_2','fond +1','fond',`${p2} · Fond`,p2,true),
+    opt('JOUEUR_2','filet +1','filet',`${p2} · Filet`,p2,true),
+    opt('JOUEUR_2','haut tête +1','attaque haut tête',`${p2} · Haut tête`,p2,true),
+    opt('JOUEUR_2','lob défense +1','défense lob',`${p2} · Lob/défense`,p2,true),
+    opt('COLLECTIF','construction duo +1','construction','Construction','Duo HWBT',true),
+    opt('COLLECTIF','transition filet +1','transition','Transition','Duo HWBT',true),
+    opt('COLLECTIF','zone libre trouvée +1','placement','Zone libre','Duo HWBT',true),
+    opt('ADVERSAIRES','faute provoquée adv gauche','pression','Provoquée G','Erreur adversaire',true),
+    opt('ADVERSAIRES','faute provoquée adv droite','pression','Provoquée D','Erreur adversaire',true),
+    opt('ADVERSAIRES','faute gratuite adv gauche','faute adverse','Gratuite G','Erreur adversaire',false),
+    opt('ADVERSAIRES','faute gratuite adv droite','faute adverse','Gratuite D','Erreur adversaire',false),
+    opt('INDETERMINE','point gagné à préciser','à préciser','Gagné · à préciser','Rapide',false)
   ];
   const optionsLost=[
-    ...serviceLostOptions,
-    ...returnLostOptions,
-    ['JOUEUR_1','fond donné','fond',`${p1} · Fond`,p1],
-    ['JOUEUR_1','filet donné','filet',`${p1} · Filet`,p1],
-    ['JOUEUR_1','haut tête donné','attaque',`${p1} · Haut tête`,p1],
-    ['JOUEUR_1','lob défense donné','défense lob',`${p1} · Lob/défense`,p1],
-    ['JOUEUR_1','mauvais choix tactique','décision',`${p1} · Choix`,p1],
-    ['JOUEUR_2','fond donné','fond',`${p2} · Fond`,p2],
-    ['JOUEUR_2','filet donné','filet',`${p2} · Filet`,p2],
-    ['JOUEUR_2','haut tête donné','attaque',`${p2} · Haut tête`,p2],
-    ['JOUEUR_2','lob défense donné','défense lob',`${p2} · Lob/défense`,p2],
-    ['JOUEUR_2','mauvais choix tactique','décision',`${p2} · Choix`,p2],
-    ['COLLECTIF','duo communication donné','communication','Duo · Communication','Duo HWBT'],
-    ['COLLECTIF','zone libre laissée ouverte','placement','Duo · Zone ouverte','Duo HWBT'],
-    ['COLLECTIF','duo cassé sur la montée','transition','Duo · Transition ratée','Duo HWBT'],
-    ['ADVERSAIRES','adv gauche winner filet','filet','ADV G · Filet','ADV gauche'],
-    ['ADVERSAIRES','adv gauche winner haut tête','attaque haut tête','Gauche · Haut tête','ADV gauche'],
-    ['ADVERSAIRES','adv gauche winner fond','fond','ADV G · Fond','ADV gauche'],
-    ['ADVERSAIRES','adv droite winner filet','filet','ADV D · Filet','ADV droite'],
-    ['ADVERSAIRES','adv droite winner haut tête','attaque haut tête','Droite · Haut tête','ADV droite'],
-    ['ADVERSAIRES','adv droite winner fond','fond','ADV D · Fond','ADV droite']
+    ...contextLost,
+    opt('JOUEUR_1','fond donné','fond',`${p1} · Fond`,p1,false),
+    opt('JOUEUR_1','filet donné','filet',`${p1} · Filet`,p1,false),
+    opt('JOUEUR_1','haut tête donné','attaque haut tête',`${p1} · Haut tête`,p1,false),
+    opt('JOUEUR_1','lob défense donné','défense lob',`${p1} · Lob/défense`,p1,false),
+    opt('JOUEUR_1','mauvais choix tactique','décision',`${p1} · Choix`,p1,false),
+    opt('JOUEUR_2','fond donné','fond',`${p2} · Fond`,p2,false),
+    opt('JOUEUR_2','filet donné','filet',`${p2} · Filet`,p2,false),
+    opt('JOUEUR_2','haut tête donné','attaque haut tête',`${p2} · Haut tête`,p2,false),
+    opt('JOUEUR_2','lob défense donné','défense lob',`${p2} · Lob/défense`,p2,false),
+    opt('JOUEUR_2','mauvais choix tactique','décision',`${p2} · Choix`,p2,false),
+    opt('COLLECTIF','duo communication donné','communication','Communication','Duo HWBT',false),
+    opt('COLLECTIF','zone libre laissée ouverte','placement','Zone ouverte','Duo HWBT',false),
+    opt('COLLECTIF','duo cassé sur la montée','transition','Transition ratée','Duo HWBT',false),
+    opt('ADVERSAIRES','adv gauche winner filet','filet','G · Filet','Winner adverse',true),
+    opt('ADVERSAIRES','adv gauche winner haut tête','attaque haut tête','G · Haut tête','Winner adverse',true),
+    opt('ADVERSAIRES','adv gauche winner fond','fond','G · Fond','Winner adverse',true),
+    opt('ADVERSAIRES','adv droite winner filet','filet','D · Filet','Winner adverse',true),
+    opt('ADVERSAIRES','adv droite winner haut tête','attaque haut tête','D · Haut tête','Winner adverse',true),
+    opt('ADVERSAIRES','adv droite winner fond','fond','D · Fond','Winner adverse',true),
+    opt('INDETERMINE','point perdu à préciser','à préciser','Perdu · à préciser','Rapide',false)
   ];
   const groupedActions=(result==='GAGNE'?optionsWon:optionsLost).reduce((acc,item)=>{const group=item[4]||'Actions';(acc[group]||(acc[group]=[])).push(item);return acc;},{});
-  const shotButtons=Object.entries(groupedActions).map(([group,items])=>`<div class="match-action-group"><div class="match-action-group-title">${esc(group)}</div><div class="match-live-options">${items.map(([origin,cause,phase,label])=>`<button class="match-live-mini ${result==='GAGNE'?'won':'lost'}" onclick="addMatchPoint('${result}','${origin}','${jsStr(cause)}','${jsStr(phase)}')">${esc(label)}</button>`).join('')}</div></div>`).join('');
-  return `<div class="card" style="border-color:${result==='GAGNE'?'var(--bronze-dim2)':'var(--border2)'}">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px">
-      <div><div class="card-title">2E CLIC OBLIGATOIRE · ${result==='GAGNE'?'COMMENT LE POINT EST GAGNÉ ?':'COMMENT LE POINT EST PERDU ?'}</div><div class="muted-help">${matchPointStateLabel(result)}. Clique la grande famille: le score avance direct. Tu pourras préciser CD/RV/vitre/centre après.</div></div>
-      <button class="btn btn-ghost btn-sm" onclick="setMatchPointResult(null)">ANNULER CHOIX</button>
-    </div>
+  const shotButtons=Object.entries(groupedActions).map(([group,items])=>`<div class="match-action-group"><div class="match-action-group-title">${esc(group)}</div><div class="match-live-options">${items.map(([origin,cause,phase,label,,forced])=>`<button class="match-live-mini ${result==='GAGNE'?'won':'lost'}" onclick="addMatchPoint('${result}','${origin}','${jsStr(cause)}','${jsStr(phase)}',${forced?'true':'false'})">${esc(label)}</button>`).join('')}</div></div>`).join('');
+  return `<div class="match-direct-side ${result==='GAGNE'?'won':'lost'}">
+    <div class="match-direct-title"><div><span>1 CLIC = SCORE + ANALYSE</span><h3>${result==='GAGNE'?'POINT GAGNÉ HWBT':'POINT PERDU HWBT'}</h3></div><span>${result==='GAGNE'?'+' : '−'}</span></div>
     <div class="match-action-groups">${shotButtons}</div>
-  </div>`;
-}
-function matchOriginChoiceHtml(m,result){
-  const slots=matchPlayerSlots(m);
-  const p1=slots.p1,p2=slots.p2;
-  const won=result==='GAGNE';
-  const originButtons=[
-    {origin:'JOUEUR_1',label:p1,cause:won?'point gagné par joueur':'point perdu par joueur',phase:'joueur'},
-    {origin:'JOUEUR_2',label:p2,cause:won?'point gagné par joueur':'point perdu par joueur',phase:'joueur'},
-    {origin:'COLLECTIF',label:'Duo HWBT',cause:won?'point construit par le duo':'point perdu par le duo',phase:'duo'},
-    {origin:'ADVERSAIRES',label:won?'Faute ADV':'Winner ADV',cause:won?'faute adverse à préciser':'winner adverse à préciser',phase:'pression'}
-  ];
-  return `<div class="card" style="border-color:${won?'var(--bronze-dim2)':'var(--border2)'};padding:14px">
-    <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px">
-      <div><div class="card-title">2E CLIC OBLIGATOIRE · ${won?'QUI GAGNE LE POINT ?':'QUI PERD / SUBIT LE POINT ?'}</div><div class="muted-help">Après ce clic, le score avance. Le détail reste optionnel juste en dessous.</div></div>
-      <button class="btn btn-ghost btn-sm" onclick="setMatchPointResult(null)">ANNULER</button>
-    </div>
-    <div class="match-live-options">${originButtons.map(o=>`<button class="match-live-mini ${won?'won':'lost'}" onclick="addMatchPoint('${result}','${o.origin}','${jsStr(o.cause)}','${jsStr(o.phase)}')">${esc(o.label)}</button>`).join('')}</div>
-  </div>`;
-}
-function matchQuickQualifyOptions(m,last){
-  if(!last) return [];
-  const score=ensureMatchScore(m);
-  const slots=matchPlayerSlots(m);
-  const server=last.server||score.server;
-  const serverTeam=matchServingTeamFromServer(server);
-  const serverName=matchServerLabel(m,server);
-  const serverOrigin=server==='J2'?'JOUEUR_2':'JOUEUR_1';
-  const p1=slots.p1,p2=slots.p2;
-  const important=matchPointImportantTypes(last).length>0||computePointImportance(m,score).types.length>0;
-  const won=last.result==='GAGNE';
-  const btn=(label,origin,cause,phase,forced=false)=>({label,origin,cause,phase,forced});
-  if(important){
-    return won?[
-      btn('Duo · choix juste','COLLECTIF','décision juste sous pression','décision',true),
-      btn(`${p1} · calme`,'JOUEUR_1','point important maîtrisé','mental',true),
-      btn(`${p2} · calme`,'JOUEUR_2','point important maîtrisé','mental',true),
-      btn('ADV G · faute','ADVERSAIRES','faute adv gauche','faute adverse',false),
-      btn('ADV D · faute','ADVERSAIRES','faute adv droite','faute adverse',false),
-      btn('ADV · cadeau','ADVERSAIRES','faute adverse gratuite','pression',false)
-    ]:[
-      btn(`${p1} · choix vite`,'JOUEUR_1','mauvais choix sous pression','décision',false),
-      btn(`${p2} · choix vite`,'JOUEUR_2','mauvais choix sous pression','décision',false),
-      btn('Duo · zone ouverte','COLLECTIF','zone libre laissée ouverte','placement',false),
-      btn('ADV G · winner','ADVERSAIRES','adv gauche winner','pression',true),
-      btn('ADV D · winner','ADVERSAIRES','adv droite winner','pression',true),
-      btn('Balle donnée','COLLECTIF','point donné sous pression','décision',false)
-    ];
-  }
-  if(won&&serverTeam==='HWBT'){
-    return [
-      btn(`${serverName} · service`,serverOrigin,'service gagnant','service',true),
-      btn(`${p1} · filet`,'JOUEUR_1','filet +1','filet',true),
-      btn(`${p2} · filet`,'JOUEUR_2','filet +1','filet',true),
-      btn('Duo · patience','COLLECTIF','construction duo +1','construction',true),
-      btn('ADV G · faute','ADVERSAIRES','faute adv gauche','faute adverse',false),
-      btn('ADV D · faute','ADVERSAIRES','faute adv droite','faute adverse',false)
-    ];
-  }
-  if(won){
-    return [
-      btn(`${p1} · retour`,'JOUEUR_1','retour +1','retour',true),
-      btn(`${p2} · retour`,'JOUEUR_2','retour +1','retour',true),
-      btn(`${p1} · fond`,'JOUEUR_1','fond +1','fond',true),
-      btn(`${p2} · fond`,'JOUEUR_2','fond +1','fond',true),
-      btn('Duo · construit','COLLECTIF','construction duo +1','construction',true),
-      btn('ADV · cadeau','ADVERSAIRES','faute adverse gratuite','pression',false)
-    ];
-  }
-  if(serverTeam==='HWBT'){
-    return [
-      btn(`${serverName} · double faute`,serverOrigin,'double faute','service',false),
-      btn(`${p1} · fond`,'JOUEUR_1','fond donné','fond',false),
-      btn(`${p2} · fond`,'JOUEUR_2','fond donné','fond',false),
-      btn('Duo · communication','COLLECTIF','duo communication donné','communication',false),
-      btn('ADV G · winner','ADVERSAIRES','adv gauche winner','pression',true),
-      btn('ADV D · winner','ADVERSAIRES','adv droite winner','pression',true)
-    ];
-  }
-  return [
-    btn(`${p1} · retour`,'JOUEUR_1','retour faute','retour',false),
-    btn(`${p2} · retour`,'JOUEUR_2','retour faute','retour',false),
-    btn(`${p1} · fond`,'JOUEUR_1','fond donné','fond',false),
-    btn(`${p2} · fond`,'JOUEUR_2','fond donné','fond',false),
-    btn('Duo · placement','COLLECTIF','zone libre laissée ouverte','placement',false),
-    btn('ADV · winner','ADVERSAIRES','winner adverse','pression',true)
-  ];
-}
-function qualifyLastMatchPoint(matchId,pointId,origin,cause,phase,forced=false){
-  const m=(STATE.matches||[]).find(x=>String(x.id)===String(matchId));
-  if(!m) return;
-  const p=(m.events||[]).find(e=>String(e.id)===String(pointId)&&String(e.type).toUpperCase()==='POINT'&&e.active!==false&&!e.cancelled);
-  if(!p) return;
-  p.origin=origin;
-  p.cause=cause;
-  p.baseCause=cause;
-  p.phase=phase||p.phase||'';
-  p.forced=!!forced;
-  p.qualifiedAt=new Date().toISOString();
-  saveStateDebounced();
-  updateMatchEncoder(m,{actions:true,stats:true,points:true});
-}
-function detailLastMatchPoint(matchId,pointId,cause,phase,forced=false){
-  const m=(STATE.matches||[]).find(x=>String(x.id)===String(matchId));
-  if(!m) return;
-  const p=(m.events||[]).find(e=>String(e.id)===String(pointId)&&String(e.type).toUpperCase()==='POINT'&&e.active!==false&&!e.cancelled);
-  if(!p) return;
-  p.cause=cause;
-  p.baseCause=cause;
-  p.phase=phase||p.phase||'';
-  p.forced=!!forced;
-  p.detailedAt=new Date().toISOString();
-  saveStateDebounced();
-  updateMatchEncoder(m,{actions:true,stats:true,points:true});
-}
-function matchQuickQualifyHtml(m,events){
-  const last=events.slice(-1)[0];
-  if(!last) return `<div class="card" style="padding:14px"><div class="card-title">3E CLIC OPTIONNEL</div><div class="muted-help">Après les 2 clics obligatoires, les détails utiles apparaîtront ici.</div></div>`;
-  const opts=matchQuickQualifyOptions(m,last).slice(0,6);
-  const detailed=last.cause&&last.cause!=='point gagné par joueur'&&last.cause!=='point perdu par joueur'&&last.cause!=='point construit par le duo'&&last.cause!=='point perdu par le duo'&&!String(last.cause||'').includes('à préciser');
-  return `<div class="card" style="padding:14px;border-color:${detailed?'var(--border)':'var(--bronze-dim2)'}">
-    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px"><div><div class="card-title">3E CLIC OPTIONNEL · COMMENT ?</div><div class="muted-help">${detailed?'Détail ajouté':'Si tu as le temps, précise le type d’action'} · ${esc(last.result)} · ${esc(matchOriginLabel(m,last.origin))} · ${esc(last.score||'score ?')}</div></div><span style="font-size:10px;color:${detailed?'var(--vert)':'var(--bronze)'};font-weight:900">${detailed?'DÉTAILLÉ':'OPTIONNEL'}</span></div>
-    <div class="match-live-options">${opts.map(o=>`<button class="match-live-mini ${last.result==='GAGNE'?'won':'lost'}" onclick="detailLastMatchPoint('${m.id}','${last.id}','${jsStr(o.cause)}','${jsStr(o.phase)}',${o.forced?'true':'false'})">${esc(o.label)}</button>`).join('')}</div>
   </div>`;
 }
 function updateMatchEncoder(m,parts={}){
@@ -7566,7 +7433,7 @@ function updateMatchEncoder(m,parts={}){
   if(document.getElementById('matchFollowScoreZone')) document.getElementById('matchFollowScoreZone').innerHTML=matchMetricCard('Score suivi',m.currentScore||m.score||'0-0');
   if(document.getElementById('matchFollowBalanceZone')) document.getElementById('matchFollowBalanceZone').innerHTML=matchMetricCard('Bilan live',`${a.matchSummary.won}-${a.matchSummary.lost}`,`${a.matchSummary.totalPoints} points encodés`);
 }
-function addMatchPoint(result,origin,causePreset='',phasePreset=''){
+function addMatchPoint(result,origin,causePreset='',phasePreset='',forcedPreset=false){
   const m=currentMatchForEncoding();
   if(!m){showNotif('Crée d’abord un vrai match');return;}
   const scoreState=ensureMatchScore(m);
@@ -7586,12 +7453,9 @@ function addMatchPoint(result,origin,causePreset='',phasePreset=''){
   const cause=causePreset||document.getElementById('matchPointCause')?.value||'';
   const server=update.prev.server||document.getElementById('matchServingTeamInput')?.value||'J1';
   const importance=computePointImportance(m,update.prev);
-  const point={type:'POINT',id:`m${m.id}-p${pointNumber}`,seq:pointNumber,t:Math.round((now-start)/1000),result,origin,score:update.score,prevScore:update.prev.display,prevMatchScore:update.prev,gameWon:update.gameWon,gameScore:update.gameScore,pointScore:update.pointScore,server,serverLabel:matchServerLabel(m,server),superTieBreak:update.superTieBreak||false,tieBreak:update.tieBreak||false,importance:importance.types,importanceFor:importance.importanceFor,phase,cause,baseCause:cause,detail:'',createdAt:new Date().toISOString()};
+  const point={type:'POINT',id:`m${m.id}-p${pointNumber}`,seq:pointNumber,t:Math.round((now-start)/1000),result,origin,score:update.score,prevScore:update.prev.display,prevMatchScore:update.prev,gameWon:update.gameWon,gameScore:update.gameScore,pointScore:update.pointScore,server,serverLabel:matchServerLabel(m,server),superTieBreak:update.superTieBreak||false,tieBreak:update.tieBreak||false,importance:importance.types,importanceFor:importance.importanceFor,phase,cause,baseCause:cause,forced:!!forcedPreset,createdAt:new Date().toISOString()};
   events.push(point);
   if(document.getElementById('matchPointScore')) document.getElementById('matchPointScore').value='';
-  UI.matchPointResult=null;
-  const skipRefine=/^service/i.test(String(phase||''))||result==='PERDU'&&/double faute/i.test(String(cause||''));
-  UI.matchRefinePointId=skipRefine?null:point.id;
   saveStateDebounced();
   updateMatchEncoder(m,{scoreboard:true,actions:true,stats:true,points:true});
   if(update.matchFinished||scoreState.matchWinner) showNotif(`Match terminé · vainqueur ${scoreState.matchWinner||update.gameWon}`);
@@ -7641,15 +7505,8 @@ function refineMatchPoint(pointId,detail){
   e.detail=detail;
   e.cause=`${e.baseCause||e.cause||'point'} · ${detail}`;
   e.refinedAt=new Date().toISOString();
-  UI.matchRefinePointId=null;
   saveStateDebounced();
   updateMatchEncoder(m,{actions:true,stats:true,points:true});
-}
-function clearMatchPointRefine(){
-  UI.matchRefinePointId=null;
-  const m=currentMatchForEncoding();
-  if(m) updateMatchEncoder(m,{actions:true});
-  else render();
 }
 function toggleMatchScoreCorrection(){
   UI.matchScoreCorrectionOpen=!UI.matchScoreCorrectionOpen;
@@ -7671,19 +7528,6 @@ function markLastMatchPointStar(){
   updateMatchEncoder(m,{actions:true,stats:true,points:true});
   showNotif(p.starPoint?'Star point ajouté':'Star point retiré');
 }
-function matchRefineHtml(m,events){
-  if(!UI.matchRefinePointId)return '';
-  const point=events.find(e=>String(e.id)===String(UI.matchRefinePointId));
-  if(!point)return '';
-  const opts=matchRefineOptions(point);
-  return `<div class="card" style="border-color:var(--bronze-dim2);padding:14px">
-    <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
-      <div><div class="card-title">DÉTAIL FACULTATIF DU DERNIER POINT</div><div style="font-size:13px;color:var(--white);font-weight:800">${esc(point.result)} · ${esc(matchOriginLabel(m,point.origin))} · ${esc(point.baseCause||point.cause||'point')}</div><div class="muted-help" style="margin-top:4px">Optionnel: si tu as le temps, précise le coup pour obtenir des stats plus fines. Le score est déjà encodé.</div></div>
-      <button class="btn btn-ghost btn-sm" onclick="clearMatchPointRefine()">PASSER</button>
-    </div>
-    <div class="match-live-options" style="margin-top:12px">${opts.map(o=>`<button class="match-live-mini ${point.result==='GAGNE'?'won':'lost'}" onclick="refineMatchPoint('${point.id}','${jsStr(o)}')">${esc(o)}</button>`).join('')}</div>
-  </div>`;
-}
 function matchLiveStatsHtml(m,a,events){
   const recent=events.slice(-8);
   const rWon=recent.filter(e=>e.result==='GAGNE').length;
@@ -7696,10 +7540,10 @@ function matchLiveStatsHtml(m,a,events){
   const topWon=matchTopEntries(matchCountBy(recent.filter(e=>e.result==='GAGNE'),'cause'),1)[0];
   const advLeft=a.adversarySideLost?.ADV_GAUCHE||0, advRight=a.adversarySideLost?.ADV_DROITE||0;
   const advDanger=advLeft>advRight?'ADV gauche':advRight>advLeft?'ADV droite':'équilibré';
-  let advice='Prochain changement: garde une consigne simple, zone claire et moins de précipitation.';
-  if(given>suffered) advice='Priorité: réduire les points donnés. Retour simple, balle plus haute, zéro cadeau sur les deux prochains jeux.';
-  else if(suffered>given) advice=`Priorité: protéger la zone forte ${advDanger}. Plus de profondeur et moins de balle courte.`;
-  else if(wonByUs>=offered&&wonByUs>=2) advice='Levier positif: HWBT crée ses points. Continue à construire avant de finir.';
+  let advice='Au prochain changement, conserve une seule consigne pendant plusieurs points: cible large, replacement avant la frappe suivante et accélération seulement sur une balle favorable. Observe ensuite si le même type de point gagné ou perdu se répète avant de modifier le plan.';
+  if(given>suffered) advice=`La priorité est de réduire les ${given} point(s) donnés par HWBT dans la fenêtre récente. Sur les 5 prochains points, demande une première balle simple au centre ou profonde, puis une frappe de construction supplémentaire; l’indicateur est de rester à une faute HWBT non provoquée au maximum.`;
+  else if(suffered>given) advice=`La priorité est de protéger la zone forte ${advDanger}, car les points sont davantage subis que donnés. Joue plus profond ou plus bas, ferme le centre avec le partenaire et vérifie si l’adversaire doit désormais jouer une frappe supplémentaire avant de finir.`;
+  else if(wonByUs>=offered&&wonByUs>=2) advice=`HWBT crée actuellement ${wonByUs} point(s) dans les 8 derniers: c’est un levier réel à conserver. Continue à construire à deux et définis la balle d’accélération; le but est de garder cette production sans augmenter les fautes sur balle neutre.`;
   const box=(label,value,help)=>`<div style="background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:12px"><div class="card-title">${esc(label)}</div><div style="font-size:24px;font-weight:900;color:var(--white);line-height:1">${esc(value)}</div><div class="muted-help" style="margin-top:5px">${esc(help||'')}</div></div>`;
   return `<div class="card" style="border-color:var(--bronze-dim2)">
     <div class="card-title">STATS DIRECTES · CHANGEMENT DE CÔTÉ</div>
@@ -7727,7 +7571,6 @@ function undoLastMatchPoint(){
       if(events[i].prevMatchScore) m.matchScore={...events[i].prevMatchScore};
       m.currentScore=events[i].prevScore||matchDisplayScore(m);
       m.score=m.currentScore;
-      UI.matchRefinePointId=null;
       saveStateDebounced();
       updateMatchEncoder(m,{scoreboard:true,actions:true,stats:true,points:true});
       showNotif('Dernier point annulé');return;
@@ -7976,41 +7819,170 @@ function matchClosedHtml(){
     }).join('')}</div>
   </div>`;
 }
+function matchLiveResearchSourcesHtml(){
+  return `<div class="match-method-note">Méthode HWBT: lecture des points réellement encodés, avec priorité aux 8 derniers. Repères inspirés de la recherche sur les <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10694705/" target="_blank" rel="noopener">indicateurs de performance en padel</a>, le <a href="https://pubmed.ncbi.nlm.nih.gov/37594324/" target="_blank" rel="noopener">maintien du filet</a>, les <a href="https://pubmed.ncbi.nlm.nih.gov/39416504/" target="_blank" rel="noopener">erreurs non provoquées</a> et de la pédagogie <a href="https://www.lta.org.uk/advantage-home/content/padel-tutorials-how-to-play-basic-shots/" target="_blank" rel="noopener">LTA Padel</a>. Ces repères guident le coach; ils ne remplacent pas son observation du niveau et du contexte.</div>`;
+}
+function matchLiveAdviceLibrary(key,ctx={}){
+  const side=ctx.side||'la zone qui produit les winners adverses';
+  const player=ctx.player||'le joueur le plus exposé';
+  const family=ctx.familyLabel||'la phase prioritaire';
+  const plans={
+    OBSERVE:{
+      headline:'Observer avant de corriger',
+      objective:'Construire une première lecture fiable sans charger les joueurs. Pendant les prochains points, le coach observe surtout la qualité du service ou du retour, la position des deux partenaires et l’origine de la première erreur.',
+      action:'Donner une seule consigne neutre: jouer une balle de plus avec une cible claire, puis se replacer avant de chercher l’accélération. Encoder précisément la frappe gagnante ou perdue pour que le prochain conseil repose sur une vraie répétition.',
+      duo:'Demander au duo d’annoncer le centre et le lob. Les deux joueurs doivent rester sur la même ligne autant que possible afin que la lecture collective soit plus claire.',
+      checkpoint:'Après 3 à 5 points supplémentaires, vérifier si une même phase ou une même frappe apparaît au moins deux fois avant de modifier le plan.',
+      why:'L’échantillon est encore trop petit pour attribuer une cause stable; la priorité est d’améliorer la qualité de l’observation.'
+    },
+    ERROR_CONTROL:{
+      headline:'Couper la série de points donnés',
+      objective:'Les derniers points montrent que HWBT perd davantage par ses propres choix que par des winners adverses. L’objectif immédiat est de retrouver une marge de sécurité sans devenir passif: hauteur utile, profondeur et cible large avant toute accélération.',
+      action:'Sur la première balle difficile, jouer au centre ou profond avec une trajectoire qui laisse le temps de se replacer. N’attaquer que si la balle est au-dessus du filet et que les deux partenaires sont équilibrés; sinon, accepter une frappe de construction supplémentaire.',
+      duo:`Donner à ${player} une mission simple et au partenaire une mission de couverture. Le partenaire annonce “on garde” ou “on avance” afin que la décision ne repose pas sur un joueur isolé.`,
+      checkpoint:'Sur les 5 prochains points, viser au maximum une faute HWBT non provoquée et compter séparément les winners réellement subis.',
+      why:'La recherche en padel relie fortement la régulation des erreurs à la performance; le conseil cherche donc d’abord à supprimer les cadeaux évitables.'
+    },
+    DEFENSE_ZONE:{
+      headline:'Fermer la zone qui nourrit les winners',
+      objective:`Les adversaires terminent trop souvent dans ${side}. Avant de vouloir contre-attaquer, HWBT doit réduire la balle courte et protéger cette diagonale avec davantage de profondeur ou une trajectoire plus basse.`,
+      action:'Jouer deux balles de contrôle vers le centre ou le joueur le moins offensif, puis varier seulement quand la paire est replacée. En défense, utiliser la vitre si elle donne du temps et choisir le lob uniquement avec assez de contrôle pour dépasser réellement les joueurs au filet.',
+      duo:'Le joueur en diagonale protège d’abord la ligne probable, tandis que le partenaire ferme le centre et annonce la balle. Si l’un recule, l’autre accompagne le mouvement pour éviter deux hauteurs de jeu différentes.',
+      checkpoint:'Pendant 4 points, observer si les adversaires continuent à finir directement ou s’ils doivent jouer au moins une frappe supplémentaire avant le winner.',
+      why:'Le conseil distingue les points réellement subis des fautes données: ici, la priorité est la qualité défensive et la couverture, pas seulement la réduction du risque.'
+    },
+    SERVICE:{
+      headline:'Construire le point dès le service',
+      objective:'La rotation de service ne crée pas assez d’avantage sur les points encodés. Le service doit être choisi pour préparer la première volée et permettre aux deux joueurs de prendre le filet, pas pour rechercher un point direct.',
+      action:'Annoncer une zone avant de servir, avancer immédiatement et jouer la première volée avec contrôle vers le centre ou dans l’espace libre. Garder la même combinaison pendant un jeu complet afin de pouvoir comparer son efficacité.',
+      duo:'Le partenaire du serveur avance en même temps, ferme le centre et annonce la direction probable du retour. Après la première volée, la paire se replace ensemble avant de chercher la finition.',
+      checkpoint:'Sur le prochain jeu de service, mesurer combien de points HWBT atteint le filet équilibré après la première volée et combien sont perdus dans les deux premières frappes.',
+      why:'Les études de match montrent que le service influence surtout la séquence qui suit et que le contrôle du filet est associé à davantage de points gagnés.'
+    },
+    RETOUR:{
+      headline:'Neutraliser la première attaque adverse',
+      objective:'HWBT gagne trop peu de points lorsque l’adversaire sert. Le retour doit d’abord empêcher une volée facile vers le bas, puis créer une occasion de disputer le filet au lieu de chercher un retour gagnant isolé.',
+      action:'Sur première balle, retourner bas au centre ou dans les pieds avec une marge suffisante; sur balle plus lente, utiliser un lob profond si le contrôle est présent. Après le retour, les deux joueurs choisissent ensemble de défendre ou d’avancer.',
+      duo:'Le partenaire du retourneur annonce rapidement “bas” ou “lob” et couvre le centre. Le retourneur se replace immédiatement pour éviter que la paire reste ouverte sur la première volée adverse.',
+      checkpoint:'Sur les 5 prochains retours, compter les retours mis en jeu, les premières volées jouées sous le filet par les adversaires et les occasions de récupérer le filet.',
+      why:'L’analyse donne de l’importance à la première balle de la séquence, car elle détermine souvent qui peut installer la position offensive.'
+    },
+    FILET:{
+      headline:'Conserver le filet avant de finir',
+      objective:'La phase filet est actuellement le chantier principal. Le duo doit privilégier la qualité de la première volée et la conservation de la position, car forcer la finition depuis une balle neutre transforme l’avantage spatial en faute.',
+      action:'Fermer le centre, jouer la première volée profonde ou dans les pieds, puis avancer ou reculer ensemble selon la réponse. Accélérer seulement lorsque le contact est haut, le corps stable et l’espace clairement créé.',
+      duo:'Les deux joueurs restent sur la même ligne et se déplacent avec la balle. Celui qui ne frappe pas ferme le centre et annonce le lob pour organiser la récupération.',
+      checkpoint:'Pendant 5 points, noter si la paire perd le filet sur la première volée, sur un lob, ou sur une accélération trop précoce.',
+      why:'Les analyses de matchs professionnels associent le temps passé et l’efficacité au filet à une probabilité plus élevée de gagner le point; il faut toutefois adapter ce repère au niveau des joueurs.'
+    },
+    DEFENSE:{
+      headline:'Transformer la défense en temps utile',
+      objective:'La défense produit trop de balles courtes ou de décisions précipitées. L’objectif n’est pas de gagner depuis le fond, mais de rester dans l’échange jusqu’à obtenir une balle qui permet de lober ou d’avancer avec contrôle.',
+      action:'Laisser passer la balle vers la vitre quand cela améliore le point de contact, puis jouer haut et profond vers une grande zone. Sur une balle basse ou tardive, supprimer l’accélération et chercher d’abord le replacement.',
+      duo:'Le partenaire accompagne latéralement et annonce si la balle peut sortir de la vitre. Après un lob réussi, les deux joueurs avancent; après un lob court, les deux restent en défense.',
+      checkpoint:'Sur les 5 prochains points défensifs, observer combien de fois HWBT obtient une balle supplémentaire ou récupère le filet sans donner une balle courte.',
+      why:'Les dynamiques de jeu en padel distinguent clairement la défense au fond et l’attaque au filet; le lob et l’usage des vitres servent de transition entre ces deux états.'
+    },
+    HAUT_TETE:{
+      headline:'Choisir le bon coup au-dessus de la tête',
+      objective:'Les pertes sur balles hautes indiquent souvent un problème de choix avant d’être un problème de puissance. Le duo doit décider s’il veut conserver le filet, mettre la pression ou finir selon la hauteur, la profondeur et l’équilibre du frappeur.',
+      action:'Si la balle est profonde ou le corps en recul, jouer une bandeja contrôlée et récupérer la position. Utiliser une vibora ou un smash seulement avec un contact devant, un appui stable et une zone de finition réellement ouverte.',
+      duo:'Le partenaire couvre le centre et se synchronise avec la récupération du frappeur. Il annonce tôt la profondeur du lob pour aider au choix avant la préparation du coup.',
+      checkpoint:'Sur les 4 prochaines balles hautes, noter le choix effectué, la position conservée après la frappe et si l’adversaire reçoit une balle offensive facile.',
+      why:'La pédagogie padel distingue plusieurs coups au-dessus de la tête; leur fonction tactique importe autant que leur exécution technique.'
+    },
+    TRANSITION:{
+      headline:'Monter ensemble sur la bonne balle',
+      objective:'La transition crée un espace entre les partenaires ou les laisse au milieu du terrain. Le déclencheur doit être commun: balle profonde, basse ou lob efficace, puis arrêt équilibré avant la frappe adverse.',
+      action:'Choisir une balle de transition avec une grande zone, avancer en deux temps et effectuer un split-step avant que l’adversaire frappe. Si la balle jouée reste courte, interrompre la montée et reconstruire plutôt que continuer sans avantage.',
+      duo:'Le joueur qui déclenche annonce “on monte” et le partenaire aligne immédiatement sa hauteur. La distance entre les deux reste compacte pour protéger le centre et éviter les diagonales ouvertes.',
+      checkpoint:'Sur les 5 prochaines transitions, vérifier si les deux joueurs arrivent sur la même ligne et si la première volée peut être jouée en équilibre.',
+      why:'La position offensive n’a de valeur que si le duo l’occupe de façon coordonnée; une montée isolée augmente les zones disponibles pour l’adversaire.'
+    },
+    DECISION:{
+      headline:'Simplifier la décision avant la frappe',
+      objective:'Les points perdus viennent d’un décalage entre la difficulté de la balle et l’intention choisie. Le joueur doit classer rapidement la balle en survie, neutre ou attaque afin d’adapter risque, hauteur et cible.',
+      action:'Sur balle de survie, remettre haut et profond; sur balle neutre, construire vers le centre ou les pieds; sur balle d’attaque, accélérer dans l’espace créé. Garder ce code pendant plusieurs points évite de changer de plan après chaque erreur.',
+      duo:`Le partenaire aide ${player} avec un mot-clé unique: “haut”, “construis” ou “attaque”. Une information courte avant la frappe est plus utile qu’une correction complète après le point.`,
+      checkpoint:'Pendant 5 points, comparer l’intention annoncée à la balle reçue et compter les pertes dues à une accélération depuis une position déséquilibrée.',
+      why:'La performance en padel dépend de la sélection du coup autant que de son exécution; le plan cherche donc à rendre la décision observable et répétable.'
+    },
+    PRESSURE:{
+      headline:'Jouer les points chauds avec un plan stable',
+      objective:'Le rendement baisse sur les points importants déjà encodés. La priorité est de réduire le nombre de décisions pendant l’échange: une cible de départ, une intention de duo et une règle claire pour l’accélération.',
+      action:'Avant le point, choisir centre/profondeur ou retour bas, puis engager une routine courte de respiration. Pendant l’échange, accepter une frappe supplémentaire et réserver l’attaque à une balle au-dessus du filet jouée en équilibre.',
+      duo:'Les joueurs se donnent un seul message commun avant le point et évitent de réanalyser l’erreur précédente. Après le point, une phrase factuelle suffit avant de revenir au plan.',
+      checkpoint:'Sur les 3 prochains points importants, vérifier la qualité de la première décision et non seulement le résultat final du point.',
+      why:'Le conseil compare les points importants aux points ordinaires du même match; il reste prudent si l’échantillon chaud est limité.'
+    },
+    CONSTRUCTION:{
+      headline:'Continuer à construire sans précipiter la finition',
+      objective:'Les points encodés montrent que la paire est plus efficace lorsqu’elle construit ensemble. Le plan consiste à conserver cette identité tout en définissant clairement la balle qui autorise l’accélération.',
+      action:'Faire déplacer les adversaires avec une balle basse, profonde ou au centre, puis jouer une frappe supplémentaire si l’espace n’est pas encore ouvert. La finition vient sur une balle haute et stable, pas simplement parce que la paire est au filet.',
+      duo:'Le joueur sans balle protège le centre et suit la direction de la frappe. Les deux partenaires maintiennent la même hauteur afin que la construction reste collective.',
+      checkpoint:'Pendant 5 points, compter les points gagnés après au moins une frappe de préparation et les pertes provoquées par une accélération sur balle neutre.',
+      why:'Les données live valorisent ici les points construits par HWBT, tout en évitant de transformer une tendance positive en surattaque.'
+    },
+    CONTROL:{
+      headline:`Stabiliser ${family}`,
+      objective:`Les points déjà encodés orientent le travail vers ${family}. Le coach doit conserver une intention simple pendant plusieurs échanges afin de vérifier si la tendance est réelle plutôt que de changer de consigne après chaque point.`,
+      action:'Jouer avec une cible large, se replacer avant la frappe suivante et accélérer uniquement depuis une position stable. Encoder précisément le type de frappe et la phase pour affiner le conseil au prochain changement de côté.',
+      duo:'Le duo annonce le centre, la montée et le lob avec des mots courts. Les deux joueurs cherchent d’abord à rester connectés sur la même ligne.',
+      checkpoint:'Sur les 5 prochains points, suivre une seule mesure: points donnés, winners subis ou réussite de la phase prioritaire.',
+      why:'Le plan repose sur la famille de jeu la plus déficitaire dans les points encodés, avec une confiance proportionnelle au nombre d’observations.'
+    }
+  };
+  return plans[key]||plans.CONTROL;
+}
 function liveMatchCoachTopo(match,a){
   const total=a.matchSummary?.totalPoints||0;
   const won=a.matchSummary?.won||0;
   const lost=a.matchSummary?.lost||0;
   const players=a.playerDetails||[];
-  const bestPlayer=players.slice().sort((x,y)=>(y.won-y.lost)-(x.won-x.lost))[0];
   const fragilePlayer=players.slice().sort((x,y)=>(y.lost-y.won)-(x.lost-x.won))[0];
   const pair=a.pairAnalysis||{};
+  const structure=a.pointStructure||{};
+  const padel=a.padelAnalysis||{};
+  const allPoints=pointEventsFromJournal(match.events||match.journal||match.eventLog||[]);
+  const recent=allPoints.slice(-8);
+  const ourOrigins=['JOUEUR_1','JOUEUR_2','COLLECTIF'];
+  const recentWon=recent.filter(p=>p.result==='GAGNE').length;
+  const recentLost=recent.filter(p=>p.result==='PERDU').length;
+  const recentConceded=recent.filter(p=>p.result==='PERDU'&&ourOrigins.includes(p.origin)).length;
+  const recentSuffered=recent.filter(p=>p.result==='PERDU'&&p.origin==='ADVERSAIRES').length;
   const advLeft=a.adversarySideLost?.ADV_GAUCHE||0;
   const advRight=a.adversarySideLost?.ADV_DROITE||0;
-  const sufferedSide=advLeft>advRight?'ADV gauche':advRight>advLeft?'ADV droite':'adversaires';
+  const sufferedSide=advLeft>advRight?'la diagonale de l’adversaire gauche':advRight>advLeft?'la diagonale de l’adversaire droit':'les zones offensives adverses';
   const topWon=players.flatMap(p=>(p.topWonCauses||[]).map(x=>({player:p.label,...x}))).sort((x,y)=>y.value-x.value)[0];
   const topLost=players.flatMap(p=>(p.topLostCauses||[]).map(x=>({player:p.label,...x}))).sort((x,y)=>y.value-x.value)[0];
-  const score=ensureMatchScore(match);
-  const scorePressure=(score.hwbtGames||0)<(score.advGames||0)||won<lost;
-  if(total<3){
-    return {
-      status:'Début d’observation',
-      strength:'Encode quelques points pour voir une vraie tendance.',
-      weakness:'Ne corrige pas encore trop vite: regarde service, retour et première erreur.',
-      advice:'Message simple: jouer clair, annoncer qui prend le centre, construire avant d’accélérer.'
-    };
-  }
-  const strength=topWon?`${topWon.player} gagne surtout via ${topWon.label}. À valoriser maintenant.`:pair.built?`La paire marque quand elle construit ensemble. Garde cette intention.`:'Les points gagnés commencent à se dessiner.';
-  const weakness=topLost?`${topLost.player} donne des points sur ${topLost.label}. Simplifier ce choix.`:pair.sufferedWinners?`${sufferedSide} trouve trop facilement le winner. Fermer la zone avant d’attaquer.`:'Le point faible n’est pas encore assez clair.';
-  let advice='Prochaine consigne: balle simple, replacement rapide, puis accélérer seulement sur balle favorable.';
-  if(pair.sufferedWinners>pair.forcedErrors) advice=`Prochaine consigne: fermer ${sufferedSide}, jouer plus profond, et éviter la balle courte qui donne le winner.`;
-  else if(pair.built>=Math.max(2,pair.pairErrors)) advice='Prochaine consigne: continuer à construire à deux, garder le filet ensemble, finir seulement quand la balle est vraiment ouverte.';
-  else if(scorePressure) advice='Prochaine consigne: réduire le risque pendant 3 points, viser centre/profondeur, récupérer le contrôle du jeu.';
-  else if(fragilePlayer?.lost>fragilePlayer?.won) advice=`Prochaine consigne pour ${fragilePlayer.label}: choix plus simple sur la première balle difficile, sans chercher le point parfait.`;
+  const workFamily=padel.work?.family||'';
+  const familyLabel=workFamily?matchPadelFamilyLabel(workFamily):'le contrôle et le replacement';
+  const service=a.serviceAnalysis||{};
+  const hot=a.scoreContext?.important||{};
+  const familyKeys={SERVICE:'SERVICE',RETOUR:'RETOUR',FILET:'FILET',HAUT_TETE:'HAUT_TETE',TRANSITION:'TRANSITION',DEFENSE:'DEFENSE',DECISION:'DECISION',CONSTRUCTION:'CONSTRUCTION',FOND:'DEFENSE',PRESSION:'PRESSURE'};
+  let key='CONTROL';
+  if(total<4) key='OBSERVE';
+  else if(recent.length>=4&&recentConceded>=Math.max(2,recentSuffered+1)) key='ERROR_CONTROL';
+  else if(hot.unique>=3&&hot.winRate<hot.ordinaryWinRate-10) key='PRESSURE';
+  else if(recentSuffered>=2&&pair.sufferedWinners>pair.forcedErrors) key='DEFENSE_ZONE';
+  else if(service.hwbtServe?.points>=4&&service.hwbtServe.winRate<45) key='SERVICE';
+  else if(service.advServe?.points>=4&&service.advServe.winRate<40) key='RETOUR';
+  else if(workFamily&&familyKeys[workFamily]) key=familyKeys[workFamily];
+  else if(pair.built>=Math.max(3,pair.pairErrors+1)) key='CONSTRUCTION';
+  else if((structure.points_concedes||0)>(structure.points_subis||0)) key='ERROR_CONTROL';
+  const plan=matchLiveAdviceLibrary(key,{side:sufferedSide,player:fragilePlayer?.label,familyLabel});
+  const confidence=total>=20?'solide':total>=10?'modérée':total>=4?'prudente':'en observation';
+  const recentSentence=recent.length?`Sur les ${recent.length} derniers points, HWBT en gagne ${recentWon} et en perd ${recentLost}; ${recentConceded} perte(s) viennent d’une action HWBT et ${recentSuffered} d’un winner adverse.`:'Aucun point n’est encore encodé dans la fenêtre live.';
+  const strength=topWon?`${topWon.player} produit le plus souvent des points gagnants via « ${topWon.label} » (${topWon.value}). Le coach peut conserver ce levier, mais doit vérifier qu’il reste efficace quand le score devient plus tendu.`:pair.built?`La paire a déjà construit ${pair.built} point(s) ensemble. Cette donnée suggère de maintenir le replacement commun et la patience avant la finition.`:'Aucune frappe gagnante ne se répète encore assez pour devenir un vrai levier. Il faut continuer à qualifier les points sans inventer une tendance.';
+  const weakness=topLost?`${topLost.player} est actuellement associé à ${topLost.value} perte(s) sur « ${topLost.label} ». Il faut simplifier l’intention sur cette frappe et observer les prochains points avant de conclure à un problème technique.`:pair.sufferedWinners?`${pair.sufferedWinners} winner(s) adverse(s) ont été réellement subis, surtout vers ${sufferedSide}. Le premier ajustement concerne la qualité de balle et la couverture collective plutôt qu’une prise de risque supplémentaire.`:'Le point faible n’est pas encore suffisamment répété. La bonne décision est de conserver une consigne stable et d’améliorer la précision de l’encodage.';
   return {
-    status:`Live: ${won}-${lost} sur ${total} points`,
+    status:`Live ${won}-${lost} · confiance ${confidence}`,
+    observation:`${recentSentence} L’analyse donne plus de poids à cette fenêtre récente tout en la comparant à l’ensemble des ${total} points encodés.`,
     strength,
     weakness,
-    advice
+    plan,
+    window:recent.length,
+    confidence
   };
 }
 function matchScoreboardInnerHtml(m,scoreState,events){
@@ -8026,19 +7998,25 @@ function matchScoreboardInnerHtml(m,scoreState,events){
 }
 function matchActionsInnerHtml(m,events){
   const scoreState=ensureMatchScore(m);
-  const pending=UI.matchPointResult||null;
   const a=analyserMatch(m.events||m.journal||m.eventLog||[],m);
   const topo=liveMatchCoachTopo(m,a);
   return `<div>
-    <div class="match-live-grid">
-      <button class="match-live-main won ${pending==='GAGNE'?'active':''}" onclick="setMatchPointResult('GAGNE')"><span>POINT GAGNÉ HWBT</span><b>1er clic</b></button>
-      <button class="match-live-main lost ${pending==='PERDU'?'active':''}" onclick="setMatchPointResult('PERDU')"><span>POINT PERDU HWBT</span><b>1er clic</b></button>
-    </div>
     ${!scoreState.server?`<div class="card" style="border-color:var(--rouge);padding:12px"><div class="card-title">SERVEUR À DÉFINIR</div><div class="muted-help">Choisis le serveur actuel puis clique <b>VALIDER SERVEUR</b>. Ce bouton ne touche jamais au score.</div></div>`:''}
-    ${pending?matchActionChoiceHtml(m,pending):''}
-    ${matchRefineHtml(m,events)}
+    <div class="card" style="padding:11px 13px;border-color:var(--bronze-dim2)"><div class="card-title">ENCODAGE DIRECT SUR UN SEUL ÉCRAN</div><div class="muted-help"><b>Un seul clic par point:</b> résultat, responsable et famille de frappe sont enregistrés ensemble. Le score, le serveur et l’importance du point sont calculés automatiquement. Les précisions très fines restent disponibles après le match dans <b>Enrichir le match</b>, pour ne pas ralentir le live.</div></div>
+    <div class="match-direct-encode">${matchActionChoiceHtml(m,'GAGNE')}${matchActionChoiceHtml(m,'PERDU')}</div>
     <div class="match-live-advice">
-      <div class="match-live-advice-box"><b>${esc(topo.status)}</b><span>${esc(topo.advice)}</span></div>
+      <div class="match-live-coach-plan">
+        <div class="card-title">CONSEIL COACH LIVE · ${esc(topo.status)}</div>
+        <h3>${esc(topo.plan.headline)}</h3>
+        <p>${esc(topo.observation)} ${esc(topo.plan.objective)}</p>
+        <div class="match-live-plan-grid">
+          <div class="match-live-plan-step"><b>1 · Consigne terrain</b><span>${esc(topo.plan.action)}</span></div>
+          <div class="match-live-plan-step"><b>2 · Organisation du duo</b><span>${esc(topo.plan.duo)}</span></div>
+          <div class="match-live-plan-step"><b>3 · Pourquoi ce conseil</b><span>${esc(topo.plan.why)}</span></div>
+        </div>
+        <div class="match-live-plan-check"><b>INDICATEUR À SUIVRE</b><br>${esc(topo.plan.checkpoint)}</div>
+        ${matchLiveResearchSourcesHtml()}
+      </div>
       <div class="match-live-advice-box"><b>Point fort vu</b><span>${esc(topo.strength)}</span></div>
       <div class="match-live-advice-box"><b>Point faible vu</b><span>${esc(topo.weakness)}</span></div>
     </div>
@@ -8127,7 +8105,10 @@ function matchCoachHtml(a){
     ADV_INCONNU:a.adversarySideLost?.ADV_INCONNU||0
   };
   const lostLabels={...nameLabels,ADV_GAUCHE:'ADV gauche',ADV_DROITE:'ADV droite',ADV_INCONNU:'ADV non précisé'};
-  const playerCards=(a.playerDetails||[]).map(pd=>`<div class="card" style="border-color:${pd.impact>=20?'var(--vert)':pd.impact<=-20?'var(--rouge)':'var(--border)'}">
+  const playerCards=(a.playerDetails||[]).map(pd=>{
+    const priorityFamily=matchPadelFamily({cause:pd.priority||'',phase:pd.topLostPhases?.[0]?.label||''});
+    const priorityAdvice=matchPadelAdvice(priorityFamily,'work');
+    return `<div class="card" style="border-color:${pd.impact>=20?'var(--vert)':pd.impact<=-20?'var(--rouge)':'var(--border)'}">
     <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
       <div><div class="card-title">JOUEUR · ${esc(pd.label).toUpperCase()}</div><div style="font-size:24px;font-weight:900;line-height:1">${esc(pd.won)} / ${esc(pd.lost)}</div><div class="muted-help">points gagnés / points perdus</div></div>
       <div style="text-align:right"><div style="font-size:26px;font-weight:900;color:${pd.impact>=20?'var(--vert)':pd.impact<=-20?'var(--rouge)':'var(--bronze)'}">${pd.impact>0?'+':''}${pd.impact}%</div><div class="card-title">IMPACT</div></div>
@@ -8137,8 +8118,9 @@ function matchCoachHtml(a){
       <div><div class="card-title">CE QUI RAPPORTE</div>${pd.topWonCauses.length?pd.topWonCauses.map(x=>`<div class="strength"><span class="plus">+</span>${esc(x.label)} · ${x.value}</div>`).join(''):'<div class="muted-help">Pas assez de points gagnés identifiés.</div>'}</div>
       <div><div class="card-title">À STABILISER</div>${pd.topLostCauses.length?pd.topLostCauses.map(x=>`<div class="strength"><span style="color:#e74c3c;font-weight:700">→</span>${esc(x.label)} · ${x.value}</div>`).join(''):'<div class="muted-help">Pas assez de pertes identifiées.</div>'}</div>
     </div>
-    <div class="divider"></div><div class="card-title">PRIORITÉ PROCHAIN MATCH</div><div style="font-size:13px;font-weight:800;color:var(--white)">${esc(pd.priority)}</div>
-  </div>`).join('');
+    <div class="divider"></div><div class="card-title">PRIORITÉ PROCHAIN MATCH · ${esc(matchPadelFamilyLabel(priorityFamily))}</div><div style="font-size:13px;font-weight:800;color:var(--white);margin-bottom:7px">${esc(pd.priority)}</div><div class="muted-help">${esc(priorityAdvice)}</div>
+  </div>`;
+  }).join('');
   const pair=a.pairAnalysis||{};
   const padel=a.padelAnalysis||{};
   const padelRows=(padel.familyRows||[]).slice(0,6);
@@ -8164,6 +8146,7 @@ function matchCoachHtml(a){
         ${(padel.plan||[]).slice(0,4).map(x=>`<div class="strength"><span class="plus">→</span>${esc(x)}</div>`).join('')||'<div class="muted-help">Ajoute plus de points pour générer un plan fiable.</div>'}
       </div>
     </div>
+    ${matchLiveResearchSourcesHtml()}
   </div>`;
   const hot=a.scoreContext?.important||{};
   const hotBlock=`<div class="card" style="border-color:var(--bronze-dim2)">
