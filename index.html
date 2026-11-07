@@ -161,6 +161,9 @@ body{min-width:0}
 .match-encode-step{border:1px solid var(--border);border-radius:7px;padding:8px 9px;background:var(--bg4);font-family:var(--font-title);font-size:9px;letter-spacing:.8px;color:var(--gray);text-align:center}
 .match-encode-step.active{border-color:var(--bronze);color:var(--white);background:var(--bronze-dim)}
 .match-encode-step.done{border-color:var(--bronze-dim2);color:var(--bronze)}
+#matchActionStep1,#matchActionStep2,#matchActionStep3{scroll-margin-top:14px}
+.match-step-focused{animation:matchStepFocused .9s ease}
+@keyframes matchStepFocused{0%{box-shadow:0 0 0 0 rgba(184,137,53,0)}30%{box-shadow:0 0 0 4px rgba(184,137,53,.42),0 0 24px rgba(184,137,53,.2)}100%{box-shadow:0 0 0 0 rgba(184,137,53,0)}}
 .match-live-advice{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
 .match-live-advice-box{border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.025);padding:12px}
 .match-live-advice-box b{display:block;font-family:var(--font-title);font-size:10px;letter-spacing:1.3px;color:var(--bronze);margin-bottom:7px;text-transform:uppercase}
@@ -7367,7 +7370,7 @@ function setMatchPointResult(result){
   const m=currentMatchForEncoding();
   UI.matchPointResult=result||null;
   if(result) UI.matchRefinePointId=null;
-  if(m) updateMatchEncoder(m,{actions:true});
+  if(m){updateMatchEncoder(m,{actions:true});focusMatchEncoderStep(result?'matchActionStep2':'matchActionStep1');}
   else render();
 }
 function matchActionChoiceHtml(m,result){
@@ -7411,7 +7414,7 @@ function matchActionChoiceHtml(m,result){
   ];
   const groupedActions=(result==='GAGNE'?optionsWon:optionsLost).reduce((acc,item)=>{const group=item[4]||'Actions';(acc[group]||(acc[group]=[])).push(item);return acc;},{});
   const shotButtons=Object.entries(groupedActions).map(([group,items])=>`<div class="match-action-group"><div class="match-action-group-title">${esc(group)}</div><div class="match-live-options">${items.map(([origin,cause,phase,label])=>`<button class="match-live-mini ${result==='GAGNE'?'won':'lost'}" onclick="addMatchPoint('${result}','${origin}','${jsStr(cause)}','${jsStr(phase)}')">${esc(label)}</button>`).join('')}</div></div>`).join('');
-  return `<div class="card" style="border-color:${result==='GAGNE'?'var(--bronze-dim2)':'var(--border2)'}">
+  return `<div class="card" id="matchActionStep2" style="border-color:${result==='GAGNE'?'var(--bronze-dim2)':'var(--border2)'}">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px">
       <div><div class="card-title">ÉTAPE 2 · ${result==='GAGNE'?'COMMENT LE POINT EST GAGNÉ ?':'COMMENT LE POINT EST PERDU ?'}</div><div class="muted-help">Choisis l’action principale. Le score avance immédiatement, puis le détail facultatif apparaît.</div></div>
       <button class="btn btn-ghost btn-sm" onclick="setMatchPointResult(null)">CHANGER GAGNÉ / PERDU</button>
@@ -7430,6 +7433,18 @@ function updateMatchEncoder(m,parts={}){
   if(parts.points&&document.getElementById('matchLastPointsZone')) document.getElementById('matchLastPointsZone').innerHTML=matchLastPointsHtml(m,events);
   if(document.getElementById('matchFollowScoreZone')) document.getElementById('matchFollowScoreZone').innerHTML=matchMetricCard('Score suivi',m.currentScore||m.score||'0-0');
   if(document.getElementById('matchFollowBalanceZone')) document.getElementById('matchFollowBalanceZone').innerHTML=matchMetricCard('Bilan live',`${a.matchSummary.won}-${a.matchSummary.lost}`,`${a.matchSummary.totalPoints} points encodés`);
+}
+function focusMatchEncoderStep(targetId,message=''){
+  if(message)showNotif(message);
+  setTimeout(()=>{
+    const target=document.getElementById(targetId);
+    if(!target)return;
+    target.scrollIntoView({behavior:'smooth',block:'start'});
+    target.classList.remove('match-step-focused');
+    void target.offsetWidth;
+    target.classList.add('match-step-focused');
+    setTimeout(()=>target.classList.remove('match-step-focused'),950);
+  },60);
 }
 function confirmMatchPointEncoded(message='Point encodé'){
   showNotif(`✓ ${message}`);
@@ -7475,6 +7490,7 @@ function addMatchPoint(result,origin,causePreset='',phasePreset=''){
   saveStateDebounced();
   updateMatchEncoder(m,{scoreboard:true,actions:true,stats:true,points:true});
   if(skipRefine) confirmMatchPointEncoded('Point encodé · aucun détail nécessaire');
+  else focusMatchEncoderStep('matchActionStep3','Action enregistrée · choisis le détail');
   if(update.matchFinished||scoreState.matchWinner) showNotif(`Match terminé · vainqueur ${scoreState.matchWinner||update.gameWon}`);
 }
 function matchRefineOptions(point){
@@ -7558,7 +7574,7 @@ function matchRefineHtml(m,events){
   const point=events.find(e=>String(e.id)===String(UI.matchRefinePointId));
   if(!point)return '';
   const opts=matchRefineOptions(point);
-  return `<div class="card" style="border-color:var(--bronze-dim2);padding:14px">
+  return `<div class="card" id="matchActionStep3" style="border-color:var(--bronze-dim2);padding:14px">
     <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
       <div><div class="card-title">ÉTAPE 3 · DÉTAIL DE LA FRAPPE</div><div style="font-size:13px;color:var(--white);font-weight:800">${esc(point.result)} · ${esc(matchOriginLabel(m,point.origin))} · ${esc(point.baseCause||point.cause||'point')}</div><div class="muted-help" style="margin-top:4px">Choisis le détail si tu l’as vu. Cette étape affine l’analyse mais ne bloque jamais l’encodage du point suivant.</div></div>
       <button class="btn btn-ghost btn-sm" onclick="clearMatchPointRefine()">PASSER LE DÉTAIL</button>
@@ -8048,7 +8064,7 @@ function matchActionsInnerHtml(m,events){
       <div class="match-encode-step ${pending?'active':refining?'done':''}">2 · ACTION</div>
       <div class="match-encode-step ${refining?'active':''}">3 · DÉTAIL</div>
     </div>
-    <div class="match-live-grid">
+    <div class="match-live-grid" id="matchActionStep1">
       <button class="match-live-main won ${pending==='GAGNE'?'active':''}" onclick="setMatchPointResult('GAGNE')"><span>POINT GAGNÉ HWBT</span><b>1 · Choisir ensuite l’action</b></button>
       <button class="match-live-main lost ${pending==='PERDU'?'active':''}" onclick="setMatchPointResult('PERDU')"><span>POINT PERDU HWBT</span><b>1 · Choisir ensuite l’action</b></button>
     </div>
