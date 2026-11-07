@@ -145,21 +145,22 @@ body{min-width:0}
 .asp-desc{font-size:10px;color:var(--gray3);font-family:var(--font-body);line-height:1.4}
 
 .match-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px}
+.match-live-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.match-live-main{border:1px solid var(--border2);border-radius:10px;padding:18px 16px;min-height:104px;text-align:left;font-family:var(--font-title);cursor:pointer;background:var(--bg2);color:var(--white);transition:all .15s}
+.match-live-main span{display:block;font-size:18px;font-weight:800;letter-spacing:1.2px}
+.match-live-main b{display:block;font-size:14px;line-height:1.2;margin-top:9px;color:var(--bronze)}
+.match-live-main.won{background:linear-gradient(135deg,var(--bronze-dim),var(--bg2));border-color:var(--bronze-dim2)}
+.match-live-main.lost{background:linear-gradient(135deg,#ffffff08,var(--bg2))}
+.match-live-main.active{box-shadow:0 0 0 2px var(--bronze);border-color:var(--bronze)}
 .match-live-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
 .match-action-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
 .match-action-group{border:1px solid var(--border);border-radius:9px;background:rgba(255,255,255,.025);padding:10px}
 .match-action-group-title{font-family:var(--font-title);font-size:10px;letter-spacing:1.3px;color:var(--bronze);margin-bottom:8px;text-transform:uppercase}
 .match-action-group .match-live-options{grid-template-columns:repeat(auto-fit,minmax(98px,1fr))}
-.match-direct-encode{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;margin-top:12px}
-.match-direct-side{border:1px solid var(--border2);border-radius:11px;background:var(--bg2);padding:13px;min-width:0}
-.match-direct-side.won{border-color:var(--bronze-dim2);background:linear-gradient(135deg,var(--bronze-dim),var(--bg2))}
-.match-direct-side.lost{background:linear-gradient(135deg,#ffffff07,var(--bg2))}
-.match-direct-title{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:11px}
-.match-direct-title h3{font-family:var(--font-title);font-size:17px;letter-spacing:.7px;color:var(--white);margin:0}
-.match-direct-title span{font-size:9px;letter-spacing:1px;color:var(--bronze);font-weight:900}
-.match-direct-side .match-action-groups{grid-template-columns:1fr 1fr;gap:8px}
-.match-direct-side .match-action-group{padding:8px}
-.match-direct-side .match-live-mini{min-height:42px;font-size:9px;padding:7px 5px}
+.match-encode-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px}
+.match-encode-step{border:1px solid var(--border);border-radius:7px;padding:8px 9px;background:var(--bg4);font-family:var(--font-title);font-size:9px;letter-spacing:.8px;color:var(--gray);text-align:center}
+.match-encode-step.active{border-color:var(--bronze);color:var(--white);background:var(--bronze-dim)}
+.match-encode-step.done{border-color:var(--bronze-dim2);color:var(--bronze)}
 .match-live-advice{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
 .match-live-advice-box{border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.025);padding:12px}
 .match-live-advice-box b{display:block;font-family:var(--font-title);font-size:10px;letter-spacing:1.3px;color:var(--bronze);margin-bottom:7px;text-transform:uppercase}
@@ -407,8 +408,10 @@ body{min-width:0}
   .score-row{gap:7px}.score-label{width:86px}.bar-bg{min-width:54px}
   .match-action-groups{grid-template-columns:1fr;gap:8px}
   .match-action-group{padding:8px}
-  .match-direct-encode{grid-template-columns:1fr}
-  .match-direct-side .match-action-groups{grid-template-columns:1fr 1fr}
+  .match-live-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .match-live-main{min-height:72px;padding:11px 10px;border-radius:8px}
+  .match-live-main span{font-size:12px;letter-spacing:.8px}
+  .match-live-main b{font-size:10px;margin-top:6px}
   .match-live-advice{grid-template-columns:1fr;gap:8px}
   .match-live-advice-box{padding:10px}
   .match-live-advice-box span{font-size:12px}
@@ -7358,6 +7361,13 @@ function matchUpcomingImportanceHtml(m,scoreState){
   const side=info.importanceFor?` · opportunité ${info.importanceFor==='HWBT'?'HWBT':'ADV'}`:'';
   return `<div style="margin:10px auto 0;max-width:560px;text-align:center;border:1px solid var(--bronze-dim2);background:rgba(184,137,53,.14);color:var(--bronze);border-radius:8px;padding:8px 10px;font-size:11px;font-weight:900;letter-spacing:1.4px">${esc(label)}${esc(side)}</div>`;
 }
+function setMatchPointResult(result){
+  const m=currentMatchForEncoding();
+  UI.matchPointResult=result||null;
+  if(result) UI.matchRefinePointId=null;
+  if(m) updateMatchEncoder(m,{actions:true});
+  else render();
+}
 function matchActionChoiceHtml(m,result){
   const scoreState=ensureMatchScore(m);
   const slots=matchPlayerSlots(m);
@@ -7365,59 +7375,45 @@ function matchActionChoiceHtml(m,result){
   const hwbtServing=scoreState.servingTeam==='HWBT';
   const servingPlayerOrigin=scoreState.server==='J2'?'JOUEUR_2':'JOUEUR_1';
   const servingPlayerName=scoreState.server==='J2'?p2:p1;
-  const opt=(origin,cause,phase,label,group,forced=false)=>[origin,cause,phase,label,group,forced];
-  const contextWon=hwbtServing
-    ?[opt(servingPlayerOrigin,'service + première balle gagnée','service',`${servingPlayerName} · Service +1`,servingPlayerOrigin==='JOUEUR_1'?p1:p2,true)]
-    :[opt('JOUEUR_1','retour +1','retour',`${p1} · Retour`,p1,true),opt('JOUEUR_2','retour +1','retour',`${p2} · Retour`,p2,true)];
-  const contextLost=hwbtServing
-    ?[opt(servingPlayerOrigin,'double faute','service',`${servingPlayerName} · Double faute`,servingPlayerOrigin==='JOUEUR_1'?p1:p2,false)]
-    :[opt('JOUEUR_1','retour faute','retour',`${p1} · Retour`,p1,false),opt('JOUEUR_2','retour faute','retour',`${p2} · Retour`,p2,false)];
+  const serviceWonOptions=hwbtServing?[
+    [servingPlayerOrigin,'service gagnant vitre','service',`${servingPlayerName} · Service vitre`,'Service gagnant'],
+    [servingPlayerOrigin,'service gagnant corps','service',`${servingPlayerName} · Service corps`,'Service gagnant'],
+    [servingPlayerOrigin,'service gagnant T','service',`${servingPlayerName} · Service T`,'Service gagnant'],
+    [servingPlayerOrigin,'point facile après service','service +1',`${servingPlayerName} · Point facile après service`,'Service gagnant']
+  ]:[];
+  const serviceLostOptions=hwbtServing?[
+    [servingPlayerOrigin,'double faute','service',`${servingPlayerName} · Double faute`,'Service donné']
+  ]:[];
+  const returnWonOptions=!hwbtServing?[
+    ['JOUEUR_1','retour +1','retour',`${p1} · Retour`,p1],
+    ['JOUEUR_2','retour +1','retour',`${p2} · Retour`,p2]
+  ]:[];
+  const returnLostOptions=!hwbtServing?[
+    ['JOUEUR_1','retour faute','retour',`${p1} · Retour`,p1],
+    ['JOUEUR_2','retour faute','retour',`${p2} · Retour`,p2]
+  ]:[];
   const optionsWon=[
-    ...contextWon,
-    opt('JOUEUR_1','fond +1','fond',`${p1} · Fond`,p1,true),
-    opt('JOUEUR_1','filet +1','filet',`${p1} · Filet`,p1,true),
-    opt('JOUEUR_1','haut tête +1','attaque haut tête',`${p1} · Haut tête`,p1,true),
-    opt('JOUEUR_1','lob défense +1','défense lob',`${p1} · Lob/défense`,p1,true),
-    opt('JOUEUR_2','fond +1','fond',`${p2} · Fond`,p2,true),
-    opt('JOUEUR_2','filet +1','filet',`${p2} · Filet`,p2,true),
-    opt('JOUEUR_2','haut tête +1','attaque haut tête',`${p2} · Haut tête`,p2,true),
-    opt('JOUEUR_2','lob défense +1','défense lob',`${p2} · Lob/défense`,p2,true),
-    opt('COLLECTIF','construction duo +1','construction','Construction','Duo HWBT',true),
-    opt('COLLECTIF','transition filet +1','transition','Transition','Duo HWBT',true),
-    opt('COLLECTIF','zone libre trouvée +1','placement','Zone libre','Duo HWBT',true),
-    opt('ADVERSAIRES','faute provoquée adv gauche','pression','Provoquée G','Erreur adversaire',true),
-    opt('ADVERSAIRES','faute provoquée adv droite','pression','Provoquée D','Erreur adversaire',true),
-    opt('ADVERSAIRES','faute gratuite adv gauche','faute adverse','Gratuite G','Erreur adversaire',false),
-    opt('ADVERSAIRES','faute gratuite adv droite','faute adverse','Gratuite D','Erreur adversaire',false),
-    opt('INDETERMINE','point gagné à préciser','à préciser','Gagné · à préciser','Rapide',false)
+    ...serviceWonOptions,...returnWonOptions,
+    ['JOUEUR_1','fond +1','fond',`${p1} · Fond`,p1],['JOUEUR_1','filet +1','filet',`${p1} · Filet`,p1],['JOUEUR_1','bandeja gagnante','attaque haut tête',`${p1} · Bandeja`,p1],['JOUEUR_1','vibora gagnante','attaque haut tête',`${p1} · Víbora`,p1],['JOUEUR_1','smash gagnant','attaque haut tête',`${p1} · Smash`,p1],['JOUEUR_1','par 3 / par 4','attaque haut tête',`${p1} · Par 3/4`,p1],['JOUEUR_1','lob défense +1','défense lob',`${p1} · Lob/défense`,p1],
+    ['JOUEUR_2','fond +1','fond',`${p2} · Fond`,p2],['JOUEUR_2','filet +1','filet',`${p2} · Filet`,p2],['JOUEUR_2','bandeja gagnante','attaque haut tête',`${p2} · Bandeja`,p2],['JOUEUR_2','vibora gagnante','attaque haut tête',`${p2} · Víbora`,p2],['JOUEUR_2','smash gagnant','attaque haut tête',`${p2} · Smash`,p2],['JOUEUR_2','par 3 / par 4','attaque haut tête',`${p2} · Par 3/4`,p2],['JOUEUR_2','lob défense +1','défense lob',`${p2} · Lob/défense`,p2],
+    ['COLLECTIF','construction duo +1','construction','Duo · Construction','Duo HWBT'],['COLLECTIF','transition filet +1','transition','Duo · Transition','Duo HWBT'],['COLLECTIF','zone libre trouvée +1','placement','Duo · Zone libre','Duo HWBT'],
+    ['ADVERSAIRES','faute adv gauche','faute adverse','ADV G · Faute','Faute adverse'],['ADVERSAIRES','faute adv droite','faute adverse','ADV D · Faute','Faute adverse']
   ];
   const optionsLost=[
-    ...contextLost,
-    opt('JOUEUR_1','fond donné','fond',`${p1} · Fond`,p1,false),
-    opt('JOUEUR_1','filet donné','filet',`${p1} · Filet`,p1,false),
-    opt('JOUEUR_1','haut tête donné','attaque haut tête',`${p1} · Haut tête`,p1,false),
-    opt('JOUEUR_1','lob défense donné','défense lob',`${p1} · Lob/défense`,p1,false),
-    opt('JOUEUR_1','mauvais choix tactique','décision',`${p1} · Choix`,p1,false),
-    opt('JOUEUR_2','fond donné','fond',`${p2} · Fond`,p2,false),
-    opt('JOUEUR_2','filet donné','filet',`${p2} · Filet`,p2,false),
-    opt('JOUEUR_2','haut tête donné','attaque haut tête',`${p2} · Haut tête`,p2,false),
-    opt('JOUEUR_2','lob défense donné','défense lob',`${p2} · Lob/défense`,p2,false),
-    opt('JOUEUR_2','mauvais choix tactique','décision',`${p2} · Choix`,p2,false),
-    opt('COLLECTIF','duo communication donné','communication','Communication','Duo HWBT',false),
-    opt('COLLECTIF','zone libre laissée ouverte','placement','Zone ouverte','Duo HWBT',false),
-    opt('COLLECTIF','duo cassé sur la montée','transition','Transition ratée','Duo HWBT',false),
-    opt('ADVERSAIRES','adv gauche winner filet','filet','G · Filet','Winner adverse',true),
-    opt('ADVERSAIRES','adv gauche winner haut tête','attaque haut tête','G · Haut tête','Winner adverse',true),
-    opt('ADVERSAIRES','adv gauche winner fond','fond','G · Fond','Winner adverse',true),
-    opt('ADVERSAIRES','adv droite winner filet','filet','D · Filet','Winner adverse',true),
-    opt('ADVERSAIRES','adv droite winner haut tête','attaque haut tête','D · Haut tête','Winner adverse',true),
-    opt('ADVERSAIRES','adv droite winner fond','fond','D · Fond','Winner adverse',true),
-    opt('INDETERMINE','point perdu à préciser','à préciser','Perdu · à préciser','Rapide',false)
+    ...serviceLostOptions,...returnLostOptions,
+    ['JOUEUR_1','fond donné','fond',`${p1} · Fond`,p1],['JOUEUR_1','filet donné','filet',`${p1} · Filet`,p1],['JOUEUR_1','haut tête donné','attaque',`${p1} · Haut tête`,p1],['JOUEUR_1','lob défense donné','défense lob',`${p1} · Lob/défense`,p1],['JOUEUR_1','mauvais choix tactique','décision',`${p1} · Choix`,p1],
+    ['JOUEUR_2','fond donné','fond',`${p2} · Fond`,p2],['JOUEUR_2','filet donné','filet',`${p2} · Filet`,p2],['JOUEUR_2','haut tête donné','attaque',`${p2} · Haut tête`,p2],['JOUEUR_2','lob défense donné','défense lob',`${p2} · Lob/défense`,p2],['JOUEUR_2','mauvais choix tactique','décision',`${p2} · Choix`,p2],
+    ['COLLECTIF','duo communication donné','communication','Duo · Communication','Duo HWBT'],['COLLECTIF','zone libre laissée ouverte','placement','Duo · Zone ouverte','Duo HWBT'],['COLLECTIF','duo cassé sur la montée','transition','Duo · Transition ratée','Duo HWBT'],
+    ['ADVERSAIRES','adv gauche winner filet','filet','ADV G · Filet','ADV gauche'],['ADVERSAIRES','adv gauche winner haut tête','attaque haut tête','Gauche · Haut tête','ADV gauche'],['ADVERSAIRES','adv gauche winner fond','fond','ADV G · Fond','ADV gauche'],
+    ['ADVERSAIRES','adv droite winner filet','filet','ADV D · Filet','ADV droite'],['ADVERSAIRES','adv droite winner haut tête','attaque haut tête','Droite · Haut tête','ADV droite'],['ADVERSAIRES','adv droite winner fond','fond','ADV D · Fond','ADV droite']
   ];
   const groupedActions=(result==='GAGNE'?optionsWon:optionsLost).reduce((acc,item)=>{const group=item[4]||'Actions';(acc[group]||(acc[group]=[])).push(item);return acc;},{});
-  const shotButtons=Object.entries(groupedActions).map(([group,items])=>`<div class="match-action-group"><div class="match-action-group-title">${esc(group)}</div><div class="match-live-options">${items.map(([origin,cause,phase,label,,forced])=>`<button class="match-live-mini ${result==='GAGNE'?'won':'lost'}" onclick="addMatchPoint('${result}','${origin}','${jsStr(cause)}','${jsStr(phase)}',${forced?'true':'false'})">${esc(label)}</button>`).join('')}</div></div>`).join('');
-  return `<div class="match-direct-side ${result==='GAGNE'?'won':'lost'}">
-    <div class="match-direct-title"><div><span>1 CLIC = SCORE + ANALYSE</span><h3>${result==='GAGNE'?'POINT GAGNÉ HWBT':'POINT PERDU HWBT'}</h3></div><span>${result==='GAGNE'?'+' : '−'}</span></div>
+  const shotButtons=Object.entries(groupedActions).map(([group,items])=>`<div class="match-action-group"><div class="match-action-group-title">${esc(group)}</div><div class="match-live-options">${items.map(([origin,cause,phase,label])=>`<button class="match-live-mini ${result==='GAGNE'?'won':'lost'}" onclick="addMatchPoint('${result}','${origin}','${jsStr(cause)}','${jsStr(phase)}')">${esc(label)}</button>`).join('')}</div></div>`).join('');
+  return `<div class="card" style="border-color:${result==='GAGNE'?'var(--bronze-dim2)':'var(--border2)'}">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px">
+      <div><div class="card-title">ÉTAPE 2 · ${result==='GAGNE'?'COMMENT LE POINT EST GAGNÉ ?':'COMMENT LE POINT EST PERDU ?'}</div><div class="muted-help">Choisis l’action principale. Le score avance immédiatement, puis le détail facultatif apparaît.</div></div>
+      <button class="btn btn-ghost btn-sm" onclick="setMatchPointResult(null)">CHANGER GAGNÉ / PERDU</button>
+    </div>
     <div class="match-action-groups">${shotButtons}</div>
   </div>`;
 }
@@ -7433,7 +7429,7 @@ function updateMatchEncoder(m,parts={}){
   if(document.getElementById('matchFollowScoreZone')) document.getElementById('matchFollowScoreZone').innerHTML=matchMetricCard('Score suivi',m.currentScore||m.score||'0-0');
   if(document.getElementById('matchFollowBalanceZone')) document.getElementById('matchFollowBalanceZone').innerHTML=matchMetricCard('Bilan live',`${a.matchSummary.won}-${a.matchSummary.lost}`,`${a.matchSummary.totalPoints} points encodés`);
 }
-function addMatchPoint(result,origin,causePreset='',phasePreset='',forcedPreset=false){
+function addMatchPoint(result,origin,causePreset='',phasePreset=''){
   const m=currentMatchForEncoding();
   if(!m){showNotif('Crée d’abord un vrai match');return;}
   const scoreState=ensureMatchScore(m);
@@ -7453,9 +7449,12 @@ function addMatchPoint(result,origin,causePreset='',phasePreset='',forcedPreset=
   const cause=causePreset||document.getElementById('matchPointCause')?.value||'';
   const server=update.prev.server||document.getElementById('matchServingTeamInput')?.value||'J1';
   const importance=computePointImportance(m,update.prev);
-  const point={type:'POINT',id:`m${m.id}-p${pointNumber}`,seq:pointNumber,t:Math.round((now-start)/1000),result,origin,score:update.score,prevScore:update.prev.display,prevMatchScore:update.prev,gameWon:update.gameWon,gameScore:update.gameScore,pointScore:update.pointScore,server,serverLabel:matchServerLabel(m,server),superTieBreak:update.superTieBreak||false,tieBreak:update.tieBreak||false,importance:importance.types,importanceFor:importance.importanceFor,phase,cause,baseCause:cause,forced:!!forcedPreset,createdAt:new Date().toISOString()};
+  const point={type:'POINT',id:`m${m.id}-p${pointNumber}`,seq:pointNumber,t:Math.round((now-start)/1000),result,origin,score:update.score,prevScore:update.prev.display,prevMatchScore:update.prev,gameWon:update.gameWon,gameScore:update.gameScore,pointScore:update.pointScore,server,serverLabel:matchServerLabel(m,server),superTieBreak:update.superTieBreak||false,tieBreak:update.tieBreak||false,importance:importance.types,importanceFor:importance.importanceFor,phase,cause,baseCause:cause,detail:'',createdAt:new Date().toISOString()};
   events.push(point);
   if(document.getElementById('matchPointScore')) document.getElementById('matchPointScore').value='';
+  UI.matchPointResult=null;
+  const skipRefine=/^service/i.test(String(phase||''))||result==='PERDU'&&/double faute/i.test(String(cause||''));
+  UI.matchRefinePointId=skipRefine?null:point.id;
   saveStateDebounced();
   updateMatchEncoder(m,{scoreboard:true,actions:true,stats:true,points:true});
   if(update.matchFinished||scoreState.matchWinner) showNotif(`Match terminé · vainqueur ${scoreState.matchWinner||update.gameWon}`);
@@ -7508,6 +7507,12 @@ function refineMatchPoint(pointId,detail){
   saveStateDebounced();
   updateMatchEncoder(m,{actions:true,stats:true,points:true});
 }
+function clearMatchPointRefine(){
+  UI.matchRefinePointId=null;
+  const m=currentMatchForEncoding();
+  if(m) updateMatchEncoder(m,{actions:true});
+  else render();
+}
 function toggleMatchScoreCorrection(){
   UI.matchScoreCorrectionOpen=!UI.matchScoreCorrectionOpen;
   render();
@@ -7527,6 +7532,19 @@ function markLastMatchPointStar(){
   saveStateDebounced();
   updateMatchEncoder(m,{actions:true,stats:true,points:true});
   showNotif(p.starPoint?'Star point ajouté':'Star point retiré');
+}
+function matchRefineHtml(m,events){
+  if(!UI.matchRefinePointId)return '';
+  const point=events.find(e=>String(e.id)===String(UI.matchRefinePointId));
+  if(!point)return '';
+  const opts=matchRefineOptions(point);
+  return `<div class="card" style="border-color:var(--bronze-dim2);padding:14px">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+      <div><div class="card-title">ÉTAPE 3 · DÉTAIL DE LA FRAPPE</div><div style="font-size:13px;color:var(--white);font-weight:800">${esc(point.result)} · ${esc(matchOriginLabel(m,point.origin))} · ${esc(point.baseCause||point.cause||'point')}</div><div class="muted-help" style="margin-top:4px">Choisis le détail si tu l’as vu. Cette étape affine l’analyse mais ne bloque jamais l’encodage du point suivant.</div></div>
+      <button class="btn btn-ghost btn-sm" onclick="clearMatchPointRefine()">PASSER LE DÉTAIL</button>
+    </div>
+    <div class="match-live-options" style="margin-top:12px">${opts.map(o=>`<button class="match-live-mini ${point.result==='GAGNE'?'won':'lost'}" onclick="refineMatchPoint('${point.id}','${jsStr(o)}')">${esc(o)}</button>`).join('')}</div>
+  </div>`;
 }
 function matchLiveStatsHtml(m,a,events){
   const recent=events.slice(-8);
@@ -7571,6 +7589,8 @@ function undoLastMatchPoint(){
       if(events[i].prevMatchScore) m.matchScore={...events[i].prevMatchScore};
       m.currentScore=events[i].prevScore||matchDisplayScore(m);
       m.score=m.currentScore;
+      UI.matchPointResult=null;
+      UI.matchRefinePointId=null;
       saveStateDebounced();
       updateMatchEncoder(m,{scoreboard:true,actions:true,stats:true,points:true});
       showNotif('Dernier point annulé');return;
@@ -7998,12 +8018,23 @@ function matchScoreboardInnerHtml(m,scoreState,events){
 }
 function matchActionsInnerHtml(m,events){
   const scoreState=ensureMatchScore(m);
+  const pending=UI.matchPointResult||null;
+  const refining=!!UI.matchRefinePointId;
   const a=analyserMatch(m.events||m.journal||m.eventLog||[],m);
   const topo=liveMatchCoachTopo(m,a);
   return `<div>
+    <div class="match-encode-steps">
+      <div class="match-encode-step ${!pending&&!refining?'active':pending||refining?'done':''}">1 · GAGNÉ / PERDU</div>
+      <div class="match-encode-step ${pending?'active':refining?'done':''}">2 · ACTION</div>
+      <div class="match-encode-step ${refining?'active':''}">3 · DÉTAIL</div>
+    </div>
+    <div class="match-live-grid">
+      <button class="match-live-main won ${pending==='GAGNE'?'active':''}" onclick="setMatchPointResult('GAGNE')"><span>POINT GAGNÉ HWBT</span><b>1 · Choisir ensuite l’action</b></button>
+      <button class="match-live-main lost ${pending==='PERDU'?'active':''}" onclick="setMatchPointResult('PERDU')"><span>POINT PERDU HWBT</span><b>1 · Choisir ensuite l’action</b></button>
+    </div>
     ${!scoreState.server?`<div class="card" style="border-color:var(--rouge);padding:12px"><div class="card-title">SERVEUR À DÉFINIR</div><div class="muted-help">Choisis le serveur actuel puis clique <b>VALIDER SERVEUR</b>. Ce bouton ne touche jamais au score.</div></div>`:''}
-    <div class="card" style="padding:11px 13px;border-color:var(--bronze-dim2)"><div class="card-title">ENCODAGE DIRECT SUR UN SEUL ÉCRAN</div><div class="muted-help"><b>Un seul clic par point:</b> résultat, responsable et famille de frappe sont enregistrés ensemble. Le score, le serveur et l’importance du point sont calculés automatiquement. Les précisions très fines restent disponibles après le match dans <b>Enrichir le match</b>, pour ne pas ralentir le live.</div></div>
-    <div class="match-direct-encode">${matchActionChoiceHtml(m,'GAGNE')}${matchActionChoiceHtml(m,'PERDU')}</div>
+    ${pending?matchActionChoiceHtml(m,pending):''}
+    ${matchRefineHtml(m,events)}
     <div class="match-live-advice">
       <div class="match-live-coach-plan">
         <div class="card-title">CONSEIL COACH LIVE · ${esc(topo.status)}</div>
